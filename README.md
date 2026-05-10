@@ -28,6 +28,16 @@ This skill wraps the entire cleanup into a single safe command. It inspects befo
 
 [Full docs →](git-clean-merged-branch/README.md)
 
+### [triage-review-comments](triage-review-comments/README.md)
+
+> *"Stop manually sorting PR feedback. Let the skill classify it for you."*
+
+I built this because every time I submitted a PR and the reviews came back, I'd spend time manually reading through each comment, figuring out what was a real blocker versus noise, and deciding what to do about it. CodeRabbit, Cursor, and human reviewers all produce different formats and different signal-to-noise ratios — and I was doing the same triage dance every time. I realized I didn't actually have to.
+
+This skill loads the full PR review context, builds a complete inventory, deduplicates by underlying issue, classifies everything into four buckets, resolves fixed inline threads on GitHub, tracks real deferred work in Linear, and recommends prevention tests so the same issues don't come back.
+
+[Full docs →](triage-review-comments/README.md)
+
 ---
 
 ## Quick start
@@ -63,6 +73,12 @@ git-clean-merged-branch/
   README.md       — full documentation
   agents/         — agent metadata
   scripts/        — the cleanup script
+
+triage-review-comments/
+  SKILL.md        — the skill Codex loads
+  README.md       — full documentation
+  agents/         — agent metadata
+  references/     — fuller triage guidance
 ```
 
 ---
