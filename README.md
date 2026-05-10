@@ -18,6 +18,16 @@ This skill saves me up to **20% of my limits** by routing broad search, routine 
 
 [Full docs →](codex-budget-router/README.md)
 
+### [git-clean-merged-branch](git-clean-merged-branch/README.md)
+
+> *"Stop babysitting git. One command, done."*
+
+I built this because I was fed up with the repetitive chore of cleaning up local branches after they'd been merged on GitHub. Fetch, switch, pull, delete — the same four commands every time, and I'd still occasionally delete the wrong branch. I found it boring, so I automated it.
+
+This skill wraps the entire cleanup into a single safe command. It inspects before acting, refuses to run on a dirty worktree, resolves the actual default branch, and handles edge cases like squash-merge detection — all without `git reset --hard` or any other broad destructive command.
+
+[Full docs →](git-clean-merged-branch/README.md)
+
 ---
 
 ## Quick start
@@ -37,7 +47,7 @@ Then restart Codex. Each skill's README has detailed install and usage instructi
 
 ## Layout
 
-Each skill lives in its own folder with a `SKILL.md`, agent profiles, references, scripts, and tests.
+Each skill lives in its own folder with a `SKILL.md`, agent profiles, scripts, and optional references and tests.
 
 ```text
 codex-budget-router/
@@ -47,6 +57,12 @@ codex-budget-router/
   references/     — workflows, prompts, fallback
   scripts/        — installer, audit tool
   tests/          — tests for the audit script
+
+git-clean-merged-branch/
+  SKILL.md        — the skill Codex loads
+  README.md       — full documentation
+  agents/         — agent metadata
+  scripts/        — the cleanup script
 ```
 
 ---

@@ -2,6 +2,8 @@
 .DS_Store
 
 # Personal/local instructions and handovers
+CLAUDE.md
+**/CLAUDE.md
 AGENTS.md
 **/AGENTS.md
 handover.md
