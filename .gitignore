@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# Personal/local instructions and handovers
+AGENTS.md
+**/AGENTS.md
+handover.md
+**/handover.md
+*handover*.md
+**/*handover*.md
+*.local.md
+**/*.local.md
+
+# Local Codex/agent artifacts
+.codex-local/
+**/.codex-local/
+.codex/
+**/.codex/
+.cursor/
+**/.cursor/
+.claude/
+**/.claude/
+.omc/
+**/.omc/
+private/
+**/private/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.mobileprovision
+
+# Build/cache output
+__pycache__/
+*.pyc
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+coverage/
