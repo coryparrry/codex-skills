@@ -75,4 +75,4 @@ If no issues are found, say that clearly and list what was checked, what was not
 - `references/ai-generated-code-failure-patterns.md` lists the AI-code review calibration patterns.
 - `references/repository-official-sources.md` gives official-source starting points for TypeScript, Node.js, Python, testing, and security.
 - `assets/templates/` contains the report and coverage matrix templates.
-- `agents/` contains Codex TOML profiles for reviewers, consolidators, and bounded fixers.
+- `agents/` contains Codex TOML profiles for reviewers and consolidators.

@@ -1,6 +1,6 @@
 # Repository Official Source Starting Points
 
-These are starting points only. The selected reviewer/fixer must check the exact package version and official docs relevant to the changed code, then record what was checked in the report or validation summary.
+These are starting points only. The selected reviewer must check the exact package version and official docs relevant to the changed code, then record what was checked in the report or review summary.
 
 ## TypeScript
 

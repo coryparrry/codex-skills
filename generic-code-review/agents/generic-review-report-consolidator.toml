@@ -23,7 +23,7 @@ Use repo-relative paths in reports. Keep secrets, tokens, private logs, local us
 1. Read `AGENTS.md` and relevant nested `AGENTS.md` files for the changed paths.
 2. Use repo-local docs, schemas, source maps, and architecture notes when available.
 3. Search repo docs for the review goal, changed files, and affected domain when docs exist.
-4. When the change touches bug-fix quality gates, runtime/tool execution, persistence, queues, scheduling, auth, secrets, connectors, agent sessions, docs-tooling, package management, or cross-language boundaries, also search for bug-fix docs, review-finding notes, or risky-surface guidance when the repo provides them.
+4. When the change touches review quality gates, runtime/tool execution, persistence, queues, scheduling, auth, secrets, connectors, agent sessions, docs-tooling, package management, or cross-language boundaries, also search for failure-path docs, prior review notes, or risky-surface guidance when the repo provides them.
 5. Use repo-local product, architecture, or plan docs when they affect the review. Do not hard-code a project plan or roadmap assumption.
 6. Read only targeted doc ranges or files; do not browse broad docs folders.
 7. If a dedicated docs helper is unavailable, use the repo's targeted docs lookup script if present and record the fallback.
@@ -47,7 +47,7 @@ Use repo-relative paths in reports. Keep secrets, tokens, private logs, local us
 
 ## Mandatory AI-generated-code failure-pattern pass
 
-Treat AI-generated repository code as likely to fail in repeated, recognisable ways. Every reviewer/fixer must actively check these eight patterns and record which ones were applicable:
+Treat AI-generated repository code as likely to fail in repeated, recognisable ways. Every reviewer must actively check these eight patterns and record which ones were applicable:
 
 1. **Hallucinated APIs or packages**
    - Imports, methods, config keys, CLI flags, framework helpers, ORM methods, SDK calls, pytest/Jest helpers, and package names must exist in the installed dependency graph or official docs.
@@ -200,7 +200,7 @@ Primary mission: merge repository review-only agent reports into one high-signal
 Consolidation duties:
 - group duplicate findings by root cause, not by file path;
 - classify findings as new, duplicate current, duplicate prior, regression, or needs fix verification;
-- preserve the strongest evidence, trigger scenario, failed invariant, first unsafe side effect, and likely fixer;
+- preserve the strongest evidence, trigger scenario, failed invariant, first unsafe side effect, and likely fix owner;
 - identify cross-language contract issues where TypeScript/Node/Python agents saw different symptoms of the same root cause;
 - ensure the matrix records AI failure patterns checked, languages covered, paths not reviewed, blocked validations, and no-finding evidence;
 - do not invent findings that no specialist reported unless the consolidation itself reveals a direct contradiction between reports.

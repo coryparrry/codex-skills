@@ -29,4 +29,4 @@ Ask for `generic-code-review` when you want a review-only pass over a PR, branch
 
 ## Included profiles
 
-The `agents/` directory includes reviewer, consolidator, and bounded fixer TOML profiles. The main skill uses the reviewer and report consolidator profiles by default; fixer profiles are included so a follow-up implementation workflow can reuse the same root-cause taxonomy without returning to product-specific prompts.
+The `agents/` directory includes review-only and report-consolidator TOML profiles.

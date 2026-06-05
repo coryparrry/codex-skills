@@ -65,7 +65,7 @@ When a finding needs implementation, include:
 - failed invariant;
 - trigger scenario;
 - first unsafe side effect;
-- primary fixer recommendation;
+- suggested fix direction;
 - owned files/tests/helpers;
 - prevention test or validation evidence needed;
 - prior-review status.
