@@ -25,7 +25,7 @@ Treat those as shorthand for: fetch GitHub, update the default branch, and remov
 - Use fast-forward-only pulls for the default branch.
 - Delete the local branch only after switching away from it.
 - Prefer safe branch deletion with `git branch -d`.
-- If safe deletion fails because GitHub used squash or rebase merge, verify the merged GitHub PR and compare the PR diff against the merge commit diff before deleting the local branch with `git branch -D`.
+- If safe deletion fails because GitHub used squash or rebase merge, verify the merged GitHub PR and compare the branch diff against the merged PR diff before deleting the local branch with `git branch -D`.
 - Use forced branch deletion without merge verification only when the user has clearly said the branch is merged or no longer needed, and after the repo is clean and the default branch is updated.
 - Delete the old remote branch after local cleanup succeeds; use `--keep-remote` only when the user explicitly asks to preserve it.
 - Never run `git reset --hard`, `git clean`, or other broad destructive cleanup for this workflow.
@@ -78,7 +78,7 @@ Tell the user:
 - which branch was cleaned up
 - which default branch was updated
 - whether the old local branch was deleted
-- whether deletion used squash-merge verification
+- whether deletion used merge diff verification
 - whether the old remote branch was deleted
 - whether the final repo state is clean
 - any action still needed if cleanup stopped

@@ -27,8 +27,8 @@ Safely switch a Git repo back to its default branch, pull latest changes,
 and delete the branch that was active when the script started.
 
 By default, if safe deletion fails, the script checks GitHub for a merged PR
-from the starting branch and verifies the branch diff equals the merge commit
-diff before deleting the local branch with git branch -D.
+from the starting branch and verifies the branch diff equals the merged PR diff
+before deleting the local branch with git branch -D.
 
 Use --force-delete-unmerged only when the user has clearly said the branch has
 already been merged or is no longer needed, even if squash-merge verification is
@@ -65,8 +65,8 @@ verify_squash_merged_branch() {
       --state merged \
       --head "$branch" \
       --limit 1 \
-      --json number,url,mergedAt,mergeCommit \
-      --jq '.[] | [.number, .url, .mergedAt, (.mergeCommit.oid // "")] | @tsv' 2>/dev/null || true
+      --json number,url,mergedAt,mergeCommit,commits \
+      --jq '.[] | [.number, .url, .mergedAt, (.mergeCommit.oid // ""), ((.commits // []) | length)] | @tsv' 2>/dev/null || true
   )"
 
   if [[ -z "$pr_info" ]]; then
@@ -74,11 +74,16 @@ verify_squash_merged_branch() {
     return 1
   fi
 
-  local pr_number pr_url merged_at merge_oid
-  IFS=$'\t' read -r pr_number pr_url merged_at merge_oid <<< "$pr_info"
+  local pr_number pr_url merged_at merge_oid commit_count
+  IFS=$'\t' read -r pr_number pr_url merged_at merge_oid commit_count <<< "$pr_info"
 
   if [[ -z "$merge_oid" ]]; then
     echo "Squash-merge verification failed: merged PR #$pr_number has no merge commit OID." >&2
+    return 1
+  fi
+
+  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt 1 ]]; then
+    echo "Squash-merge verification failed: merged PR #$pr_number has no commit count." >&2
     return 1
   fi
 
@@ -89,29 +94,42 @@ verify_squash_merged_branch() {
   fi
 
   local branch_patch_id merge_patch_id
-  if ! branch_patch_id="$(git diff --full-index "$merge_parent...$branch" | git patch-id --stable | awk '{print $1}')"; then
-    echo "Squash-merge verification failed: could not compute patch-id for '$branch'." >&2
-    return 1
+  local matched_shape=""
+  local candidates=("$merge_parent:squash")
+
+  if [[ "$commit_count" -gt 1 ]]; then
+    local rebase_base
+    if rebase_base="$(git rev-parse "$merge_oid~$commit_count" 2>/dev/null)"; then
+      candidates+=("$rebase_base:rebase")
+    fi
   fi
 
-  if ! merge_patch_id="$(git diff --full-index "$merge_parent" "$merge_oid" | git patch-id --stable | awk '{print $1}')"; then
-    echo "Squash-merge verification failed: could not compute patch-id for merge commit '$merge_oid'." >&2
-    return 1
-  fi
+  local candidate candidate_base candidate_shape
+  for candidate in "${candidates[@]}"; do
+    candidate_base="${candidate%%:*}"
+    candidate_shape="${candidate##*:}"
 
-  if [[ -z "$branch_patch_id" || -z "$merge_patch_id" ]]; then
-    echo "Squash-merge verification failed: branch or merge diff was empty." >&2
-    echo "PR: $pr_url" >&2
-    return 1
-  fi
+    if ! branch_patch_id="$(git diff --full-index "$candidate_base...$branch" | git patch-id --stable | awk '{print $1}')"; then
+      continue
+    fi
 
-  if [[ "$branch_patch_id" != "$merge_patch_id" ]]; then
+    if ! merge_patch_id="$(git diff --full-index "$candidate_base" "$merge_oid" | git patch-id --stable | awk '{print $1}')"; then
+      continue
+    fi
+
+    if [[ -n "$branch_patch_id" && "$branch_patch_id" == "$merge_patch_id" ]]; then
+      matched_shape="$candidate_shape"
+      break
+    fi
+  done
+
+  if [[ -z "$matched_shape" ]]; then
     echo "Squash-merge verification failed: branch diff does not match merged PR #$pr_number." >&2
     echo "PR: $pr_url" >&2
     return 1
   fi
 
-  echo "Verified squash-merged branch: '$branch' diff matches merged PR #$pr_number from $merged_at."
+  echo "Verified ${matched_shape}-merged branch: '$branch' diff matches merged PR #$pr_number from $merged_at."
   echo "PR: $pr_url"
   return 0
 }
@@ -172,7 +190,7 @@ if [[ "$start_branch" != "$default_branch" ]]; then
       deleted_branch=true
     elif [[ "$verify_squash_merge" == true ]] && verify_squash_merged_branch "$start_branch"; then
       verified_squash_merge=true
-      echo "Safe deletion failed because Git ancestry does not include the branch, but squash-merge diff verification passed."
+      echo "Safe deletion failed because Git ancestry does not include the branch, but merge diff verification passed."
       run git branch -D "$start_branch"
       deleted_branch=true
     elif [[ "$force_delete_unmerged" == true ]]; then
@@ -215,7 +233,7 @@ if [[ "$start_branch" == "$default_branch" ]]; then
 elif [[ "$deleted_branch" == true ]]; then
   echo "Deleted old local branch: $start_branch"
   if [[ "$verified_squash_merge" == true ]]; then
-    echo "Deletion used verified squash-merge diff equality."
+    echo "Deletion used verified merge diff equality."
   fi
 else
   echo "Old local branch was already absent: $start_branch"
