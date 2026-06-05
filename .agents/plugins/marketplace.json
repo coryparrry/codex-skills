@@ -1,0 +1,20 @@
+{
+  "name": "codex-skills",
+  "interface": {
+    "displayName": "Personal Codex Skills"
+  },
+  "plugins": [
+    {
+      "name": "personal-codex-skills",
+      "source": {
+        "source": "local",
+        "path": "./plugins/personal-codex-skills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Development"
+    }
+  ]
+}

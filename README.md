@@ -10,11 +10,13 @@ A personal collection of Codex skills I've built to solve real problems in my da
 
 > *"Spend your strongest Codex model on judgment, not file searching."*
 
+**Deprecated / needs update:** this skill still depends on removed GPT-5.3 Codex model routes and should not be used as-is until its routing table and agent profiles are refreshed.
+
 I built this because I kept hitting my Codex limits halfway through real work. The root model was burning through expensive credits on repo scans, log triage, and routine test fixes — work cheaper models could handle just fine. Worse, my Spark limits sat completely unused because there was no safe way to route work to them.
 
-This skill saves me up to **20% of my limits** by routing broad search, routine implementation, tests, and bounded review to cheaper workers while keeping architecture and final judgment with the root model.
+This skill used to save me up to **20% of my limits** by routing broad search, routine implementation, tests, and bounded review to cheaper workers while keeping architecture and final judgment with the root model. It needs a current model refresh before it is useful again.
 
-**Six worker profiles** cover the full spectrum: cheap mapping and research (gpt-5.4-mini), Spark-first routine implementation (gpt-5.3-codex-spark), bounded non-trivial work (gpt-5.3-codex), and mid-tier review and debugging (gpt-5.4).
+**Six worker profiles** cover the historical routing spectrum, but the GPT-5.3 Codex profiles are now stale.
 
 [Full docs →](codex-budget-router/README.md)
 
@@ -42,8 +44,33 @@ This skill loads the full PR review context, builds a complete inventory, dedupl
 
 ## Quick start
 
+### Plugin marketplace install
+
+The recommended install path is the Codex plugin marketplace flow. In the Codex app, open Settings -> Plugins, choose the option to add another marketplace source, and paste this repository URL:
+
+```text
+https://github.com/coryparrry/codex-skills.git
+```
+
+Codex can then install the `personal-codex-skills` plugin from that marketplace source and keep it updated from the Git repo.
+
+CLI equivalent:
+
 ```bash
-git clone https://github.com/<your-org>/codex-skills.git
+codex plugin marketplace add \
+  'https://github.com/coryparrry/codex-skills.git' \
+  --ref 'main' \
+  --sparse '.agents/plugins' \
+  --sparse 'plugins'
+
+codex plugin list --marketplace codex-skills
+codex plugin add personal-codex-skills --marketplace codex-skills
+```
+
+### Manual skill install
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
 
 # Install a skill
@@ -61,7 +88,7 @@ Each skill lives in its own folder with a `SKILL.md`, agent profiles, scripts, a
 
 ```text
 codex-budget-router/
-  SKILL.md        — the skill Codex loads
+  SKILL.md        — deprecated routing skill
   README.md       — full documentation
   agents/         — worker TOML profiles
   references/     — workflows, prompts, fallback
@@ -79,6 +106,13 @@ triage-review-comments/
   README.md       — full documentation
   agents/         — agent metadata
   references/     — fuller triage guidance
+
+plugins/personal-codex-skills/
+  .codex-plugin/  — plugin manifest
+  skills/         — bundled installable copies of the skills
+
+.agents/plugins/
+  marketplace.json — repository marketplace manifest
 ```
 
 ---
