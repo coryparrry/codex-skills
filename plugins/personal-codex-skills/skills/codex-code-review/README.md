@@ -17,8 +17,9 @@ This skill was adapted from a private product-specific review workflow, with pri
 Copy the skill folder into your Codex skills directory, then install the agent profiles:
 
 ```bash
-cp -R codex-code-review ~/.agents/skills/codex-code-review
-codex-code-review/scripts/install-agent-profiles.sh
+mkdir -p ~/.codex/skills
+cp -R codex-code-review ~/.codex/skills/codex-code-review
+~/.codex/skills/codex-code-review/scripts/install-agent-profiles.sh
 ```
 
 Restart Codex after installing profiles.
