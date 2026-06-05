@@ -15,7 +15,7 @@ This skill wraps the entire cleanup into a single command. It inspects before it
 - Switches to the default branch
 - Fast-forward-only pulls to avoid surprise merges
 - Safely deletes the old local branch (`git branch -d`)
-- Verifies squash-merged branches against the merged GitHub PR before forced local deletion
+- Verifies squash-merged branches by comparing the branch diff to the merged GitHub PR before forced local deletion
 - Deletes the old remote branch by default after local cleanup succeeds
 - Shows the final repo status so you can confirm everything is clean
 
@@ -94,7 +94,7 @@ git-clean-merged-branch
 
 ### Force-delete after squash/rebase merge
 
-If GitHub used squash or rebase merge, `git branch -d` will refuse because the commits don't match. The script tries to verify a merged GitHub PR and matching tree before force-deleting locally. If GitHub verification is unavailable and you know the branch has already been merged and is no longer needed:
+If GitHub used squash or rebase merge, `git branch -d` will refuse because the commits don't match. The script tries to verify a merged GitHub PR and matching diff before force-deleting locally. If GitHub verification is unavailable and you know the branch has already been merged and is no longer needed:
 
 ```bash
 bash ~/.codex/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh --force-delete-unmerged
