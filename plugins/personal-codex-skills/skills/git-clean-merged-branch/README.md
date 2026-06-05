@@ -16,6 +16,7 @@ This skill wraps the entire cleanup into a single command. It inspects before it
 - Fast-forward-only pulls to avoid surprise merges
 - Safely deletes the old local branch (`git branch -d`)
 - Verifies squash-merged branches by comparing the branch diff to the merged GitHub PR before forced local deletion
+- Verifies the fetched remote branch tip before deleting the old remote branch
 - Deletes the old remote branch by default after local cleanup succeeds
 - Shows the final repo status so you can confirm everything is clean
 
@@ -25,6 +26,7 @@ This skill wraps the entire cleanup into a single command. It inspects before it
 - Run `git reset --hard`, `git clean`, or any other broad destructive command
 - Delete branches that git considers unmerged (unless you explicitly pass `--force-delete-unmerged`)
 - Preserve the old remote branch unless you pass `--keep-remote`
+- Delete a remote branch whose fetched tip has unverified commits
 - Work outside a git repo or without an `origin` remote
 
 ## How it works
