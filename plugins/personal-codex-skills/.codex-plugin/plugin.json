@@ -1,7 +1,7 @@
 {
   "name": "personal-codex-skills",
   "version": "0.3.0",
-  "description": "Reusable Codex workflow skills for generic code review, review triage, branch cleanup, and historical budget routing.",
+  "description": "Reusable Codex workflow skills for Codex Code Review, review triage, branch cleanup, and historical budget routing.",
   "author": {
     "name": "Cory Parry"
   },
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Personal Codex Skills",
-    "shortDescription": "Workflow skills for generic code review, PR triage, branch cleanup, and historical budget routing.",
-    "longDescription": "A bundle of reusable Codex skills for generic multi-lens code review, triaging review comments, cleaning up merged Git branches, and preserving the deprecated Codex budget router as a historical reference.",
+    "shortDescription": "Workflow skills for Codex Code Review, PR triage, branch cleanup, and historical budget routing.",
+    "longDescription": "A bundle of reusable Codex skills for Codex Code Review, triaging review comments, cleaning up merged Git branches, and preserving the deprecated Codex budget router as a historical reference.",
     "developerName": "Cory Parry",
     "category": "Development",
     "capabilities": [
@@ -28,7 +28,7 @@
     ],
     "websiteURL": "https://github.com/coryparrry/codex-skills",
     "defaultPrompt": [
-      "Use generic-code-review to run a repository-local multi-lens code review.",
+      "Use codex-code-review to run a repository-local multi-lens code review.",
       "Use triage-review-comments to inventory and classify current PR feedback.",
       "Use git-clean-merged-branch to safely clean up a merged local branch."
     ],

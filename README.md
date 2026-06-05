@@ -6,15 +6,15 @@ A personal collection of Codex skills I've built to solve real problems in my da
 
 ## Skills
 
-### [generic-code-review](generic-code-review/README.md)
+### [codex-code-review](codex-code-review/README.md)
 
 > *"Run a serious review without dragging private project assumptions into the next repo."*
 
-This skill is a genericized version of a product-specific code-review workflow. It keeps the useful parts: specialist review lanes, coverage matrices, AI-generated-code failure-pattern calibration, and report consolidation. It removes private product names, private paths, product-specific docs tooling, and phase assumptions.
+Codex Code Review is a reusable version of a product-specific code-review workflow. It keeps the useful parts: specialist review lanes, coverage matrices, AI-generated-code failure-pattern calibration, and report consolidation. It removes private product names, private paths, product-specific docs tooling, and phase assumptions.
 
 Reports are written inside the reviewed repository under `.codex/code-review-reports/`, and the skill includes Codex TOML profiles for reviewer and consolidator agents.
 
-[Full docs →](generic-code-review/README.md)
+[Full docs →](codex-code-review/README.md)
 
 ### [codex-budget-router](codex-budget-router/README.md)
 
@@ -117,8 +117,8 @@ triage-review-comments/
   agents/         — agent metadata
   references/     — fuller triage guidance
 
-generic-code-review/
-  SKILL.md        — generic review router
+codex-code-review/
+  SKILL.md        — Codex Code Review router
   README.md       — full documentation
   agents/         — reviewer and consolidator TOML profiles
   references/     — workflow and calibration references
