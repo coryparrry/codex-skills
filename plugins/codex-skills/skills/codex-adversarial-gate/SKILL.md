@@ -1,15 +1,15 @@
 ---
 name: codex-adversarial-gate
-description: Use when running ce-work, closing implementation phases/slices, auditing completion claims, or reviewing/updating Codex plans. Blocks completion with adversarial reviewer-plus-critic gates until evidence, dissent handling, validation, and docs/Adversarial Reviews archival pass.
+description: Use when closing implementation phases/slices, auditing completion claims, or reviewing/updating Codex plans. Blocks completion with adversarial reviewer-plus-critic gates until evidence, dissent handling, validation, and docs/Adversarial Reviews archival pass.
 ---
 
 # Codex Adversarial Gate
 
 Use this skill to prevent Codex from marking implementation work complete just because the implementing thread is confident.
 
-Default to implementation closeout when this skill is used with `ce-work` or other implementation work. Plan review still exists for drafting or updating plans, but routine implementation should spend budget on completion review and archival, not on re-litigating an accepted plan.
+Default to implementation closeout for implementation work. Plan review still exists for drafting or updating plans, but routine implementation should spend budget on completion review and archival, not on re-litigating an accepted plan.
 
-When this skill is active with `ce-work`, it is a slice-boundary gate, not a final closeout add-on. Loading the skill, keeping a pending reminder, or saying the gate will happen later does not count as using it. Each reviewable phase, U-slice, checkpoint, or grouped implementation unit must stop at its completion boundary until the completion reviewer and critic outputs are archived.
+When this skill is active for implementation work, it is a slice-boundary gate, not a final closeout add-on. Loading the skill, keeping a pending reminder, or saying the gate will happen later does not count as using it. Each reviewable phase, U-slice, checkpoint, or grouped implementation unit must stop at its completion boundary until the completion reviewer and critic outputs are archived.
 
 ## Routing
 
@@ -29,7 +29,7 @@ A reviewable phase/slice is any named implementation unit in the active plan, ta
 
 - For all uses, read `references/protocol-rules.md`.
 - For plan drafting or plan updates, read `references/plan-review-workflow.md`, `references/plan-phase-score-rubric.md`, and `templates/plan-adversarial-review-section.md`.
-- For implementation closeout, especially with `ce-work`, read `references/completion-review-workflow.md`, `references/task-completion-gate-rubric.md`, `references/review-archive.md`, and `templates/task-completion-gate-block.md`.
+- For implementation closeout, read `references/completion-review-workflow.md`, `references/task-completion-gate-rubric.md`, `references/review-archive.md`, and `templates/task-completion-gate-block.md`.
 - If the custom agents are unavailable but an independent reviewer context exists, read `references/reviewer-prompts.md`.
 - Use `scripts/archive_adversarial_review.py` to archive exact review outputs when Python 3 is available. If it is unavailable, follow `references/review-archive.md` manually.
 
