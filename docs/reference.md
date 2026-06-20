@@ -17,7 +17,6 @@ This reference describes the files, install paths, scripts, custom agents, and v
   skills.sh.json
   skills/
     codex-adversarial-gate/
-    codex-code-review/
     git-clean-merged-branch/
     triage-review-comments/
 ```
@@ -41,7 +40,7 @@ The manifest exposes the lightweight copied skill folders under `plugins/codex-s
 | Config path | `skills.sh.json` |
 | Repo page | `https://skills.sh/coryparrry/codex-skills` |
 | Badge | `https://skills.sh/b/coryparrry/codex-skills` |
-| Groups | `Review Gates`, `Review Workflows`, `Git Workflow` |
+| Groups | `Review Gates`, `PR Review`, `Git Workflow` |
 
 The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service.
 
@@ -72,14 +71,13 @@ It contains one plugin entry:
 
 Use the Codex app to add this repo as a marketplace source, then install **Codex Skills** from that marketplace.
 
-Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash skills/codex-adversarial-gate/scripts/install.sh` when those agents are needed. Use skills.sh or manual install for `codex-code-review`.
+Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash skills/codex-adversarial-gate/scripts/install.sh` when those agents are needed.
 
 ## Skills
 
 | Skill | Purpose | Main files |
 |---|---|---|
 | `codex-adversarial-gate` | Gate plan and implementation closeout with reviewer-plus-critic evidence | `SKILL.md`, `agents/`, `references/`, `scripts/`, `templates/` |
-| `codex-code-review` | Run repository-local multi-lens code review | `SKILL.md`, `agents/`, `assets/`, `references/`, `scripts/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/clean_merged_branch.sh` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/triage-review-comments.md` |
 
@@ -90,7 +88,7 @@ Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`,
 | Skills | `${CODEX_HOME:-$HOME/.codex}/skills/<skill-name>/` |
 | Codex agents | `${CODEX_HOME:-$HOME/.codex}/agents/` |
 
-`codex-adversarial-gate` and `codex-code-review` need files in both locations. The two utility skills need only their skill folder.
+`codex-adversarial-gate` needs files in both locations. The two utility skills need only their skill folder.
 
 ## Repo-Level Scripts
 
@@ -106,7 +104,6 @@ Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`,
 | `skills/codex-adversarial-gate/scripts/install.sh` | Copies the adversarial gate skill and custom agents into Codex |
 | `skills/codex-adversarial-gate/scripts/archive_adversarial_review.py` | Archives exact plan, completion, or critic review output |
 | `skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py` | Tests the review archive helper |
-| `skills/codex-code-review/scripts/install-agent-profiles.sh` | Copies code review agent profiles into Codex |
 | `skills/git-clean-merged-branch/scripts/clean_merged_branch.sh` | Fetches, switches to default branch, pulls, and deletes the starting branch |
 
 ## Codex Adversarial Gate Agents
@@ -180,7 +177,6 @@ The script refuses to run outside a Git repo, without an `origin` remote, from d
 ```bash
 bash -n scripts/install.sh
 bash -n skills/codex-adversarial-gate/scripts/install.sh
-bash -n skills/codex-code-review/scripts/install-agent-profiles.sh
 bash scripts/test_install.sh
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
@@ -203,6 +199,5 @@ plugin-eval analyze plugins/codex-skills --format markdown
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
-- [Codex Code Review](codex-code-review.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

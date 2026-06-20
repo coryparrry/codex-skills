@@ -10,10 +10,9 @@
       ]
     },
     {
-      "title": "Review Workflows",
-      "description": "Skills for code review and PR feedback triage.",
+      "title": "PR Review",
+      "description": "Skills for PR feedback triage.",
       "skills": [
-        "codex-code-review",
         "triage-review-comments"
       ]
     },

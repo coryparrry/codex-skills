@@ -99,4 +99,3 @@ skills/triage-review-comments/
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
-- [Codex Code Review](codex-code-review.md)

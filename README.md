@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> A small Codex skill bundle for adversarial review gates, code review, safe Git branch cleanup, and practical PR feedback triage.
+> A small Codex skill bundle for adversarial review gates, safe Git branch cleanup, and practical PR feedback triage.
 
 ## 📌 Overview
 
@@ -18,12 +18,11 @@ The main skill in this repo is `codex-adversarial-gate`. It keeps implementation
 2. A critic reviews that `PASS` and returns `AGREE_PASS`.
 3. Both exact review outputs are archived under `docs/Adversarial Reviews/`.
 
-The repo also includes utility skills for generic code review, safe merged-branch cleanup, and PR review feedback triage.
+The repo also includes utility skills for safe merged-branch cleanup and PR review feedback triage.
 
 ## ✨ Skills
 
 - 🧠 **codex-adversarial-gate** gates plan and implementation closeout with reviewer-plus-critic evidence.
-- 🔍 **codex-code-review** runs repository-local multi-lens code review and writes review artifacts into the reviewed repo.
 - 🌿 **git-clean-merged-branch** returns a repo to its default branch and deletes merged local and remote branches after safety checks.
 - 🔎 **triage-review-comments** inventories PR comments, removes noise, deduplicates findings, and classifies real review work.
 - 🧾 **Codex marketplace plugin** exposes the bundle through `plugins/codex-skills`.
@@ -38,7 +37,6 @@ The repo also includes utility skills for generic code review, safe merged-branc
 │       └── marketplace.json
 ├── docs/
 │   ├── codex-adversarial-gate.md
-│   ├── codex-code-review.md
 │   ├── git-clean-merged-branch.md
 │   ├── installation.md
 │   ├── reference.md
@@ -54,7 +52,6 @@ The repo also includes utility skills for generic code review, safe merged-branc
 ├── skills.sh.json
 └── skills/
     ├── codex-adversarial-gate/
-    ├── codex-code-review/
     ├── git-clean-merged-branch/
     └── triage-review-comments/
 ```
@@ -78,7 +75,7 @@ cd codex-skills
 bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. Use the skills.sh or manual install path for `codex-code-review`, which carries a larger reviewer-profile set.
+Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
 
 The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
@@ -88,12 +85,6 @@ Run the adversarial completion gate:
 
 ```text
 Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
-```
-
-Run a generic code review:
-
-```text
-Use $codex-code-review to review this PR.
 ```
 
 Clean up a branch after GitHub merge:
@@ -113,7 +104,6 @@ Use $triage-review-comments to triage the review comments on this PR.
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
 - [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
-- [Codex Code Review](docs/codex-code-review.md)
 - [Reference](docs/reference.md)
 - [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
 - [Triage Review Comments](docs/triage-review-comments.md)
@@ -136,13 +126,12 @@ Install the repo skills for Codex with the `skills` CLI:
 npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
 ```
 
-If you use `codex-adversarial-gate` or `codex-code-review`, also run the agent installers:
+If you use `codex-adversarial-gate`, also run its agent installer:
 
 ```bash
 git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
 bash skills/codex-adversarial-gate/scripts/install.sh
-bash skills/codex-code-review/scripts/install-agent-profiles.sh
 ```
 
 ### Install A Skill
@@ -153,16 +142,6 @@ Install `codex-adversarial-gate`:
 git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
 bash skills/codex-adversarial-gate/scripts/install.sh
-```
-
-Install `codex-code-review`:
-
-```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-mkdir -p ~/.codex/skills
-cp -R skills/codex-code-review ~/.codex/skills/codex-code-review
-bash ~/.codex/skills/codex-code-review/scripts/install-agent-profiles.sh
 ```
 
 Install `git-clean-merged-branch`:
@@ -198,7 +177,6 @@ Run syntax and helper checks:
 ```bash
 bash -n scripts/install.sh
 bash -n skills/codex-adversarial-gate/scripts/install.sh
-bash -n skills/codex-code-review/scripts/install-agent-profiles.sh
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null

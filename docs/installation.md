@@ -29,7 +29,7 @@ cd codex-skills
 bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-The marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. Use the skills.sh or manual install path for `codex-code-review`, which carries a larger reviewer-profile set.
+The marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
 
 The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
@@ -41,16 +41,15 @@ Install the repo skills for Codex with the `skills` CLI:
 npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
 ```
 
-If you use `codex-adversarial-gate` or `codex-code-review`, also clone the repo and run the relevant agent installer:
+If you use `codex-adversarial-gate`, also clone the repo and run its agent installer:
 
 ```bash
 git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
 bash skills/codex-adversarial-gate/scripts/install.sh
-bash skills/codex-code-review/scripts/install-agent-profiles.sh
 ```
 
-The `skills` CLI installs the skill folders. The agent installer scripts are still required for custom reviewer TOMLs.
+The `skills` CLI installs the skill folders. The adversarial gate installer is still required for its custom reviewer TOMLs.
 
 ## Install Codex Adversarial Gate
 
@@ -61,18 +60,6 @@ bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 Use the install script for `codex-adversarial-gate` because it also copies the custom reviewer agents.
-
-## Install Codex Code Review
-
-```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-mkdir -p ~/.codex/skills
-cp -R skills/codex-code-review ~/.codex/skills/codex-code-review
-bash ~/.codex/skills/codex-code-review/scripts/install-agent-profiles.sh
-```
-
-Use the install script for `codex-code-review` because it copies the bundled reviewer profiles into Codex's agents directory.
 
 ## Install Git Clean Merged Branch
 
@@ -109,6 +96,5 @@ If cloning fails, check that `git` is available and that the repository URL is r
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
-- [Codex Code Review](codex-code-review.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

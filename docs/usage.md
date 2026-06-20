@@ -12,8 +12,6 @@ Make sure the relevant skill is installed. See [Install Codex Skills](installati
 
 For `codex-adversarial-gate`, also make sure the custom reviewer agent TOMLs are installed. The skill depends on them for the normal reviewer and critic flow.
 
-For `codex-code-review`, also make sure the bundled review agent TOMLs are installed.
-
 ## Choose A Skill
 
 | Goal | Skill |
@@ -21,7 +19,6 @@ For `codex-code-review`, also make sure the bundled review agent TOMLs are insta
 | Review a plan before execution | `codex-adversarial-gate` |
 | Close an implementation phase or slice | `codex-adversarial-gate` |
 | Recover from a skipped completion gate | `codex-adversarial-gate` |
-| Review a PR, branch, or diff | `codex-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
@@ -84,24 +81,6 @@ The helper writes review records under:
 <repo>/docs/Adversarial Reviews/
 ```
 
-## Review A PR Or Branch
-
-Use `codex-code-review` when you want a review-only pass over a PR, branch, or diff.
-
-Ask:
-
-```text
-Use $codex-code-review to review this PR.
-```
-
-The skill should write reports under:
-
-```text
-.codex/code-review-reports/
-```
-
-Do not use it as an implementation skill unless you explicitly ask Codex to fix findings after the review.
-
 ## Clean Up A Merged Branch
 
 Use `git-clean-merged-branch` after a PR has been merged and you want the local branch removed safely.
@@ -161,6 +140,5 @@ If review triage has no PR context, load the PR or provide enough review context
 - [Installation](installation.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
-- [Codex Code Review](codex-code-review.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
