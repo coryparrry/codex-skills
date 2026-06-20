@@ -34,14 +34,15 @@ Use $codex-adversarial-gate to close this implementation slice with archived rev
 
 At each reviewable implementation boundary, Codex should:
 
-1. Freeze the artifact and stop editing.
-2. Build a compact evidence packet.
+1. Build a compact evidence packet.
+2. Pre-freeze the final review surface: stage intended files and ignored evidence logs, refresh manifests/checksums when used, and rerun current status, untracked-file, staged-diff, and whitespace checks.
 3. Run `task_completion_adversarial_reviewer`.
 4. Archive the exact reviewer output.
-5. Keep the work open if the reviewer does not return `PASS`.
-6. Run `task_completion_review_critic` only after reviewer `PASS`.
-7. Archive the exact critic output.
-8. Accept completion only when the critic returns `AGREE_PASS`.
+5. If the archive changes the staged artifact, stage it and rerun the staged status/whitespace checks before critic review.
+6. Keep the work open if the reviewer does not return `PASS`.
+7. Run `task_completion_review_critic` only after reviewer `PASS`, passing the original packet, reviewer output, reviewer archive path, and current frozen-state evidence.
+8. Archive the exact critic output.
+9. Accept completion only when the critic returns `AGREE_PASS`.
 
 A loaded skill, reminder, checklist item, or promise to review later is not enough. The review cycle must finish before the phase or slice is marked complete.
 
@@ -54,11 +55,14 @@ The evidence packet should be compact and pointer-heavy. Include:
 - changed files, including staged, unstaged, and untracked files;
 - diff pointers;
 - validation commands with cwd, exit status, and whether they ran after the latest fix;
+- frozen-state evidence: staged status, unstaged diff, untracked files, staged whitespace check, manifest/checksum status, and intentionally staged ignored evidence files;
 - skipped checks and reasons;
-- relevant plan entries and known risks;
-- changed contracts, security or privacy surfaces, and user-facing behavior when relevant.
+- relevant plan entries, prevention lanes, source-owner/proof-tier notes, and known risks;
+- changed contracts, security or privacy surfaces, acceptance traceability, validation environment, and user-facing behavior when relevant.
 
 Reviewer agreement is not evidence by itself. The reviewer and critic should be able to trace claims back to raw code, diffs, logs, screenshots, or owner decisions.
+
+Separate product and evidence blockers from artifact hygiene. Archive formatting or evidence-file hygiene blocks closeout only when it fails required checks, contradicts the evidence packet, hides raw proof, or makes the archived gate trail unreliable.
 
 ## Use The Gate For Plan Review
 

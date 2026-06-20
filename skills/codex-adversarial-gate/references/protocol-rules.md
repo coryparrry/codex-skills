@@ -12,16 +12,18 @@ The implementing Codex thread is the implementer. Reviewer and critic roles are 
 
 Keep the reviewer and critic read-only. Archiving is an implementer responsibility because letting the reviewer mutate the repo during review weakens the frozen-artifact boundary.
 
-The protocol applies throughout the implementation flow. A loaded skill, pending checklist item, or final closeout reminder is not enough; every reviewable phase or slice boundary must stop for the reviewer-plus-critic archive cycle before the implementer can mark that unit complete.
+For `ce-work`, the protocol applies throughout the implementation flow. A loaded skill, pending checklist item, or final closeout reminder is not enough; every reviewable phase or slice boundary must stop for the reviewer-plus-critic archive cycle before the implementer can mark that unit complete.
 
 ## Paper-Derived Process
 
 - Freeze the artifact before review. Any implementation edit, staging change, generated artifact change, or fix command invalidates the active review cycle.
+- Freeze once before the decisive review cycle whenever possible: write evidence and archives, stage ignored evidence files intentionally, refresh checksums/manifests, and rerun current staged status and whitespace checks before dispatch.
 - Separate review from editing. Reviewers inspect; the implementer fixes only after a non-PASS verdict or after closeout.
 - Treat reviewer `PASS` as preliminary. Final acceptance requires critic `AGREE_PASS`.
 - Preserve disagreement. `DISAGREE_EVIDENCE` and `DISAGREE_CONCERN` must be resolved through a fresh review cycle or explicit blocker.
 - Reject false consensus. Agreement is worthless without raw evidence.
 - Filter thin findings. Unsupported speculation does not prove failure, but it should become a concrete missing-evidence request before PASS.
+- Separate product and evidence blockers from artifact hygiene. Hygiene blocks only when it fails required checks, contradicts the evidence packet, hides raw proof, or makes the archived trail unreliable.
 - Run a scope critic. The critic must compare the diff against the task, plan, implementation unit, and user-requested boundary.
 - Keep an archive and disagreement log so humans can audit what happened later.
 

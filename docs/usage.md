@@ -41,11 +41,13 @@ Use $codex-adversarial-gate to close this implementation slice with archived rev
 For implementation closeout, Codex should:
 
 1. Build a compact evidence packet.
-2. Run `task_completion_adversarial_reviewer`.
-3. Archive the exact reviewer output.
-4. Run `task_completion_review_critic` when the reviewer returns `PASS`.
-5. Archive the exact critic output.
-6. Accept completion only when the critic returns `AGREE_PASS`.
+2. Pre-freeze the final review surface, including staged intended files, ignored evidence logs, manifest/checksum refreshes when used, and current status/whitespace checks.
+3. Run `task_completion_adversarial_reviewer`.
+4. Archive the exact reviewer output.
+5. If archiving changes the staged artifact, stage the archive and rerun current staged status/whitespace checks.
+6. Run `task_completion_review_critic` when the reviewer returns `PASS`, passing the reviewer archive path and frozen-state evidence.
+7. Archive the exact critic output.
+8. Accept completion only when the critic returns `AGREE_PASS`.
 
 Do not use the plan reviewer to close implementation work.
 

@@ -24,10 +24,10 @@ Inputs you should expect:
 - locked decisions and assumptions;
 - unresolved risks;
 - phase list and acceptance criteria;
-- changed-file scope, deliberate non-touches, generated artifacts, and out-of-scope boundaries;
-- validation strategy, expected proof, weak proof that must not be accepted, and manual checks when needed;
-- runtime/API/schema/docs/user-facing/security/privacy impact or concrete non-applicable reasons;
-- deferred follow-ups and where they are recorded.
+- file/action ownership map or repo-specific equivalent, deliberate non-touches, generated artifacts, duplicate representations, and out-of-scope boundaries;
+- proof-tier map or repo-specific equivalent, first failing proof, expected proof, weak proof that must not be accepted, and manual checks when needed;
+- runtime/API/schema/docs/user-facing/security/privacy impact, runtime-contract maps or concrete non-applicable reasons;
+- prevention guard, deferred follow-ups, and where they are recorded.
 
 Review goals:
 1. Find incorrect assumptions, stale source-of-truth references, vague work items, missing acceptance criteria, risky sequencing, dependency risks, weak validation, missing completion gates, missing archive requirements, unrecorded deferred work, security/privacy gaps, and scope creep.
@@ -37,12 +37,12 @@ Review goals:
 Scoring rubric:
 - Source grounding, current state, and owner decisions: 15 points.
 - Plan type, scope, sequencing, and dependencies: 10 points.
-- Changed-file ownership and non-touches: 15 points.
-- Evidence and validation quality: 15 points.
-- Runtime behavior and contract parity: 15 points.
+- File/action ownership and prevention guard: 15 points.
+- Proof tier and validation quality: 15 points.
+- Runtime emission vs contract parity: 15 points.
 - Developer-facing surface and deferred follow-ups: 10 points.
 - Safety, security, privacy, and scope control: 10 points.
-- Handoff, plan sanity check, and completion criteria: 10 points.
+- Handoff, self-review, and completion criteria: 10 points.
 
 Score caps:
 - unresolved owner decision affecting scope, architecture, dependency, validation, security, or deployment: max 69;
@@ -56,16 +56,16 @@ Score caps:
 - no adversarial completion gate written into implementation phases/slices: max 89;
 - completion gate lacks task_completion_review_critic PASS audit after task_completion_adversarial_reviewer PASS: max 84;
 - completion gate accepts implementer validation summaries, reviewer confidence, or reviewer/critic agreement without raw evidence, artifact paths, or safe rerun proof: max 84;
-- phase lacks archive-path, evidence, validation, risk, or closeout requirements: max 89;
-- implementation plan lacks changed-file scope, validation plan, deferred follow-ups, plan sanity checks, or repo-specific equivalents required by the active planning workflow: max 89 for one missing requirement, max 79 for two or more;
-- public contract/runtime surface touched without runtime proof expectations or a concrete non-applicable reason: max 79;
-- API, CLI, MCP, SDK, docs, setup, auth, errors, migration, or deployment surface touched without developer-facing checks or a concrete non-applicable reason: max 84;
-- changed-file scope omits deliberate non-touches, generated artifacts, duplicate representations, or why the file owns the change: max 84;
-- validation plan omits first failing proof, expected failure/pass, or weak proof not accepted: max 84;
-- runtime contract proof relies only on static schema parity while runtime behaviour changes: max 74;
+- phase lacks source-owner, proof-tier, archive-path, or relevant prevention-lane closeout requirements: max 89;
+- implementation plan lacks Plan Type, File Action Map, Proof Tier Map, Deferred Follow-Ups, Plan Quality Self-Review, or repo-specific equivalents required by the active planning workflow: max 89 for one missing requirement, max 79 for two or more;
+- public contract/runtime surface touched without a Runtime Emission vs Contract Map or repo-specific equivalent: max 79;
+- API, CLI, MCP, SDK, docs, setup, auth, errors, migration, or deployment surface touched without a Developer-Facing Surface Check, repo-specific equivalent, or concrete non-applicable reason: max 84;
+- File Action Map or repo-specific equivalent omits canonical owner/source, deliberate non-touches, or why the file owns the change: max 84;
+- Proof Tier Map or repo-specific equivalent omits first failing proof, expected failure/pass, or weak proof not accepted: max 84;
+- Runtime Emission vs Contract Map or repo-specific equivalent relies only on static schema parity while runtime behaviour changes: max 74;
 - deferred work is accepted but not recorded in the appropriate todo/doc surface: max 84;
-- plan sanity checks rubber-stamp missing sections, placeholder steps, weak proof, or scope creep: max 79;
-- plan contains TODO, TBD, "handle edge cases", "add validation", "write tests", "similar to above", "implement later", or future-implementer decision handoff: max 79.
+- Plan Quality Self-Review is present but rubber-stamps missing sections, placeholder steps, weak proof, or scope creep: max 79;
+- plan contains TODO, TBD, "handle edge cases", "add validation", "write tests", "similar to above", "implement later", or future-agent decision handoff: max 79.
 
 A score of 100 means you cannot identify any concrete actionable objection under the rubric. Do not award 100 if the plan merely sounds reasonable.
 
@@ -94,12 +94,17 @@ Return exactly this structure:
 
 | Section | Score/Status | Defects | Required revision |
 |---|---|---|---|
-| Scope and sequencing |  |  |  |
-| Changed files and non-touches |  |  |  |
-| Validation and evidence |  |  |  |
-| Runtime contracts or N/A reason |  |  |  |
-| User/security/privacy impact |  |  |  |
-| Deferred follow-ups |  |  |  |
+| Plan Type / scope and sequencing |  |  |  |
+| Repo-specific prevention guard |  |  |  |
+| File Action Map or equivalent |  |  |  |
+| Proof Tier Map or equivalent |  |  |  |
+| Auth/Exposure Mode Matrix or equivalent |  |  |  |
+| Runtime Emission vs Contract Map or equivalent |  |  |  |
+| Acceptance Criteria Traceability Map or equivalent |  |  |  |
+| Validation Environment Contract or equivalent |  |  |  |
+| Developer-Facing Surface Check or equivalent |  |  |  |
+| Deferred Follow-Ups |  |  |  |
+| Plan Quality Self-Review |  |  |  |
 | Completion gates |  |  |  |
 
 ## Cross-Plan Findings
@@ -121,7 +126,7 @@ Identify validation that is weak, missing, or mismatched to the changed behaviou
 
 ## Completion Gate Critique
 
-Confirm whether every implementation phase/slice contains an adversarial completion gate. The gate must require a frozen artifact, compact evidence packet, current status/diff including untracked files, raw validation artifacts or safe rerun proof, skipped-check reporting, rerun change log, touched files, validation evidence, changed user/API/schema/docs/runtime behavior, security/privacy risks, acceptance traceability, and deferred follow-ups or N/A reasons. It must require task_completion_adversarial_reviewer first, then task_completion_review_critic for any reviewer PASS. If any gate is missing or weak, name the affected phases/slices.
+Confirm whether every implementation phase/slice contains an adversarial completion gate. The gate must require a frozen artifact, compact evidence packet, current status/diff including untracked files, raw validation artifacts or safe rerun proof, skipped-check reporting, outer-loop change log, applicable file-action/proof-tier/auth-exposure/runtime-contract/acceptance-traceability/validation-environment/developer-facing/deferred-follow-up entries or repo-specific equivalents, prevention lanes, source-owner/proof-tier notes, frozen-state evidence, and known risks. It must require task_completion_adversarial_reviewer first, then task_completion_review_critic for any reviewer PASS. If any gate is missing or weak, name the affected phases/slices.
 
 ## Final Instruction To Implementer
 
