@@ -1,66 +1,57 @@
-# Usage Guide
+# Use Codex Skills
 
-Use this guide when you want Codex to apply the adversarial review gate to a plan or implementation closeout.
+This how-to guide explains when and how to invoke the skills in this repository.
 
-## When To Use The Skill
+## Purpose
 
-Use `codex-adversarial-gate` when:
+Use this guide when the skills are already installed and you want to choose the right one for a task.
 
-- finalizing or updating an implementation plan;
-- closing a phase, slice, checkpoint, or grouped implementation unit;
-- recovering from a skipped review gate;
-- auditing a completion claim before marking work complete.
+## Before You Start
 
-Do not use the plan reviewer to close implementation work. Completion closeout requires the completion reviewer and then the critic.
+Make sure the relevant skill is installed. See [Install Codex Skills](installation.md).
 
-## Plan Review
+For `codex-adversarial-gate`, also make sure the custom reviewer agent TOMLs are installed. The skill depends on them for the normal reviewer and critic flow.
 
-Use plan review before finalizing a plan.
+## Choose A Skill
+
+| Goal | Skill |
+|---|---|
+| Review a plan before execution | `codex-adversarial-gate` |
+| Close an implementation phase or slice | `codex-adversarial-gate` |
+| Recover from a skipped completion gate | `codex-adversarial-gate` |
+| Clean up one merged local Git branch | `git-clean-merged-branch` |
+| Classify PR review feedback | `triage-review-comments` |
+
+## Gate Plan Or Implementation Work
+
+Use `codex-adversarial-gate` when Codex should not mark work complete without independent review evidence.
+
+For a plan review, ask:
 
 ```text
 Use $codex-adversarial-gate to adversarially review this plan before finalization.
 ```
 
-Expected flow:
-
-1. Add the contract from `templates/plan-adversarial-review-section.md`.
-2. Run `plan_adversarial_reviewer`.
-3. Revise the plan if the reviewer returns `FAIL_NEEDS_REVISION`.
-4. Archive the exact review output.
-5. Finalize only when every reviewable phase reaches `PASS_100`, or stop for owner input if blocked.
-
-## Completion Closeout
-
-Use completion review before marking a phase or slice complete.
+For implementation closeout, ask:
 
 ```text
 Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
 ```
 
-Build a compact packet with:
+For implementation closeout, Codex should:
 
-- phase or slice name;
-- exact acceptance criteria;
-- current branch and status;
-- changed files, including untracked files;
-- relevant diff pointers;
-- validation commands, cwd, exit status, and raw output or log path;
-- skipped checks and reasons;
-- known risks or security-sensitive surfaces;
-- rerun change log when applicable.
+1. Build a compact evidence packet.
+2. Run `task_completion_adversarial_reviewer`.
+3. Archive the exact reviewer output.
+4. Run `task_completion_review_critic` when the reviewer returns `PASS`.
+5. Archive the exact critic output.
+6. Accept completion only when the critic returns `AGREE_PASS`.
 
-Then run:
-
-1. `task_completion_adversarial_reviewer`
-2. archive the exact reviewer output
-3. `task_completion_review_critic` if the reviewer returns `PASS`
-4. archive the exact critic output
-
-The phase or slice is complete only when the critic returns `AGREE_PASS`.
+Do not use the plan reviewer to close implementation work.
 
 ## Archive Review Output
 
-Archive from a file:
+Archive a review from a file:
 
 ```bash
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/archive_adversarial_review.py" \
@@ -72,7 +63,7 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/archi
   --review-file ./review.md
 ```
 
-Archive from standard input:
+Archive a review from standard input:
 
 ```bash
 printf '%s\n' "$REVIEW_TEXT" | python3 "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/archive_adversarial_review.py" \
@@ -84,23 +75,69 @@ printf '%s\n' "$REVIEW_TEXT" | python3 "${CODEX_HOME:-$HOME/.codex}/skills/codex
   --stdin
 ```
 
-The helper creates `docs/Adversarial Reviews/` in the target repository and prints the archive path.
+The helper writes review records under:
 
-## Recover A Skipped Gate
+```text
+<repo>/docs/Adversarial Reviews/
+```
 
-If a phase was already marked complete without archived reviewer and critic outputs:
+## Clean Up A Merged Branch
 
-1. Freeze the current artifact.
-2. Reopen or qualify the completion status.
-3. Build a fresh evidence packet.
-4. Run `task_completion_adversarial_reviewer`.
-5. Archive the reviewer output.
-6. Run `task_completion_review_critic` for reviewer `PASS`.
-7. Archive the critic output.
-8. Restore complete status only after `AGREE_PASS`.
+Use `git-clean-merged-branch` after a PR has been merged and you want the local branch removed safely.
 
-## Fallback Prompts
+From inside the target Git repository, ask:
 
-If the custom agents are unavailable but an independent reviewer context exists, use `references/reviewer-prompts.md`.
+```text
+git-clean-merged-branch
+```
 
-Do not run fallback prompts in the same implementing thread. If no independent reviewer context is available, stop with `BLOCKED_REVIEW_CONTEXT_UNAVAILABLE`.
+The skill should run its cleanup script from the installed skill folder:
+
+```bash
+bash "${CODEX_HOME:-$HOME/.codex}/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh"
+```
+
+If GitHub used squash or rebase merge and the branch is definitely no longer needed, use the force-delete option:
+
+```bash
+bash "${CODEX_HOME:-$HOME/.codex}/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh" --force-delete-unmerged
+```
+
+Do not use the force-delete option unless the branch is known to be merged or intentionally disposable.
+
+## Triage PR Review Comments
+
+Use `triage-review-comments` when a PR has review comments that need sorting before implementation.
+
+Ask:
+
+```text
+Use $triage-review-comments to triage the review comments on this PR.
+```
+
+The skill should:
+
+1. Load the current PR review context.
+2. Inventory open and resolved inline threads, general comments, and standalone review findings.
+3. Remove boilerplate and non-actionable comments.
+4. Deduplicate repeated findings.
+5. Classify actionable items into `Fix now`, `Fix if cheap`, `Defer`, or `Ignore`.
+6. Resolve clearly fixed inline threads when GitHub tooling is available.
+7. Recommend prevention checks for real issues.
+
+The skill classifies review work. It does not implement fixes by itself.
+
+## Common Cases
+
+If a completion gate was skipped, use `codex-adversarial-gate` to freeze the current artifact, reopen the status, run reviewer and critic, archive both outputs, and only then restore completion.
+
+If branch cleanup stops on local changes, commit, stash, or discard those changes before rerunning the skill.
+
+If review triage has no PR context, load the PR or provide enough review context before invoking the skill.
+
+## Related Docs
+
+- [Installation](installation.md)
+- [Reference](reference.md)
+- [Git Clean Merged Branch](git-clean-merged-branch.md)
+- [Triage Review Comments](triage-review-comments.md)

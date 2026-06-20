@@ -1,105 +1,99 @@
-# Triage Review Comments
+# Triage PR Review Comments
 
-> *"Stop manually sorting PR feedback. Let the skill classify it for you."*
+This how-to guide explains how to use `triage-review-comments` to classify PR review feedback before deciding what to fix.
 
-I built this because every time I submitted a PR and the reviews came back, I'd spend time manually reading through each comment, figuring out what was a real blocker versus noise, and deciding what to do about it. CodeRabbit, Cursor, and human reviewers all produce different formats and different signal-to-noise ratios — and I was doing the same triage dance every time. I realized I didn't actually have to.
+## Purpose
 
-This skill loads the full PR review context, builds a complete inventory, deduplicates by underlying issue, classifies everything into four buckets, resolves inline threads that are already fixed, tracks real deferred work in Linear, and recommends prevention tests so the same issues don't come back.
+Use this skill when a PR has review comments from humans or automation and you need a practical triage pass.
 
----
+The skill treats each comment as a hypothesis. It checks comments against the current code, removes noise, deduplicates repeated findings, and sorts actionable work into buckets.
 
-## What it does
+## Before You Start
 
-- Builds a complete inventory of every review comment: open inline threads, resolved threads, general comments, and standalone review findings
-- Strips out boilerplate, walkthrough notes, and automation banners that contain no actionable finding
-- Deduplicates comments that describe the same underlying issue
-- Classifies every actionable comment into one of four buckets:
-  - **Fix now** — reachable, meaningful, should block merge
-  - **Fix if cheap** — probably valid, limited impact, low-risk to take now
-  - **Defer** — real work but better as follow-up
-  - **Ignore** — duplicate, stale, speculative, style-only, or already fixed
-- Resolves fixed inline review threads on GitHub when the current code clearly addresses them
-- Files real deferred items as Linear issues under the correct project
-- Recommends the smallest practical prevention test or check for every real issue
+You need:
 
-## What it doesn't do
+- the `triage-review-comments` skill installed;
+- access to the PR review context;
+- GitHub tooling available if you want fixed inline threads resolved remotely;
+- Linear context available if deferred items should be filed in Linear.
 
-- Apply fixes automatically (it classifies and recommends, you decide)
-- Resolve general PR conversation comments (GitHub doesn't treat those as resolvable threads)
-- Replace your judgment on whether a `Defer` item is worth tracking
-- Work without PR review context to load
+The skill is most useful before you start implementing review feedback.
 
-## How it works
+## Install The Skill
 
-```
-triage-review-comments
-  ├─ Load PR review context (inline threads, general comments, reviews)
-  ├─ Strip boilerplate and non-actionable content
-  ├─ Deduplicate by underlying issue
-  ├─ Classify each comment → Fix now / Fix if cheap / Defer / Ignore
-  ├─ Resolve fixed inline threads on GitHub
-  ├─ File deferred items in Linear
-  ├─ Recommend prevention tests for real issues
-  └─ Return full inventory, buckets, and next steps
-```
-
-The skill treats every review comment as a hypothesis that must be checked against the actual code — nothing gets classified on trust alone.
-
-## Installation
+From a local clone of this repository:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-
-# Install the skill
-mkdir -p ~/.codex/skills
-cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+mkdir -p "$CODEX_HOME/skills"
+cp -R skills/triage-review-comments "$CODEX_HOME/skills/triage-review-comments"
 ```
 
-Then restart Codex. No dependencies, no agent profiles to install.
+Restart Codex if the skill does not appear.
 
----
+## Run The Skill
 
-## Usage
-
-Invoke the skill by name when you have an open PR with review comments:
+Ask Codex from a thread that has access to the PR:
 
 ```text
-Use triage-review-comments to triage the review comments on this PR.
+Use $triage-review-comments to triage the review comments on this PR.
 ```
 
-Or more casually:
+The skill should load review context before classifying comments. Do not classify comments only from memory or from a PR title.
 
-```text
-triage-review-comments
-```
+## Understand The Output
 
-**Good fits:**
+The skill reports:
 
-- A PR just came back from review with comments from multiple sources (human, CodeRabbit, Cursor)
-- You want a single triage pass that separates blockers from noise before you start fixing
-- You want prevention tests recommended alongside every real issue
-- You want fixed threads resolved on GitHub and deferred work tracked in Linear in one pass
+- inventory counts for review comments and threads;
+- comments grouped into `Fix now`, `Fix if cheap`, `Defer`, and `Ignore`;
+- inline threads resolved on GitHub;
+- threads that look fixed but could not be resolved remotely;
+- prevention checks for real issues;
+- next steps.
 
-**Not a fit:**
+Use `Fix now` for reachable, meaningful issues that should block merge.
 
-- A PR with zero review comments (nothing to triage)
-- A review that's entirely style nits you've already decided to ignore
-- You want the skill to apply the fixes for you (it classifies, you implement)
+Use `Fix if cheap` for likely-valid, low-risk issues that are worth taking now if they stay small.
 
----
+Use `Defer` for real work that should become follow-up rather than block the current PR.
 
-## Layout
+Use `Ignore` for duplicate, stale, speculative, style-only, or already-fixed comments.
+
+## Handle Common Cases
+
+If a bot leaves a walkthrough or summary with no concrete finding, classify it as non-actionable.
+
+If several comments describe the same underlying issue, keep one representative finding and mark the rest as duplicates.
+
+If code already fixes an inline thread, resolve it on GitHub when tooling is available.
+
+If a real issue is deferred, track it in the right follow-up system when project context is clear.
+
+If no PR context is available, stop and ask for the PR or review material instead of guessing.
+
+## What The Skill Will Not Do
+
+The skill will not:
+
+- implement fixes automatically;
+- replace owner judgment on whether deferred work is worth tracking;
+- resolve general PR conversation comments that GitHub does not expose as resolvable threads;
+- invent PR context that is not available.
+
+## File Layout
 
 ```text
 skills/triage-review-comments/
-  SKILL.md                    — the skill Codex loads
-  agents/                     — agent metadata
-  references/                 — full triage rubric and output shape
+  SKILL.md
+  agents/
+    openai.yaml
+  references/
+    triage-review-comments.md
 ```
 
----
+## Related Docs
 
-## License
-
-MIT — see [LICENSE](../LICENSE).
+- [Installation](installation.md)
+- [Usage Guide](usage.md)
+- [Reference](reference.md)

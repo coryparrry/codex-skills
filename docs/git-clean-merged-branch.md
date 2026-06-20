@@ -1,107 +1,110 @@
-# Git Clean Merged Branch
+# Clean Up A Merged Git Branch
 
-> *"Stop babysitting git. One command, done."*
+This how-to guide explains how to use `git-clean-merged-branch` to clean up one local branch after it has been merged on GitHub.
 
-I built this because I was fed up with the repetitive chore of cleaning up local branches after they'd been merged on GitHub. Fetch, switch, pull, delete — the same four commands every single time, and I'd still occasionally delete the wrong branch or forget to pull before switching. I found it boring, so I automated it.
+## Purpose
 
-This skill wraps the entire cleanup into a single command. It inspects before it acts, refuses to run on a dirty worktree, and handles edge cases like squash-merge detection and detached HEAD.
+Use this skill when you are on a local branch that has already been merged and you want to:
 
----
+- fetch the latest remote branch state;
+- switch back to the repository default branch;
+- fast-forward pull the default branch;
+- delete the old local branch safely.
 
-## What it does
+## Before You Start
 
-- Fetches from `origin` with pruning
-- Resolves the repo's actual default branch (from `origin/HEAD`, falling back to `main` then `master`)
-- Switches to the default branch
-- Fast-forward-only pulls to avoid surprise merges
-- Safely deletes the old local branch (`git branch -d`)
-- Shows the final repo status so you can confirm everything is clean
+You need:
 
-## What it doesn't do
+- the `git-clean-merged-branch` skill installed;
+- a Git repository with an `origin` remote;
+- a clean worktree;
+- a current branch, not detached `HEAD`.
 
-- Touch uncommitted or untracked changes (it stops and tells you to handle them first)
-- Run `git reset --hard`, `git clean`, or any other broad destructive command
-- Delete branches that git considers unmerged (unless you explicitly pass `--force-delete-unmerged`)
-- Work outside a git repo or without an `origin` remote
+The skill stops when the worktree has uncommitted or untracked changes. It will not stash, discard, or reset them for you.
 
-## How it works
+## Install The Skill
 
-```
-clean_merged_branch.sh
-  ├─ Check: inside a git repo?
-  ├─ Check: clean worktree?
-  ├─ Record current branch
-  ├─ git fetch origin --prune
-  ├─ Resolve default branch
-  ├─ git switch <default>
-  ├─ git pull --ff-only origin <default>
-  ├─ git branch -d <old-branch>   (or -D with --force-delete-unmerged)
-  └─ git status --short --branch
-```
-
-The script stops at the first sign of trouble and tells you exactly what's wrong, rather than guessing and making things worse.
-
-## Installation
+From a local clone of this repository:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-
-# Install the skill
-mkdir -p ~/.codex/skills
-cp -R skills/git-clean-merged-branch ~/.codex/skills/git-clean-merged-branch
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+mkdir -p "$CODEX_HOME/skills"
+cp -R skills/git-clean-merged-branch "$CODEX_HOME/skills/git-clean-merged-branch"
 ```
 
-Then restart Codex. That's it — no agent profiles to install, no dependencies.
+Restart Codex if the skill does not appear.
 
----
+## Run The Skill
 
-## Usage
-
-From inside any repo:
-
-```text
-clean merged branch
-```
-
-Or invoke the skill by name:
+From inside the repository whose branch you want to clean up, ask Codex:
 
 ```text
 git-clean-merged-branch
 ```
 
-**Good fits:**
-
-- You just merged a PR on GitHub and want the local branch gone
-- You've accumulated stale local branches and want to clean up one at a time
-- You want a safe, predictable cleanup that won't nuke uncommitted work
-
-**Not a fit:**
-
-- You want to batch-delete many branches at once (this cleans one branch per run)
-- You have uncommitted changes you intend to keep (commit or stash them first)
-
-### Force-delete after squash/rebase merge
-
-If GitHub used squash or rebase merge, `git branch -d` will refuse because the commits don't match. When you know the branch has already been merged and is no longer needed:
+The standard script command is:
 
 ```bash
-bash ~/.codex/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh --force-delete-unmerged
+bash "${CODEX_HOME:-$HOME/.codex}/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh"
 ```
 
----
+## Understand The Output
 
-## Layout
+The script prints each Git command before it runs it. On success, it reports:
+
+- the branch where cleanup started;
+- the default branch it updated;
+- whether the old local branch was deleted;
+- the final `git status --short --branch` output.
+
+The script resolves the default branch from `origin/HEAD`. If that is unavailable, it falls back to `origin/main` and then `origin/master`.
+
+## Handle Squash Or Rebase Merges
+
+After a squash or rebase merge, Git may not consider the local branch merged because the commit history changed.
+
+If the branch has definitely been merged or is intentionally disposable, rerun with:
+
+```bash
+bash "${CODEX_HOME:-$HOME/.codex}/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh" --force-delete-unmerged
+```
+
+Use this option only when deletion is intentional. It changes branch deletion from `git branch -d` to `git branch -D` after the safe deletion attempt fails.
+
+## Common Stops
+
+If the repo has local changes, commit, stash, or discard them before rerunning.
+
+If there is no `origin` remote, add or fix the remote before rerunning.
+
+If the repository is in detached `HEAD`, switch to the branch you want to clean up before rerunning.
+
+If the default branch cannot be identified, check `origin/HEAD`, `origin/main`, or `origin/master`.
+
+## What The Skill Will Not Do
+
+The skill will not:
+
+- batch-delete many branches;
+- clean up remote branches;
+- run `git reset --hard`;
+- run `git clean`;
+- discard or stash local changes;
+- force-delete an unmerged branch unless explicitly requested with `--force-delete-unmerged`.
+
+## File Layout
 
 ```text
 skills/git-clean-merged-branch/
-  SKILL.md                    — the skill Codex loads
-  agents/                     — agent metadata
-  scripts/                    — the cleanup script
+  SKILL.md
+  agents/
+    openai.yaml
+  scripts/
+    clean_merged_branch.sh
 ```
 
----
+## Related Docs
 
-## License
-
-MIT — see [LICENSE](../LICENSE).
+- [Installation](installation.md)
+- [Usage Guide](usage.md)
+- [Reference](reference.md)
