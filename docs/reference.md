@@ -28,6 +28,41 @@ This reference describes the files, install paths, scripts, custom agents, and v
 
 The manifest exposes every skill folder under `skills/`.
 
+## Marketplace Entry
+
+Codex marketplace discovery uses a marketplace file that points at a plugin folder.
+
+For a user-level install, the marketplace file is:
+
+```text
+~/.agents/plugins/marketplace.json
+```
+
+The plugin folder can be symlinked at:
+
+```text
+~/plugins/codex-skills
+```
+
+Use this plugin entry:
+
+```json
+{
+  "name": "codex-skills",
+  "source": {
+    "source": "local",
+    "path": "./plugins/codex-skills"
+  },
+  "policy": {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL"
+  },
+  "category": "Coding"
+}
+```
+
+Marketplace install exposes the skill bundle. It does not copy `codex-adversarial-gate` custom reviewer TOMLs into `~/.codex/agents`; run `bash skills/codex-adversarial-gate/scripts/install.sh` for that.
+
 ## Skills
 
 | Skill | Purpose | Main files |
