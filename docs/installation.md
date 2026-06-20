@@ -11,7 +11,7 @@ Use this guide when you want Codex to discover a skill from this repository.
 You need:
 
 - Codex with local skills enabled.
-- Git, to clone the repository.
+- `skills` CLI support through `npx`.
 - Python 3, if you install `codex-adversarial-gate`.
 
 ## Install Through Codex Marketplace
@@ -21,12 +21,11 @@ You need:
 3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
 4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
 
-If you use `codex-adversarial-gate`, also clone the repo and run its agent installer:
+If you use `codex-adversarial-gate`, also install the skill with the `skills` CLI and run its local agent installer:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 The marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
@@ -38,15 +37,15 @@ The adversarial gate installer is still required when you need its custom review
 Install the repo skills for Codex with the `skills` CLI:
 
 ```bash
-npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
+npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
 ```
 
-If you use `codex-adversarial-gate`, also clone the repo and run its agent installer:
+The `skills` CLI stores global Codex skill copies under `~/.agents/skills/`.
+
+If you use `codex-adversarial-gate`, also run its local agent installer:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 The `skills` CLI installs the skill folders. The adversarial gate installer is still required for its custom reviewer TOMLs.
@@ -54,9 +53,8 @@ The `skills` CLI installs the skill folders. The adversarial gate installer is s
 ## Install Codex Adversarial Gate
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 Use the install script for `codex-adversarial-gate` because it also copies the custom reviewer agents.
@@ -64,19 +62,13 @@ Use the install script for `codex-adversarial-gate` because it also copies the c
 ## Install Git Clean Merged Branch
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-mkdir -p ~/.codex/skills
-cp -R skills/git-clean-merged-branch ~/.codex/skills/git-clean-merged-branch
+npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
 ```
 
 ## Install Triage Review Comments
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-mkdir -p ~/.codex/skills
-cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
+npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
 ```
 
 Restart Codex if the new skill does not appear.
@@ -85,11 +77,11 @@ Restart Codex if the new skill does not appear.
 
 If Codex does not show an installed skill, restart Codex and check that `SKILL.md` is under the expected directory.
 
-If `codex-adversarial-gate` loads but custom agents are missing, rerun `bash skills/codex-adversarial-gate/scripts/install.sh`.
+If `codex-adversarial-gate` loads but custom agents are missing, rerun `bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh`.
 
 If the marketplace plugin does not appear, check that this repo contains `.agents/plugins/marketplace.json` and `plugins/codex-skills/.codex-plugin/plugin.json`, then remove and add the marketplace again in the Codex app.
 
-If cloning fails, check that `git` is available and that the repository URL is reachable.
+If installation fails, check that `npx skills add coryparrry/codex-skills --global --agent codex --skill '*'` succeeds.
 
 ## Related Docs
 

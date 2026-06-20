@@ -2,16 +2,7 @@
 set -euo pipefail
 
 SKILL_NAME="codex-adversarial-gate"
-REPO_URL="${REPO_URL:-https://github.com/coryparrry/codex-skills.git}"
 PACKAGE_INSTALLER="skills/$SKILL_NAME/scripts/install.sh"
-TEMP_REPO=""
-
-cleanup() {
-  if [ -n "$TEMP_REPO" ] && [ -d "$TEMP_REPO" ]; then
-    rm -rf "$TEMP_REPO"
-  fi
-}
-trap cleanup EXIT
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-}"
 if [ -n "$SCRIPT_PATH" ] && [ -f "$SCRIPT_PATH" ]; then
@@ -22,17 +13,13 @@ if [ -n "$SCRIPT_PATH" ] && [ -f "$SCRIPT_PATH" ]; then
   fi
 fi
 
-if ! command -v git >/dev/null 2>&1; then
-  echo "git is required to install from $REPO_URL" >&2
-  exit 1
-fi
+cat >&2 <<EOF
+This installer must be run from a trusted local checkout.
 
-TEMP_REPO="$(mktemp -d)"
-git clone --depth 1 "$REPO_URL" "$TEMP_REPO"
+Install the skill first:
+  npx skills add coryparrry/codex-skills --global --agent codex --skill $SKILL_NAME
 
-if [ ! -f "$TEMP_REPO/$PACKAGE_INSTALLER" ]; then
-  echo "missing package installer: $PACKAGE_INSTALLER" >&2
-  exit 1
-fi
-
-bash "$TEMP_REPO/$PACKAGE_INSTALLER"
+Then run the installed skill's agent installer:
+  bash ~/.agents/skills/$SKILL_NAME/scripts/install.sh
+EOF
+exit 1

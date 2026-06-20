@@ -67,12 +67,11 @@ Install through the Codex app:
 3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
 4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
 
-If you use `codex-adversarial-gate`, also clone the repo and run its agent installer:
+If you use `codex-adversarial-gate`, also install the skill with the `skills` CLI and run its local agent installer:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
@@ -115,7 +114,7 @@ Use $triage-review-comments to triage the review comments on this PR.
 ### Prerequisites
 
 - Codex with local skills enabled
-- Git, to clone the repository
+- `skills` CLI support through `npx`
 - Python 3 for the adversarial review archive helper
 
 ### Install With skills.sh
@@ -123,15 +122,15 @@ Use $triage-review-comments to triage the review comments on this PR.
 Install the repo skills for Codex with the `skills` CLI:
 
 ```bash
-npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
+npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
 ```
+
+The `skills` CLI stores global Codex skill copies under `~/.agents/skills/`.
 
 If you use `codex-adversarial-gate`, also run its agent installer:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 ### Install A Skill
@@ -139,27 +138,20 @@ bash skills/codex-adversarial-gate/scripts/install.sh
 Install `codex-adversarial-gate`:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 Install `git-clean-merged-branch`:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-mkdir -p ~/.codex/skills
-cp -R skills/git-clean-merged-branch ~/.codex/skills/git-clean-merged-branch
+npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
 ```
 
 Install `triage-review-comments`:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-mkdir -p ~/.codex/skills
-cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
+npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
 ```
 
 Restart Codex if the new skills or agents do not appear immediately.

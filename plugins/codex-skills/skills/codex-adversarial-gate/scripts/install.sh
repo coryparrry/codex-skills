@@ -2,19 +2,15 @@
 set -euo pipefail
 
 SKILL_NAME="codex-adversarial-gate"
-REPO_URL="${REPO_URL:-https://github.com/coryparrry/codex-skills.git}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-SKILL_SOURCE_SUBDIR="skills/$SKILL_NAME"
 
 SKILLS_DIR="$CODEX_HOME/skills"
 AGENTS_DIR="$CODEX_HOME/agents"
 SKILL_DIR="$SKILLS_DIR/$SKILL_NAME"
 
 SOURCE_DIR=""
-REMOTE_INSTALL=0
 STAGING_DIR=""
 BACKUP_DIR=""
-CHECKOUT_DIR=""
 
 cleanup() {
   if [ -n "$STAGING_DIR" ] && [ -d "$STAGING_DIR" ]; then
@@ -22,9 +18,6 @@ cleanup() {
   fi
   if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
     rm -rf "$BACKUP_DIR"
-  fi
-  if [ -n "$CHECKOUT_DIR" ] && [ -d "$CHECKOUT_DIR" ]; then
-    rm -rf "$CHECKOUT_DIR"
   fi
 }
 
@@ -79,33 +72,21 @@ if [ -n "$SCRIPT_PATH" ] && [ -f "$SCRIPT_PATH" ]; then
 fi
 
 if [ -z "$SOURCE_DIR" ]; then
-  if ! command -v git >/dev/null 2>&1; then
-    echo "git is required to install from $REPO_URL" >&2
-    exit 1
-  fi
+  cat >&2 <<EOF
+This installer must be run from a trusted local skill directory.
 
-  REMOTE_INSTALL=1
+Install the skill first:
+  npx skills add coryparrry/codex-skills --global --agent codex --skill $SKILL_NAME
+
+Then run:
+  bash ~/.agents/skills/$SKILL_NAME/scripts/install.sh
+EOF
+  exit 1
 fi
 
 mkdir -p "$SKILLS_DIR" "$AGENTS_DIR"
 
-if [ "$REMOTE_INSTALL" -eq 1 ]; then
-  CHECKOUT_DIR="$(mktemp -d "$SKILLS_DIR/.${SKILL_NAME}.repo.XXXXXX")"
-  git clone --depth 1 "$REPO_URL" "$CHECKOUT_DIR"
-  if [ -d "$CHECKOUT_DIR/$SKILL_SOURCE_SUBDIR" ]; then
-    SOURCE_DIR="$CHECKOUT_DIR/$SKILL_SOURCE_SUBDIR"
-  else
-    SOURCE_DIR="$CHECKOUT_DIR"
-  fi
-
-  STAGING_DIR="$(mktemp -d "$SKILLS_DIR/.${SKILL_NAME}.tmp.XXXXXX")"
-  rmdir "$STAGING_DIR"
-  cp -R "$SOURCE_DIR"/. "$STAGING_DIR"/
-  rm -rf "$STAGING_DIR/.git" "$STAGING_DIR/docs/solutions"
-  validate_skill_dir "$STAGING_DIR"
-  replace_skill_dir "$STAGING_DIR"
-  SOURCE_DIR="$SKILL_DIR"
-elif [ ! -d "$SKILL_DIR" ] || [ "$SOURCE_DIR" != "$(cd "$SKILL_DIR" 2>/dev/null && pwd)" ]; then
+if [ ! -d "$SKILL_DIR" ] || [ "$SOURCE_DIR" != "$(cd "$SKILL_DIR" 2>/dev/null && pwd)" ]; then
   STAGING_DIR="$(mktemp -d "$SKILLS_DIR/.${SKILL_NAME}.tmp.XXXXXX")"
   cp -R "$SOURCE_DIR"/. "$STAGING_DIR"/
   rm -rf "$STAGING_DIR/.git" "$STAGING_DIR/docs/solutions"
