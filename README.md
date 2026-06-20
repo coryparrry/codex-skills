@@ -1,88 +1,85 @@
-# My Codex Skills
+# Codex Skills
 
-A personal collection of Codex skills I've built to solve real problems in my daily workflow. Each skill is self-contained, generic, and ready to install — grab the ones you want.
-
----
+Small Codex skills for review gates, Git branch cleanup, and PR feedback triage.
 
 ## Skills
 
-### [codex-budget-router](codex-budget-router/README.md)
+### [codex-adversarial-gate](skills/codex-adversarial-gate/SKILL.md)
 
-> *"Spend your strongest Codex model on judgment, not file searching."*
+Keeps implementation work open until an independent completion reviewer returns `PASS`, a critic returns `AGREE_PASS`, and both exact review outputs are archived under `docs/Adversarial Reviews/`.
 
-I built this because I kept hitting my Codex limits halfway through real work. The root model was burning through expensive credits on repo scans, log triage, and routine test fixes — work cheaper models could handle just fine. Worse, my Spark limits sat completely unused because there was no safe way to route work to them.
+Use it for plan checks, phase or slice closeout, and recovery when a completion gate was skipped. The installer also copies the bundled custom reviewer TOMLs into Codex's agents directory.
 
-This skill saves me up to **20% of my limits** by routing broad search, routine implementation, tests, and bounded review to cheaper workers while keeping architecture and final judgment with the root model.
+- [Installation](docs/installation.md)
+- [Usage Guide](docs/usage.md)
+- [Reference](docs/reference.md)
 
-**Six worker profiles** cover the full spectrum: cheap mapping and research (gpt-5.4-mini), Spark-first routine implementation (gpt-5.3-codex-spark), bounded non-trivial work (gpt-5.3-codex), and mid-tier review and debugging (gpt-5.4).
+### [git-clean-merged-branch](docs/git-clean-merged-branch.md)
 
-[Full docs →](codex-budget-router/README.md)
+Safely returns a repo to its default branch after the current branch has been merged. It fetches, fast-forward pulls, and deletes only the starting local branch after refusing dirty worktrees.
 
-### [git-clean-merged-branch](git-clean-merged-branch/README.md)
+### [triage-review-comments](docs/triage-review-comments.md)
 
-> *"Stop babysitting git. One command, done."*
+Inventories PR review comments, strips noise, deduplicates repeated findings, classifies the rest, resolves clearly fixed inline threads when tooling is available, and recommends prevention checks.
 
-I built this because I was fed up with the repetitive chore of cleaning up local branches after they'd been merged on GitHub. Fetch, switch, pull, delete — the same four commands every time, and I'd still occasionally delete the wrong branch. I found it boring, so I automated it.
+## Quick Start
 
-This skill wraps the entire cleanup into a single safe command. It inspects before acting, refuses to run on a dirty worktree, resolves the actual default branch, and handles edge cases like squash-merge detection — all without `git reset --hard` or any other broad destructive command.
-
-[Full docs →](git-clean-merged-branch/README.md)
-
-### [triage-review-comments](triage-review-comments/README.md)
-
-> *"Stop manually sorting PR feedback. Let the skill classify it for you."*
-
-I built this because every time I submitted a PR and the reviews came back, I'd spend time manually reading through each comment, figuring out what was a real blocker versus noise, and deciding what to do about it. CodeRabbit, Cursor, and human reviewers all produce different formats and different signal-to-noise ratios — and I was doing the same triage dance every time. I realized I didn't actually have to.
-
-This skill loads the full PR review context, builds a complete inventory, deduplicates by underlying issue, classifies everything into four buckets, resolves fixed inline threads on GitHub, tracks real deferred work in Linear, and recommends prevention tests so the same issues don't come back.
-
-[Full docs →](triage-review-comments/README.md)
-
----
-
-## Quick start
+Install the adversarial gate and its custom agents:
 
 ```bash
-git clone https://github.com/<your-org>/codex-skills.git
-cd codex-skills
-
-# Install a skill
-cp -r codex-budget-router ~/.agents/skills/codex-budget-router
-codex-budget-router/scripts/install-agent-profiles.sh
+/bin/bash -c 'set -euo pipefail
+tmp_dir="$(mktemp -d)"
+trap "rm -rf \"$tmp_dir\"" EXIT
+git clone --depth 1 https://github.com/coryparrry/codex-skills.git "$tmp_dir"
+/bin/bash "$tmp_dir/scripts/install.sh"'
 ```
 
-Then restart Codex. Each skill's README has detailed install and usage instructions.
+Install a single skill from a local clone:
 
----
+```bash
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+mkdir -p "$CODEX_HOME/skills"
+cp -R skills/git-clean-merged-branch "$CODEX_HOME/skills/git-clean-merged-branch"
+```
+
+Restart Codex if the installed skills or agents do not appear immediately.
 
 ## Layout
 
-Each skill lives in its own folder with a `SKILL.md`, agent profiles, scripts, and optional references and tests.
-
 ```text
-codex-budget-router/
-  SKILL.md        — the skill Codex loads
-  README.md       — full documentation
-  agents/         — worker TOML profiles
-  references/     — workflows, prompts, fallback
-  scripts/        — installer, audit tool
-  tests/          — tests for the audit script
-
-git-clean-merged-branch/
-  SKILL.md        — the skill Codex loads
-  README.md       — full documentation
-  agents/         — agent metadata
-  scripts/        — the cleanup script
-
-triage-review-comments/
-  SKILL.md        — the skill Codex loads
-  README.md       — full documentation
-  agents/         — agent metadata
-  references/     — fuller triage guidance
+.
+├── .codex-plugin/
+│   └── plugin.json
+├── docs/
+│   ├── git-clean-merged-branch.md
+│   ├── installation.md
+│   ├── reference.md
+│   ├── triage-review-comments.md
+│   └── usage.md
+├── scripts/
+│   ├── install.sh
+│   └── test_install.sh
+└── skills/
+    ├── codex-adversarial-gate/
+    │   ├── SKILL.md
+    │   ├── agents/
+    │   ├── references/
+    │   ├── scripts/
+    │   └── templates/
+    ├── git-clean-merged-branch/
+    │   ├── SKILL.md
+    │   ├── agents/
+    │   └── scripts/
+    └── triage-review-comments/
+        ├── SKILL.md
+        ├── agents/
+        └── references/
 ```
 
----
+## Codex Marketplace
+
+The Codex plugin manifest lives at [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json) and exposes the skills under [`skills/`](skills/).
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

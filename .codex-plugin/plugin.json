@@ -1,0 +1,40 @@
+{
+  "name": "codex-skills",
+  "version": "0.1.0",
+  "description": "Codex skills for adversarial review gates, branch cleanup, and PR review triage.",
+  "author": {
+    "name": "Cory Parry",
+    "url": "https://github.com/coryparrry"
+  },
+  "homepage": "https://github.com/coryparrry/codex-skills",
+  "repository": "https://github.com/coryparrry/codex-skills",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "skills",
+    "review",
+    "git"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Skills",
+    "shortDescription": "Review gates, branch cleanup, and PR review triage skills.",
+    "longDescription": "A small Codex skill bundle for adversarial completion review, safe merged-branch cleanup, and practical PR feedback triage.",
+    "developerName": "Cory Parry",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/coryparrry/codex-skills",
+    "privacyPolicyURL": "https://github.com/coryparrry/codex-skills/security/policy",
+    "termsOfServiceURL": "https://github.com/coryparrry/codex-skills/blob/main/LICENSE",
+    "defaultPrompt": [
+      "Use codex-adversarial-gate to close an implementation slice with archived reviewer and critic evidence.",
+      "Use git-clean-merged-branch after a branch has been merged on GitHub.",
+      "Use triage-review-comments to classify PR review feedback."
+    ],
+    "screenshots": []
+  }
+}

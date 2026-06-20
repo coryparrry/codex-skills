@@ -38,9 +38,12 @@ private/
 # Build/cache output
 __pycache__/
 *.pyc
+.pytest_cache/
 node_modules/
 dist/
 build/
 .next/
 .turbo/
 coverage/
+docs/solutions/
+CONCEPTS.md
