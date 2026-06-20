@@ -21,12 +21,13 @@ The skill is most useful before you start implementing review feedback.
 
 ## Install The Skill
 
-From a local clone of this repository:
+Clone the repository and copy the skill folder:
 
 ```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-mkdir -p "$CODEX_HOME/skills"
-cp -R skills/triage-review-comments "$CODEX_HOME/skills/triage-review-comments"
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+mkdir -p ~/.codex/skills
+cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
 ```
 
 Restart Codex if the skill does not appear.

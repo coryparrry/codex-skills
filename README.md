@@ -64,54 +64,37 @@ The repo also includes smaller utility skills for safely cleaning up merged Git 
 ### Prerequisites
 
 - Codex with local skills enabled
-- Git, for the one-command install
+- Git, to clone the repository
 - Python 3 for the adversarial review archive helper
 
-### One-Command Install
+### Install A Skill
 
-Copy and paste this command to install `codex-adversarial-gate` and its bundled custom agents:
-
-```bash
-/bin/bash -c 'set -euo pipefail
-tmp_dir="$(mktemp -d)"
-trap "rm -rf \"$tmp_dir\"" EXIT
-git clone --depth 1 https://github.com/coryparrry/codex-skills.git "$tmp_dir"
-/bin/bash "$tmp_dir/scripts/install.sh"'
-```
-
-The installer copies:
-
-```text
-~/.codex/skills/codex-adversarial-gate/
-~/.codex/agents/plan-adversarial-reviewer.toml
-~/.codex/agents/task-completion-adversarial-reviewer.toml
-~/.codex/agents/task-completion-review-critic.toml
-```
-
-If you use a custom Codex home, set `CODEX_HOME`:
+Install `codex-adversarial-gate`:
 
 ```bash
-CODEX_HOME="$HOME/.codex" /bin/bash -c 'set -euo pipefail
-tmp_dir="$(mktemp -d)"
-trap "rm -rf \"$tmp_dir\"" EXIT
-git clone --depth 1 https://github.com/coryparrry/codex-skills.git "$tmp_dir"
-/bin/bash "$tmp_dir/scripts/install.sh"'
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-### Install From A Local Clone
+Use the install script for `codex-adversarial-gate` because it also copies the custom reviewer agents.
 
-Use this when you have already cloned the repository:
+Install `git-clean-merged-branch`:
 
 ```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}" bash scripts/install.sh
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+mkdir -p ~/.codex/skills
+cp -R skills/git-clean-merged-branch ~/.codex/skills/git-clean-merged-branch
 ```
 
-Install an individual utility skill from a local clone:
+Install `triage-review-comments`:
 
 ```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-mkdir -p "$CODEX_HOME/skills"
-cp -R skills/git-clean-merged-branch "$CODEX_HOME/skills/git-clean-merged-branch"
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+mkdir -p ~/.codex/skills
+cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
 ```
 
 Restart Codex if the new skills or agents do not appear immediately.
@@ -149,8 +132,6 @@ Use $triage-review-comments to triage the review comments on this PR.
 ## 🧩 Codex Marketplace
 
 The Codex plugin manifest lives at [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json). It exposes the installable skills under [`skills/`](skills/).
-
-Use the installer above for the adversarial gate because it copies both the skill and the bundled custom agent TOMLs.
 
 ## 🧪 Validation
 

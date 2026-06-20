@@ -24,12 +24,13 @@ The skill stops when the worktree has uncommitted or untracked changes. It will 
 
 ## Install The Skill
 
-From a local clone of this repository:
+Clone the repository and copy the skill folder:
 
 ```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-mkdir -p "$CODEX_HOME/skills"
-cp -R skills/git-clean-merged-branch "$CODEX_HOME/skills/git-clean-merged-branch"
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+mkdir -p ~/.codex/skills
+cp -R skills/git-clean-merged-branch ~/.codex/skills/git-clean-merged-branch
 ```
 
 Restart Codex if the skill does not appear.
