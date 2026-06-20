@@ -20,9 +20,8 @@ You need:
 Install with the skill script because the marketplace install does not copy the custom reviewer agent TOMLs:
 
 ```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
+bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
 ## Use The Gate For Implementation Closeout

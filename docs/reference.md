@@ -71,7 +71,7 @@ It contains one plugin entry:
 
 Use the Codex app to add this repo as a marketplace source, then install **Codex Skills** from that marketplace.
 
-Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash skills/codex-adversarial-gate/scripts/install.sh` when those agents are needed.
+Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh` when those agents are needed.
 
 ## Skills
 
@@ -85,17 +85,18 @@ Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`,
 
 | Component | Destination |
 |---|---|
+| `skills` CLI global skill copies | `~/.agents/skills/<skill-name>/` |
 | Skills | `${CODEX_HOME:-$HOME/.codex}/skills/<skill-name>/` |
 | Codex agents | `${CODEX_HOME:-$HOME/.codex}/agents/` |
 
-`codex-adversarial-gate` needs files in both locations. The two utility skills need only their skill folder.
+`codex-adversarial-gate` needs a `skills` CLI copy first, then its local installer copies files into `CODEX_HOME`. The two utility skills need only their skill folder.
 
 ## Repo-Level Scripts
 
 | Script | Purpose |
 |---|---|
 | `scripts/install.sh` | Installs `codex-adversarial-gate` and its custom agents |
-| `scripts/test_install.sh` | Smoke-tests local and clone-style adversarial gate installs |
+| `scripts/test_install.sh` | Smoke-tests local adversarial gate installs and curl-style installer rejection |
 
 ## Skill Scripts
 
