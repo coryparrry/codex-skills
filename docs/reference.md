@@ -6,6 +6,9 @@ This reference describes the files, install paths, scripts, custom agents, and v
 
 ```text
 .
+  .agents/
+    plugins/
+      marketplace.json
   .codex-plugin/
     plugin.json
   docs/
@@ -30,28 +33,20 @@ The manifest exposes every skill folder under `skills/`.
 
 ## Marketplace Entry
 
-Codex marketplace discovery uses a marketplace file that points at a plugin folder.
-
-For a user-level install, the marketplace file is:
+Codex marketplace discovery uses a marketplace file that points at a plugin folder. This repo's marketplace file is:
 
 ```text
-~/.agents/plugins/marketplace.json
+.agents/plugins/marketplace.json
 ```
 
-The plugin folder can be symlinked at:
-
-```text
-~/plugins/codex-skills
-```
-
-Use this plugin entry:
+It contains one plugin entry:
 
 ```json
 {
   "name": "codex-skills",
   "source": {
     "source": "local",
-    "path": "./plugins/codex-skills"
+    "path": "./"
   },
   "policy": {
     "installation": "AVAILABLE",
@@ -60,6 +55,8 @@ Use this plugin entry:
   "category": "Coding"
 }
 ```
+
+Use the Codex app to add this repo as a marketplace source, then install **Codex Skills** from that marketplace.
 
 Marketplace install exposes the skill bundle. It does not copy `codex-adversarial-gate` custom reviewer TOMLs into `~/.codex/agents`; run `bash skills/codex-adversarial-gate/scripts/install.sh` for that.
 
@@ -171,6 +168,7 @@ python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
   skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 git diff --check
 ```

@@ -31,6 +31,9 @@ The repo also includes smaller utility skills for safely cleaning up merged Git 
 
 ```text
 .
+├── .agents/
+│   └── plugins/
+│       └── marketplace.json
 ├── .codex-plugin/
 │   └── plugin.json
 ├── docs/
@@ -131,53 +134,24 @@ Use $triage-review-comments to triage the review comments on this PR.
 
 ## 🧩 Codex Marketplace
 
-The Codex plugin manifest lives at [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json). It exposes the installable skills under [`skills/`](skills/).
+The repo marketplace lives at [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). The Codex plugin manifest lives at [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json), and it exposes the installable skills under [`skills/`](skills/).
 
-Install the repo as a local Codex marketplace plugin:
+Install through the Codex app:
+
+1. Open **Plugins** in the Codex app.
+2. Click **Add marketplace**.
+3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
+4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
+
+If you use `codex-adversarial-gate`, also clone the repo and run the installer:
 
 ```bash
 git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
-mkdir -p ~/plugins ~/.agents/plugins
-ln -sfn "$PWD" ~/plugins/codex-skills
-```
-
-Create `~/.agents/plugins/marketplace.json`:
-
-```json
-{
-  "name": "local",
-  "interface": {
-    "displayName": "Local Plugins"
-  },
-  "plugins": [
-    {
-      "name": "codex-skills",
-      "source": {
-        "source": "local",
-        "path": "./plugins/codex-skills"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Coding"
-    }
-  ]
-}
-```
-
-If you already have a marketplace file, add the `codex-skills` object to its `plugins` array instead of replacing the file.
-
-Restart Codex so it reloads the marketplace, then install **Codex Skills** from the **Local Plugins** marketplace.
-
-If you use `codex-adversarial-gate`, also run:
-
-```bash
 bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-Marketplace install exposes the skill bundle. The adversarial gate install script is still required because that skill needs custom reviewer TOMLs copied into `~/.codex/agents`.
+The marketplace install exposes the skill bundle. The adversarial gate install script is still required because that skill needs custom reviewer TOMLs copied into `~/.codex/agents`.
 
 ## 🧪 Validation
 
@@ -192,6 +166,8 @@ Run syntax and helper checks:
 ```bash
 bash -n scripts/install.sh
 bash -n skills/codex-adversarial-gate/scripts/install.sh
+python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
+python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \

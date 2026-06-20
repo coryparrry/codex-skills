@@ -16,47 +16,16 @@ You need:
 
 ## Install Through Codex Marketplace
 
-Clone the repository and link it into your local plugin folder:
+1. Open **Plugins** in the Codex app.
+2. Click **Add marketplace**.
+3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
+4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
+
+If you use `codex-adversarial-gate`, also clone the repo and run its install script:
 
 ```bash
 git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
-mkdir -p ~/plugins ~/.agents/plugins
-ln -sfn "$PWD" ~/plugins/codex-skills
-```
-
-Create `~/.agents/plugins/marketplace.json`:
-
-```json
-{
-  "name": "local",
-  "interface": {
-    "displayName": "Local Plugins"
-  },
-  "plugins": [
-    {
-      "name": "codex-skills",
-      "source": {
-        "source": "local",
-        "path": "./plugins/codex-skills"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Coding"
-    }
-  ]
-}
-```
-
-If `marketplace.json` already exists, add the `codex-skills` object to its `plugins` array instead of replacing the file.
-
-Restart Codex so it reloads the marketplace, then install **Codex Skills** from the **Local Plugins** marketplace.
-
-If you use `codex-adversarial-gate`, run its install script after the marketplace install:
-
-```bash
 bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
@@ -98,7 +67,7 @@ If Codex does not show an installed skill, restart Codex and check that `SKILL.m
 
 If `codex-adversarial-gate` loads but custom agents are missing, rerun `bash skills/codex-adversarial-gate/scripts/install.sh`.
 
-If the marketplace plugin does not appear, check that `~/plugins/codex-skills/.codex-plugin/plugin.json` exists and that the marketplace entry path is `./plugins/codex-skills`.
+If the marketplace plugin does not appear, check that this repo contains `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`, then remove and add the marketplace again in the Codex app.
 
 If cloning fails, check that `git` is available and that the repository URL is reachable.
 
