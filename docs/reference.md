@@ -183,5 +183,6 @@ plugin-eval analyze . --format markdown
 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
+- [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

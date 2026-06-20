@@ -75,5 +75,6 @@ If cloning fails, check that `git` is available and that the repository URL is r
 
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

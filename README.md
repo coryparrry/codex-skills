@@ -37,6 +37,7 @@ The repo also includes smaller utility skills for safely cleaning up merged Git 
 ├── .codex-plugin/
 │   └── plugin.json
 ├── docs/
+│   ├── codex-adversarial-gate.md
 │   ├── git-clean-merged-branch.md
 │   ├── installation.md
 │   ├── reference.md
@@ -61,6 +62,58 @@ The repo also includes smaller utility skills for safely cleaning up merged Git 
         ├── agents/
         └── references/
 ```
+
+## 🧩 Codex Marketplace
+
+The repo marketplace lives at [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). The Codex plugin manifest lives at [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json), and it exposes the installable skills under [`skills/`](skills/).
+
+Install through the Codex app:
+
+1. Open **Plugins** in the Codex app.
+2. Click **Add marketplace**.
+3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
+4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
+
+If you use `codex-adversarial-gate`, also clone the repo and run the installer:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+bash skills/codex-adversarial-gate/scripts/install.sh
+```
+
+The marketplace install exposes the skill bundle. The adversarial gate install script is still required because that skill needs custom reviewer TOMLs copied into `~/.codex/agents`.
+
+## ⚡ Quick Usage
+
+Run the adversarial completion gate:
+
+```text
+Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
+```
+
+Clean up a branch after GitHub merge:
+
+```text
+git-clean-merged-branch
+```
+
+Triage PR review comments:
+
+```text
+Use $triage-review-comments to triage the review comments on this PR.
+```
+
+## 📖 Documentation
+
+- [Installation](docs/installation.md)
+- [Usage Guide](docs/usage.md)
+- [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
+- [Reference](docs/reference.md)
+- [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
+- [Triage Review Comments](docs/triage-review-comments.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
 
 ## 🚀 Install
 
@@ -101,57 +154,6 @@ cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
 ```
 
 Restart Codex if the new skills or agents do not appear immediately.
-
-## ⚡ Quick Usage
-
-Run the adversarial completion gate:
-
-```text
-Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
-```
-
-Clean up a branch after GitHub merge:
-
-```text
-git-clean-merged-branch
-```
-
-Triage PR review comments:
-
-```text
-Use $triage-review-comments to triage the review comments on this PR.
-```
-
-## 📖 Documentation
-
-- [Installation](docs/installation.md)
-- [Usage Guide](docs/usage.md)
-- [Reference](docs/reference.md)
-- [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
-- [Triage Review Comments](docs/triage-review-comments.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
-
-## 🧩 Codex Marketplace
-
-The repo marketplace lives at [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). The Codex plugin manifest lives at [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json), and it exposes the installable skills under [`skills/`](skills/).
-
-Install through the Codex app:
-
-1. Open **Plugins** in the Codex app.
-2. Click **Add marketplace**.
-3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
-4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
-
-If you use `codex-adversarial-gate`, also clone the repo and run the installer:
-
-```bash
-git clone https://github.com/coryparrry/codex-skills.git
-cd codex-skills
-bash skills/codex-adversarial-gate/scripts/install.sh
-```
-
-The marketplace install exposes the skill bundle. The adversarial gate install script is still required because that skill needs custom reviewer TOMLs copied into `~/.codex/agents`.
 
 ## 🧪 Validation
 

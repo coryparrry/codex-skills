@@ -98,3 +98,4 @@ skills/triage-review-comments/
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Codex Adversarial Review Gate](codex-adversarial-gate.md)

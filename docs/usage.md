@@ -139,5 +139,6 @@ If review triage has no PR context, load the PR or provide enough review context
 
 - [Installation](installation.md)
 - [Reference](reference.md)
+- [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
