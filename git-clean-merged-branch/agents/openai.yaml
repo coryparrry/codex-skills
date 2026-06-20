@@ -1,3 +1,0 @@
-display_name: Clean Merged Git Branch
-short_description: Clean up a merged local Git branch safely.
-default_prompt: Clean merged branch.

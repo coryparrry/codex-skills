@@ -1,140 +1,209 @@
-# My Codex Skills
+# Codex Skills
 
-A personal collection of Codex skills I've built to solve real problems in my daily workflow. Each skill is self-contained, generic, and ready to install — grab the ones you want.
+![Codex Skill Bundle](https://img.shields.io/badge/Codex-Skill_Bundle-111827?style=for-the-badge)
+![Review Gate](https://img.shields.io/badge/Review_Gate-Adversarial-b91c1c?style=for-the-badge)
+![Git Workflow](https://img.shields.io/badge/Git-Workflow-2563eb?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
+[![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
----
+> A small Codex skill bundle for adversarial review gates, safe Git branch cleanup, and practical PR feedback triage.
 
-## Skills
+## 📌 Overview
 
-### [codex-code-review](codex-code-review/README.md)
+`codex-skills` packages focused Codex skills that solve repeatable engineering workflow problems without bringing along a heavy process framework.
 
-> *"Run a serious review without dragging private project assumptions into the next repo."*
+The main skill in this repo is `codex-adversarial-gate`. It keeps implementation work open until:
 
-Codex Code Review is a reusable version of a product-specific code-review workflow. It keeps the useful parts: specialist review lanes, coverage matrices, AI-generated-code failure-pattern calibration, and report consolidation. It removes private product names, private paths, product-specific docs tooling, and phase assumptions.
+1. An independent completion reviewer returns `PASS`.
+2. A critic reviews that `PASS` and returns `AGREE_PASS`.
+3. Both exact review outputs are archived under `docs/Adversarial Reviews/`.
 
-Reports are written inside the reviewed repository under `.codex/code-review-reports/`, and the skill includes Codex TOML profiles for reviewer and consolidator agents.
+The repo also includes utility skills for safe merged-branch cleanup and PR review feedback triage.
 
-[Full docs →](codex-code-review/README.md)
+## ✨ Skills
 
-### [codex-budget-router](codex-budget-router/README.md)
+- 🧠 **codex-adversarial-gate** gates plan and implementation closeout with reviewer-plus-critic evidence.
+- 🌿 **git-clean-merged-branch** returns a repo to its default branch and deletes merged local and remote branches after safety checks.
+- 🔎 **triage-review-comments** inventories PR comments, removes noise, deduplicates findings, and classifies real review work.
+- 🧾 **Codex marketplace plugin** exposes the bundle through `plugins/codex-skills`.
+- ✅ **Install smoke tests** verify the adversarial gate installer and custom-agent copy flow.
 
-> *"Spend your strongest Codex model on judgment, not file searching."*
-
-**Deprecated / needs update:** this skill still depends on removed GPT-5.3 Codex model routes and should not be used as-is until its routing table and agent profiles are refreshed.
-
-I built this because I kept hitting my Codex limits halfway through real work. The root model was burning through expensive credits on repo scans, log triage, and routine test fixes — work cheaper models could handle just fine. Worse, my Spark limits sat completely unused because there was no safe way to route work to them.
-
-This skill used to save me up to **20% of my limits** by routing broad search, routine implementation, tests, and bounded review to cheaper workers while keeping architecture and final judgment with the root model. It needs a current model refresh before it is useful again.
-
-**Six worker profiles** cover the historical routing spectrum, but the GPT-5.3 Codex profiles are now stale.
-
-[Full docs →](codex-budget-router/README.md)
-
-### [git-clean-merged-branch](git-clean-merged-branch/README.md)
-
-> *"Stop babysitting git. One command, done."*
-
-I built this because I was fed up with the repetitive chore of cleaning up local branches after they'd been merged on GitHub. Fetch, switch, pull, delete — the same four commands every time, and I'd still occasionally delete the wrong branch. I found it boring, so I automated it.
-
-This skill wraps the entire cleanup into a single safe command. It inspects before acting, refuses to run on a dirty worktree, resolves the actual default branch, and handles edge cases like squash-merge detection — all without `git reset --hard` or any other broad destructive command.
-
-[Full docs →](git-clean-merged-branch/README.md)
-
-### [triage-review-comments](triage-review-comments/README.md)
-
-> *"Stop manually sorting PR feedback. Let the skill classify it for you."*
-
-I built this because every time I submitted a PR and the reviews came back, I'd spend time manually reading through each comment, figuring out what was a real blocker versus noise, and deciding what to do about it. CodeRabbit, Cursor, and human reviewers all produce different formats and different signal-to-noise ratios — and I was doing the same triage dance every time. I realized I didn't actually have to.
-
-This skill loads the full PR review context, builds a complete inventory, deduplicates by underlying issue, classifies everything into four buckets, resolves fixed inline threads on GitHub, tracks real deferred work in Linear, and recommends prevention tests so the same issues don't come back.
-
-[Full docs →](triage-review-comments/README.md)
-
----
-
-## Quick start
-
-### Plugin marketplace install
-
-The recommended install path is the Codex plugin marketplace flow. In the Codex app, open Settings -> Plugins, choose the option to add another marketplace source, and paste this repository URL:
+## 🧰 What Is Included
 
 ```text
-https://github.com/coryparrry/codex-skills.git
+.
+├── .agents/
+│   └── plugins/
+│       └── marketplace.json
+├── docs/
+│   ├── codex-adversarial-gate.md
+│   ├── git-clean-merged-branch.md
+│   ├── installation.md
+│   ├── reference.md
+│   ├── triage-review-comments.md
+│   └── usage.md
+├── plugins/
+│   └── codex-skills/
+│       ├── .codex-plugin/
+│       └── skills/
+├── scripts/
+│   ├── install.sh
+│   └── test_install.sh
+├── skills.sh.json
+└── skills/
+    ├── codex-adversarial-gate/
+    ├── git-clean-merged-branch/
+    └── triage-review-comments/
 ```
 
-Codex can then install the `personal-codex-skills` plugin from that marketplace source and keep it updated from the Git repo.
+## 🧩 Codex Marketplace
 
-CLI equivalent:
+The repo marketplace lives at [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). The Codex plugin manifest lives at [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json), and it exposes the lightweight installable skills under [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/).
 
-```bash
-codex plugin marketplace add \
-  'https://github.com/coryparrry/codex-skills.git' \
-  --ref 'main' \
-  --sparse '.agents/plugins' \
-  --sparse 'plugins'
+Install through the Codex app:
 
-codex plugin list --marketplace codex-skills
-codex plugin add personal-codex-skills --marketplace codex-skills
-```
+1. Open **Plugins** in the Codex app.
+2. Click **Add marketplace**.
+3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
+4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
 
-### Manual skill install
+If you use `codex-adversarial-gate`, also clone the repo and run its agent installer:
 
 ```bash
 git clone https://github.com/coryparrry/codex-skills.git
 cd codex-skills
-
-# Install a skill
-cp -r codex-budget-router ~/.agents/skills/codex-budget-router
-codex-budget-router/scripts/install-agent-profiles.sh
+bash skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-Then restart Codex. Each skill's README has detailed install and usage instructions.
+Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
 
----
+The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
-## Layout
+## ⚡ Quick Usage
 
-Each skill lives in its own folder with a `SKILL.md`, agent profiles, scripts, and optional references and tests.
+Run the adversarial completion gate:
 
 ```text
-codex-budget-router/
-  SKILL.md        — deprecated routing skill
-  README.md       — full documentation
-  agents/         — worker TOML profiles
-  references/     — workflows, prompts, fallback
-  scripts/        — installer, audit tool
-  tests/          — tests for the audit script
-
-git-clean-merged-branch/
-  SKILL.md        — the skill Codex loads
-  README.md       — full documentation
-  agents/         — agent metadata
-  scripts/        — the cleanup script
-
-triage-review-comments/
-  SKILL.md        — the skill Codex loads
-  README.md       — full documentation
-  agents/         — agent metadata
-  references/     — fuller triage guidance
-
-codex-code-review/
-  SKILL.md        — Codex Code Review router
-  README.md       — full documentation
-  agents/         — reviewer and consolidator TOML profiles
-  references/     — workflow and calibration references
-  assets/         — report and coverage matrix templates
-  scripts/        — agent profile installer
-
-plugins/personal-codex-skills/
-  .codex-plugin/  — plugin manifest
-  skills/         — bundled installable copies of the skills
-
-.agents/plugins/
-  marketplace.json — repository marketplace manifest
+Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
 ```
 
----
+Clean up a branch after GitHub merge:
 
-## License
+```text
+git-clean-merged-branch
+```
 
-MIT
+Triage PR review comments:
+
+```text
+Use $triage-review-comments to triage the review comments on this PR.
+```
+
+## 📖 Documentation
+
+- [Installation](docs/installation.md)
+- [Usage Guide](docs/usage.md)
+- [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
+- [Reference](docs/reference.md)
+- [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
+- [Triage Review Comments](docs/triage-review-comments.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+
+## 🚀 Install
+
+### Prerequisites
+
+- Codex with local skills enabled
+- Git, to clone the repository
+- Python 3 for the adversarial review archive helper
+
+### Install With skills.sh
+
+Install the repo skills for Codex with the `skills` CLI:
+
+```bash
+npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
+```
+
+If you use `codex-adversarial-gate`, also run its agent installer:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+bash skills/codex-adversarial-gate/scripts/install.sh
+```
+
+### Install A Skill
+
+Install `codex-adversarial-gate`:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+bash skills/codex-adversarial-gate/scripts/install.sh
+```
+
+Install `git-clean-merged-branch`:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+mkdir -p ~/.codex/skills
+cp -R skills/git-clean-merged-branch ~/.codex/skills/git-clean-merged-branch
+```
+
+Install `triage-review-comments`:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+mkdir -p ~/.codex/skills
+cp -R skills/triage-review-comments ~/.codex/skills/triage-review-comments
+```
+
+Restart Codex if the new skills or agents do not appear immediately.
+
+## 🧪 Validation
+
+Run the install smoke test:
+
+```bash
+bash scripts/test_install.sh
+```
+
+Run syntax and helper checks:
+
+```bash
+bash -n scripts/install.sh
+bash -n skills/codex-adversarial-gate/scripts/install.sh
+python3 -m json.tool skills.sh.json >/dev/null
+python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
+python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+python3 -m py_compile \
+  skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
+  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
+git diff --check
+```
+
+Run a plugin packaging check when `plugin-eval` is available:
+
+```bash
+plugin-eval analyze plugins/codex-skills --format markdown
+```
+
+## 🤝 Contributing
+
+Contributions should keep each skill small, installable, and generic. Changes to `codex-adversarial-gate` should preserve the central invariant: implementation work is not complete until reviewer `PASS`, critic `AGREE_PASS`, and both exact review outputs are archived.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+
+## 🛡️ Security
+
+Do not archive review output that contains credentials, tokens, private paths, or sensitive diagnostics. See [SECURITY.md](SECURITY.md).
+
+## 📄 License
+
+Distributed under the MIT License. See [LICENSE](LICENSE).
