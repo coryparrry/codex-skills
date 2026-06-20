@@ -1,0 +1,21 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Review Gates",
+      "description": "Skills for adversarial plan and implementation closeout.",
+      "skills": [
+        "codex-adversarial-gate"
+      ]
+    },
+    {
+      "title": "Git Workflow",
+      "description": "Skills for practical Git and PR review workflows.",
+      "skills": [
+        "git-clean-merged-branch",
+        "triage-review-comments"
+      ]
+    }
+  ]
+}

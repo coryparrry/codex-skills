@@ -31,6 +31,24 @@ bash skills/codex-adversarial-gate/scripts/install.sh
 
 The marketplace install exposes the plugin skills. The adversarial gate script is still required because that skill needs custom reviewer TOMLs copied into `~/.codex/agents`.
 
+## Install Through skills.sh
+
+Install the repo skills for Codex with the `skills` CLI:
+
+```bash
+npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
+```
+
+If you use `codex-adversarial-gate`, also clone the repo and run its install script:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+bash skills/codex-adversarial-gate/scripts/install.sh
+```
+
+The `skills` CLI installs the skill folders. The adversarial gate script is still required for the custom reviewer TOMLs.
+
 ## Install Codex Adversarial Gate
 
 ```bash

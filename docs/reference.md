@@ -13,6 +13,7 @@ This reference describes the files, install paths, scripts, custom agents, and v
     plugin.json
   docs/
   scripts/
+  skills.sh.json
   skills/
     codex-adversarial-gate/
     git-clean-merged-branch/
@@ -30,6 +31,17 @@ This reference describes the files, install paths, scripts, custom agents, and v
 | Capabilities | `Interactive`, `Read`, `Write` |
 
 The manifest exposes every skill folder under `skills/`.
+
+## skills.sh Config
+
+| Field | Value |
+|---|---|
+| Config path | `skills.sh.json` |
+| Repo page | `https://skills.sh/coryparrry/codex-skills` |
+| Badge | `https://skills.sh/b/coryparrry/codex-skills` |
+| Groups | `Review Gates`, `Git Workflow` |
+
+The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service.
 
 ## Marketplace Entry
 
@@ -168,6 +180,7 @@ python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
   skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 git diff --check

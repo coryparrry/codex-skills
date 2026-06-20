@@ -4,6 +4,7 @@
 ![Review Gate](https://img.shields.io/badge/Review_Gate-Adversarial-b91c1c?style=for-the-badge)
 ![Git Workflow](https://img.shields.io/badge/Git-Workflow-2563eb?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
+[![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
 > A small Codex skill bundle for adversarial review gates, safe Git branch cleanup, and practical PR feedback triage.
 
@@ -46,6 +47,7 @@ The repo also includes smaller utility skills for safely cleaning up merged Git 
 ├── scripts/
 │   ├── install.sh
 │   └── test_install.sh
+├── skills.sh.json
 └── skills/
     ├── codex-adversarial-gate/
     │   ├── SKILL.md
@@ -123,6 +125,22 @@ Use $triage-review-comments to triage the review comments on this PR.
 - Git, to clone the repository
 - Python 3 for the adversarial review archive helper
 
+### Install With skills.sh
+
+Install the repo skills for Codex with the `skills` CLI:
+
+```bash
+npx skills add https://github.com/coryparrry/codex-skills --agent codex --skill '*'
+```
+
+If you use `codex-adversarial-gate`, also run the repo installer because that skill needs custom reviewer TOMLs copied into `~/.codex/agents`:
+
+```bash
+git clone https://github.com/coryparrry/codex-skills.git
+cd codex-skills
+bash skills/codex-adversarial-gate/scripts/install.sh
+```
+
 ### Install A Skill
 
 Install `codex-adversarial-gate`:
@@ -168,6 +186,7 @@ Run syntax and helper checks:
 ```bash
 bash -n scripts/install.sh
 bash -n skills/codex-adversarial-gate/scripts/install.sh
+python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool .codex-plugin/plugin.json >/dev/null
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
