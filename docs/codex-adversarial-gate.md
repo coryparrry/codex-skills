@@ -138,3 +138,4 @@ skills/codex-adversarial-gate/
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Codex Code Review](codex-code-review.md)

@@ -8,7 +8,7 @@
       "name": "codex-skills",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/codex-skills"
       },
       "policy": {
         "installation": "AVAILABLE",

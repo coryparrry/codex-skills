@@ -10,11 +10,18 @@
       ]
     },
     {
-      "title": "Git Workflow",
-      "description": "Skills for practical Git and PR review workflows.",
+      "title": "Review Workflows",
+      "description": "Skills for code review and PR feedback triage.",
       "skills": [
-        "git-clean-merged-branch",
+        "codex-code-review",
         "triage-review-comments"
+      ]
+    },
+    {
+      "title": "Git Workflow",
+      "description": "Skills for practical Git workflow cleanup.",
+      "skills": [
+        "git-clean-merged-branch"
       ]
     }
   ]

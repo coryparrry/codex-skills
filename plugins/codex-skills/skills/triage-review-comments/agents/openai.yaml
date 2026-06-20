@@ -1,0 +1,4 @@
+interface:
+  display_name: "Triage Review Comments"
+  short_description: "Classify PR review comments and suggest prevention tests."
+  default_prompt: "Use $triage-review-comments to fully inventory the current PR comments first, then actually resolve high-confidence inline review threads already fixed by the current code when GitHub tooling is available, report any fixed threads that could not be resolved remotely, file real deferred items in Linear under the correct project, sort the rest into fix now, fix if cheap, defer, and ignore, and recommend practical tests, workflows, CLI checks, or Codex pre-push validation that would prevent the real issues from recurring."
