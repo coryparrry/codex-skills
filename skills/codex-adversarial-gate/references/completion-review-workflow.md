@@ -1,10 +1,10 @@
 # Completion Review Workflow
 
-Read this for implementation closeout, especially with `ce-work`.
+Read this for implementation closeout.
 
-## ce-work Slice Boundary Contract
+## Slice Boundary Contract
 
-When `codex-adversarial-gate` is active with `ce-work`, run this workflow at each reviewable implementation boundary, not only before the final response.
+When `codex-adversarial-gate` is active for implementation work, run this workflow at each reviewable implementation boundary, not only before the final response.
 
 - Treat every named phase, U-slice, checkpoint, grouped unit, goal-dashboard item, task-list item, Todo/checklist item, issue-tracker item, or final-report row as reviewable if the implementing thread would mark it `complete`, `done`, `closed`, or equivalent.
 - Keep the unit open as `implemented-awaiting-adversarial-review` or equivalent until reviewer `PASS`, critic `AGREE_PASS`, and both archive paths exist.

@@ -12,7 +12,7 @@ The implementing Codex thread is the implementer. Reviewer and critic roles are 
 
 Keep the reviewer and critic read-only. Archiving is an implementer responsibility because letting the reviewer mutate the repo during review weakens the frozen-artifact boundary.
 
-For `ce-work`, the protocol applies throughout the implementation flow. A loaded skill, pending checklist item, or final closeout reminder is not enough; every reviewable phase or slice boundary must stop for the reviewer-plus-critic archive cycle before the implementer can mark that unit complete.
+The protocol applies throughout the implementation flow. A loaded skill, pending checklist item, or final closeout reminder is not enough; every reviewable phase or slice boundary must stop for the reviewer-plus-critic archive cycle before the implementer can mark that unit complete.
 
 ## Paper-Derived Process
 
