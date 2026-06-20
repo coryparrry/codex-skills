@@ -40,6 +40,8 @@ The archive file must include:
 
 If the review output contains a secret or credential, stop and report it instead of archiving. Do not redact silently unless the owner explicitly instructs it.
 
+Archive exact reviewer text. Do not silently trim or normalize the review body to satisfy formatting checks; that weakens the audit trail. After archiving, stage the archive if it belongs in the closeout commit, rerun the current staged status/whitespace checks, and treat any formatting failure as artifact hygiene unless it contradicts the evidence packet or makes the gate trail unreliable.
+
 ## Preferred Script
 
 Use the bundled helper when Python 3 is available:

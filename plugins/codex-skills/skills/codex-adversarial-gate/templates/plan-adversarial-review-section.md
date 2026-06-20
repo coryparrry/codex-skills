@@ -13,9 +13,9 @@ Rules:
 1. Before finalizing this plan, identify decisions only the owner can make and ask those questions. Do not record unasked questions as "user decisions", "owner decisions", assumptions, TBDs, or future implementer choices.
 2. If blocking owner decisions remain unanswered, stop with `BLOCKED_OWNER_DECISION`; do not save, hand off, or mark the plan final.
 3. Before finalizing this plan, run `plan_adversarial_reviewer`. Run at most 3 completed plan-review iterations by default: iteration 1 reviews the whole plan; later iterations are delta reviews focused on prior findings and exact revisions. Continue beyond 3 only if the owner asks or a critical safety/security/source-truth blocker needs one small fix and one additional delta review.
-4. The plan reviewer must score scope, changed files, validation, runtime contracts, user/security impact, deferred follow-ups, and completion gates when applicable.
-5. Missing, fake, or unjustified-N/A plan sections cap the plan score under the adversarial rubric. Static schema parity alone is not enough when runtime behavior changes.
-6. Before marking any implementation phase or reviewable slice complete, freeze the artifact and run `task_completion_adversarial_reviewer` with a compact evidence packet: acceptance criteria, current status and changed files, diff inspection pointers, raw validation log paths or raw output excerpts with exit status, skipped checks and reasons, known risks, and rerun change log when applicable.
+4. The plan reviewer must score the required plan-quality sections when present or applicable, using repo-specific equivalent names when the active planning workflow uses different labels: `Plan Type`, repo-specific prevention guard, `File Action Map`, `Proof Tier Map`, `Auth/Exposure Mode Matrix`, `Runtime Emission vs Contract Map`, `Acceptance Criteria Traceability Map`, `Validation Environment Contract`, `Developer-Facing Surface Check`, `Deferred Follow-Ups`, `Plan Quality Self-Review`, `Adversarial Review Contract`, and `Phase/Slice Commit Contract`.
+5. Missing, fake, or unjustified-N/A plan-quality sections cap the plan score under the adversarial rubric. Static schema parity alone is not enough when runtime behavior changes.
+6. Before marking any implementation phase or reviewable slice complete, freeze the artifact and run `task_completion_adversarial_reviewer` with a compact evidence packet: acceptance criteria, current status and changed files, diff inspection pointers, raw validation log paths or raw output excerpts with exit status, skipped checks, known risks, relevant prevention lanes, outer-loop change log when rerunning, the concrete repo-specific prevention guard when applicable, and the applicable file-action/proof-tier/auth-exposure/runtime-contract/acceptance-traceability/validation-environment/developer-facing/deferred-follow-up entries or repo-specific equivalents.
 7. Do not use `plan_adversarial_reviewer` for implementation completion. If it was used, its verdict does not count; rerun with `task_completion_adversarial_reviewer`.
 8. A reviewer `PASS` is preliminary. Run `task_completion_review_critic` with the original evidence packet and exact reviewer output.
 9. A phase/slice is complete only after `task_completion_adversarial_reviewer` returns `PASS` and `task_completion_review_critic` returns `AGREE_PASS`.
@@ -36,14 +36,21 @@ Rules:
 - Loop cap used:
 - Plan review archive paths:
 - Final phase scores:
-- Plan section scores:
-  - Scope and sequencing:
-  - Changed files and non-touches:
-  - Validation and evidence:
-  - Runtime contracts or N/A reason:
-  - User/security/privacy impact:
-  - Deferred follow-ups:
-  - Completion gates:
+- Plan-quality/equivalent section scores:
+  - Repo-specific equivalents or N/A reasons:
+  - Plan Type:
+  - Repo-specific prevention guard:
+  - File Action Map:
+  - Proof Tier Map:
+  - Auth/Exposure Mode Matrix:
+  - Runtime Emission vs Contract Map:
+  - Acceptance Criteria Traceability Map:
+  - Validation Environment Contract:
+  - Developer-Facing Surface Check:
+  - Deferred Follow-Ups:
+  - Plan Quality Self-Review:
+  - Adversarial Review Contract:
+  - Phase/Slice Commit Contract:
 - Findings fixed during iteration:
 - Remaining blockers after capped loop:
 - Remaining non-blocking risks:

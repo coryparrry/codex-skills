@@ -20,6 +20,8 @@ If this is a rerun after task_completion_review_critic returned DISAGREE_EVIDENC
 
 Follow the frozen-artifact rule. If files, staging, generated artifacts, or fix commands changed after the implementer built the packet, the current review cycle is invalid and you should return BLOCKED_INSUFFICIENT_EVIDENCE unless the implementer supplies a fresh packet and change log.
 
+Check the final staged artifact before PASS. The packet should show intended ignored evidence files staged, manifests/checksums current when relied on, and current status/untracked/staged-diff/whitespace checks rerun after the latest evidence or archive change. If these are missing and closeout depends on them, return BLOCKED_INSUFFICIENT_EVIDENCE.
+
 Inputs you should expect:
 - phase/slice id/name;
 - exact acceptance criteria;
@@ -28,8 +30,11 @@ Inputs you should expect:
 - current branch/status and changed files, including staged, unstaged, and untracked files;
 - diff inspection pointers or a narrow relevant patch excerpt;
 - validation ledger with command, cwd, exit status, raw log path or raw output excerpt, and run order after the latest fix;
+- frozen-state evidence: latest staged status, unstaged diff, untracked files, staged whitespace check, manifest/checksum status, and intentionally staged ignored evidence files;
 - rerun change log describing what changed since the previous reviewer/critic verdict when this is a rerun;
 - skipped checks and reasons;
+- prevention lanes and source-owner/proof-tier notes;
+- repo-specific prevention guard when present;
 - changed user/API/schema/docs/runtime behavior;
 - security/privacy/auth/exposure risks or a concrete non-applicable reason;
 - acceptance criteria traceability;
@@ -53,6 +58,11 @@ Risk checks:
 - Check writes, migrations, queue actions, external calls, publish/deploy steps, or irreversible state changes when touched.
 - Check auth, ownership, permissions, filesystem paths, public/private diagnostics, redaction, or unsafe defaults when touched.
 
+Blocker calibration:
+- Product blockers include unmet acceptance criteria, incorrect behavior, unsafe exposure, source-owner drift, stale generated/source-truth artifacts, scope creep, or validation that does not prove the changed behavior.
+- Evidence blockers include missing raw logs, stale/wrong-branch validation, unstaged or untracked files that alter the reviewed artifact, ignored evidence files that were not staged, missing manifests/checksums when the packet relies on them, or a live command contradicting the packet.
+- Artifact hygiene includes archive formatting, evidence-file whitespace, filename polish, or log packaging details that do not change product behavior. It blocks only when it fails a required repo check, contradicts the packet's current-state claims, hides or corrupts raw evidence, or would make the archived gate trail unreliable.
+
 Verdicts:
 - PASS: criteria met, scope controlled, validation sufficient, no blocking defects found. This is preliminary and must go to task_completion_review_critic.
 - FAIL_NEEDS_FIX: implementation has a concrete defect or unmet requirement.
@@ -64,6 +74,7 @@ PASS rules:
 - PASS is preliminary until task_completion_review_critic returns AGREE_PASS.
 - PASS requires raw validation artifacts or a safe targeted reviewer rerun. Implementer summaries alone are insufficient.
 - PASS requires current branch/status and staged, unstaged, and relevant untracked-file inspection.
+- PASS requires final staged-artifact freeze evidence when closeout will be committed: intended ignored evidence files staged, manifests/checksums current when used, and status/whitespace checks rerun after the latest archive or evidence change.
 - PASS is forbidden if the artifact changed during the active reviewer/critic cycle without a fresh packet.
 - PASS is forbidden if a critic disagreement is unresolved by exact evidence, a fix, an owner decision, or a BLOCKED verdict.
 - PASS is forbidden if validation evidence predates the latest relevant change or comes from a different branch/worktree.
@@ -107,9 +118,11 @@ Return exactly this structure:
 | Validation environment |  |  |
 | Deferred follow-ups or N/A reason |  |  |
 | Raw validation artifact or safe rerun proof |  |  |
+| Frozen staged artifact evidence |  |  |
 | Rerun change log, if rerun |  |  |
 | Critic dissent addressed, if rerun |  |  |
 | Skipped checks |  |  |
+| Prevention lanes and source-owner/proof-tier notes |  |  |
 | Scope boundaries |  |  |
 | Project-specific risk checks |  |  |
 | Safety/privacy/security |  |  |

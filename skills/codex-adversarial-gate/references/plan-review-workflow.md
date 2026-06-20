@@ -12,7 +12,7 @@ Return `BLOCKED_OWNER_DECISION` if the plan records an unresolved owner choice a
 
 1. Draft the plan with the active planning skill and current repo instructions.
 2. Add the contract from `templates/plan-adversarial-review-section.md`.
-3. Run `plan_adversarial_reviewer` with the plan path, source docs checked, owner questions/answers, assumptions, phase list, validation strategy, dependency choices, evidence expectations, and out-of-scope boundaries.
+3. Run `plan_adversarial_reviewer` with the plan path, source docs checked, owner questions/answers, assumptions, phase list, validation strategy, dependency choices, plan-quality sections or repo-specific equivalents, and out-of-scope boundaries.
 4. Require every reviewable phase to score 100.
 5. Revise and rerun only inside the bounded loop.
 6. Archive each reviewer output under `<repo>/docs/Adversarial Reviews/`.
@@ -35,16 +35,16 @@ Return `BLOCKED_OWNER_DECISION` if the plan records an unresolved owner choice a
 - unresolved risks or non-blockers;
 - phase list and acceptance criteria;
 - dependency and validation choices;
-- changed-file plan or equivalent;
-- evidence and validation plan or equivalent;
+- file/action ownership map or equivalent;
+- proof-tier map or equivalent;
 - production-composition proof expectations when relevant;
-- auth/exposure notes when relevant;
-- runtime/generated-artifact contract notes when relevant;
+- auth/exposure mode matrix when relevant;
+- runtime/generated-artifact contract map when relevant;
 - acceptance traceability;
 - validation environment contract;
 - developer-facing surface check;
 - deferred follow-ups;
-- plan quality sanity check;
+- plan quality self-review;
 - out-of-scope boundaries.
 
 ## Stop Conditions

@@ -15,18 +15,21 @@ Do not edit files. Do not implement fixes. Do not run broad write-capable comman
 Inputs you should expect:
 - the original frozen completion evidence packet;
 - the exact output from task_completion_adversarial_reviewer;
+- the reviewer archive path;
+- current frozen-state evidence after the reviewer archive, including staged status, unstaged diff, untracked files, staged whitespace checks, and manifest/checksum status when used;
 - phase/slice id/name and acceptance criteria;
 - current branch/status, changed files, diff pointers, and raw validation artifacts;
-- project-specific risk checks, source-of-truth notes, changed user/API/schema/docs/runtime behavior, security/privacy risks, acceptance traceability, and validation environment;
+- prevention lanes, source-owner/proof-tier notes, project-specific risk checks, source-of-truth notes, changed user/API/schema/docs/runtime behavior, security/privacy risks, acceptance traceability, and validation environment;
 - rerun change log if this is a rerun after a prior disagreement.
 
 Critic protocol:
 1. Check whether the artifact stayed frozen during review. If files, staging, generated artifacts, or fix commands changed after the packet was sent, return DISAGREE_CONCERN.
 2. Check whether the reviewer cited raw evidence for every material PASS claim. Implementer summaries and reviewer confidence are not evidence.
-3. Check current-state integrity: branch/status, staged diff, unstaged diff, relevant untracked files, and post-fix validation evidence.
+3. Check current-state integrity: branch/status, staged diff, unstaged diff, relevant untracked files, staged ignored evidence files, manifest/checksum freshness when relied on, and post-fix validation evidence.
 4. Check scope: compare the diff against the task, plan, implementation unit, user-requested boundary, and recorded deferred follow-ups.
 5. Check false-confidence patterns: lint-only proof for runtime behavior, static-schema-only proof for changed runtime behavior, mock-only or override-only proof for production wiring, stale logs, missing denied paths, happy-path-only tests, missing required risk evidence, and unrecorded deferrals.
-6. Preserve dissent. If a real concern cannot be resolved from evidence, return DISAGREE_CONCERN. If code/log/status evidence contradicts the reviewer, return DISAGREE_EVIDENCE.
+6. Classify concerns as product blockers, evidence blockers, or artifact hygiene. Artifact hygiene blocks only when it fails a required check, contradicts current-state evidence, hides or corrupts raw proof, or would make the archived gate trail unreliable.
+7. Preserve dissent. If a real concern cannot be resolved from evidence, return DISAGREE_CONCERN. If code/log/status evidence contradicts the reviewer, return DISAGREE_EVIDENCE.
 
 Dispositions:
 - AGREE_PASS: the reviewer PASS is evidence-backed, scoped, and safe to accept.
@@ -35,10 +38,10 @@ Dispositions:
 
 Return AGREE_PASS only when:
 - every material PASS claim has evidence you can point to;
-- current branch/status, staged and unstaged diffs, relevant untracked files, and validation artifacts were checked;
+- current branch/status, staged and unstaged diffs, relevant untracked files, frozen staged-artifact evidence, and validation artifacts were checked;
 - validation is current and matches the changed behavior;
 - scope did not drift or the drift was explicitly owner-approved and validated;
-- project-specific risk checks have no blocker;
+- selected prevention lanes and project-specific risk checks have no blocker;
 - skipped checks are justified;
 - no reviewer concern was dropped through confident prose.
 
@@ -72,6 +75,10 @@ State whether the diff stayed within the task, plan, implementation unit, and us
 ## False-Consensus Check
 
 Name any places where the reviewer accepted confidence, implementer summaries, stale proof, weak proof, or agreement without evidence.
+
+## Artifact Hygiene Check
+
+State whether any artifact hygiene issue is blocking, nonblocking, or irrelevant. If blocking, explain which required check, current-state claim, raw proof, or archive reliability property it breaks.
 
 ## Dissent Log
 
