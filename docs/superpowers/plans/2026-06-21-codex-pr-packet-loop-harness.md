@@ -1307,7 +1307,7 @@ Run:
 
 ```bash
 for skill in codex-packet-init codex-packet-slice codex-packet-dispatch codex-packet-worker codex-packet-review codex-packet-integrate codex-packet-maintain; do
-  python3 /Users/coryparry/.codex/skills/.system/skill-creator/scripts/quick_validate.py "skills/$skill"
+  python3 /Users/coryparry/.codex/skills/.system/skill-creator/scripts/quick_validate.py "experimental/codex-pr-packet-loop/skills/$skill"
 done
 ```
 
