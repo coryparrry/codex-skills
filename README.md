@@ -23,7 +23,7 @@ The repo also includes utility skills for beta multi-worktree orchestration, saf
 ## ✨ Skills
 
 - 🧠 **codex-adversarial-gate** gates plan and implementation closeout with reviewer-plus-critic evidence.
-- 🧭 **multi-phase-orchestrator** (beta) coordinates multiple work units through fresh Codex worktree threads.
+- 🧭 [**multi-phase-orchestrator** (beta)](docs/multi-phase-orchestrator.md#multi-phase-orchestrator-beta) coordinates multiple work units through fresh Codex worktree threads.
 - 🌿 **git-clean-merged-branch** returns a repo to its default branch and deletes merged local and remote branches after safety checks.
 - 🔎 **triage-review-comments** inventories PR comments, removes noise, deduplicates findings, and classifies real review work.
 - 🧾 **Codex marketplace plugin** exposes the bundle through `plugins/codex-skills`.
