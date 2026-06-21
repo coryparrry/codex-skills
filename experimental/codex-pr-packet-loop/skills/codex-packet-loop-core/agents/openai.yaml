@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Loop Core"
+  short_description: "Validate packet-loop state and leases"
+  default_prompt: "Use $codex-packet-loop-core to validate the packet-loop state for this repo."
