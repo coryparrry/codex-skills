@@ -190,6 +190,54 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("human-gated", result.stderr)
 
+    def test_init_refuses_to_overwrite_existing_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+
+            result = self.run_cli(repo, "init", "--name", "replacement")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("already initialized", result.stderr)
+            manifest = json.loads((repo / ".codex/packet-loop/manifest.json").read_text())
+            self.assertEqual(manifest["repo"]["name"], "demo")
+            self.assertEqual(manifest["packet_order"], ["P001"])
+            self.assertTrue((repo / ".codex/packet-loop/packets/P001.json").is_file())
+
+    def test_transition_cannot_reserve_packet_without_lease(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
+
+            result = self.run_cli(repo, "transition", "--packet", "P001", "--status", "reserved")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid transition", result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["status"], "ready")
+            self.assertIsNone(packet["lease"])
+
+    def test_validate_rejects_reserved_packet_without_lease(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
+
+            packet_path = repo / ".codex/packet-loop/packets/P001.json"
+            packet = json.loads(packet_path.read_text())
+            packet["status"] = "reserved"
+            packet["lease"] = None
+            packet_path.write_text(json.dumps(packet) + "\n")
+
+            result = self.run_cli(repo, "validate")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("reserved packet requires lease", result.stderr)
+
     def test_lease_ready_packet(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

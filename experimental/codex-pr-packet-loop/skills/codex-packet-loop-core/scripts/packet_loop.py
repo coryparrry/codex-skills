@@ -37,7 +37,7 @@ MODES = {"planning"}
 HUMAN_GATED_STATUSES = {"merged", "rejected"}
 ALLOWED_TRANSITIONS = {
     "candidate": {"ready", "blocked", "needs-reslice", "rejected"},
-    "ready": {"reserved", "blocked", "needs-reslice", "rejected"},
+    "ready": {"blocked", "needs-reslice", "rejected"},
     "reserved": {"ready", "in-progress", "blocked", "needs-reslice", "rejected"},
     "in-progress": {"ready", "pr-open", "needs-fix", "blocked", "needs-reslice", "rejected"},
     "pr-open": {"reviewing", "needs-fix", "blocked", "rejected"},
@@ -284,6 +284,13 @@ def validate_packet(packet: dict[str, Any]) -> list[str]:
         ):
             errors.append(f"packet {packet.get('id', '<unknown>')} validation.commands must be non-empty strings")
     lease = packet.get("lease")
+    if status in {"reserved", "in-progress"}:
+        if not isinstance(lease, dict):
+            errors.append(f"{status} packet requires lease")
+        if not isinstance(packet.get("branch"), str) or not packet.get("branch"):
+            errors.append(f"{status} packet requires branch")
+        if not isinstance(packet.get("worktree"), str) or not packet.get("worktree"):
+            errors.append(f"{status} packet requires worktree")
     if lease is not None:
         if not isinstance(lease, dict):
             errors.append(f"packet {packet.get('id', '<unknown>')} lease must be an object or null")
@@ -330,6 +337,8 @@ def packet_list(values: list[str] | None) -> list[str]:
 
 def cmd_init(args: argparse.Namespace) -> int:
     repo = args.repo
+    if manifest_path(repo).exists():
+        raise PacketLoopError("packet-loop state already initialized")
     if args.active_packet_limit < 1:
         raise PacketLoopError("active_packet_limit must be a positive integer")
     state_dir(repo).mkdir(parents=True, exist_ok=True)
