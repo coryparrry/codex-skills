@@ -1,6 +1,6 @@
 interface:
-  display_name: "Multi-Phase Orchestrator"
-  short_description: "Coordinate fresh worktree threads"
+  display_name: "Multi-Phase Orchestrator (Beta)"
+  short_description: "Beta worktree-thread orchestration"
   default_prompt: "Use $multi-phase-orchestrator to coordinate these work units with fresh worktree threads, required skills per unit, validation, and safe integration."
 
 policy:

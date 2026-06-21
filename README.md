@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> A small Codex skill bundle for adversarial review gates, safe Git branch cleanup, and practical PR feedback triage.
+> A small Codex skill bundle for adversarial review gates, beta multi-agent orchestration, safe Git branch cleanup, and practical PR feedback triage.
 
 ## 📌 Overview
 
@@ -18,11 +18,12 @@ The main skill in this repo is `codex-adversarial-gate`. It keeps implementation
 2. A critic reviews that `PASS` and returns `AGREE_PASS`.
 3. Both exact review outputs are archived under `docs/Adversarial Reviews/`.
 
-The repo also includes utility skills for safe merged-branch cleanup and PR review feedback triage.
+The repo also includes utility skills for beta multi-worktree orchestration, safe merged-branch cleanup, and PR review feedback triage.
 
 ## ✨ Skills
 
 - 🧠 **codex-adversarial-gate** gates plan and implementation closeout with reviewer-plus-critic evidence.
+- 🧭 **multi-phase-orchestrator** (beta) coordinates multiple work units through fresh Codex worktree threads.
 - 🌿 **git-clean-merged-branch** returns a repo to its default branch and deletes merged local and remote branches after safety checks.
 - 🔎 **triage-review-comments** inventories PR comments, removes noise, deduplicates findings, and classifies real review work.
 - 🧾 **Codex marketplace plugin** exposes the bundle through `plugins/codex-skills`.
@@ -39,6 +40,7 @@ The repo also includes utility skills for safe merged-branch cleanup and PR revi
 │   ├── codex-adversarial-gate.md
 │   ├── git-clean-merged-branch.md
 │   ├── installation.md
+│   ├── multi-phase-orchestrator.md
 │   ├── reference.md
 │   ├── triage-review-comments.md
 │   └── usage.md
@@ -53,6 +55,7 @@ The repo also includes utility skills for safe merged-branch cleanup and PR revi
 └── skills/
     ├── codex-adversarial-gate/
     ├── git-clean-merged-branch/
+    ├── multi-phase-orchestrator/
     └── triage-review-comments/
 ```
 
@@ -74,7 +77,7 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adve
 bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
+Marketplace install exposes `codex-adversarial-gate`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`.
 
 The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
@@ -98,11 +101,18 @@ Triage PR review comments:
 Use $triage-review-comments to triage the review comments on this PR.
 ```
 
+Coordinate related work units through fresh worktree threads:
+
+```text
+Use $multi-phase-orchestrator to coordinate these work units with fresh worktree threads.
+```
+
 ## 📖 Documentation
 
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
 - [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
+- [Multi-Phase Orchestrator](docs/multi-phase-orchestrator.md)
 - [Reference](docs/reference.md)
 - [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
 - [Triage Review Comments](docs/triage-review-comments.md)
@@ -152,6 +162,12 @@ Install `triage-review-comments`:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
+```
+
+Install `multi-phase-orchestrator` beta:
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill multi-phase-orchestrator
 ```
 
 Restart Codex if the new skills or agents do not appear immediately.

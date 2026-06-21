@@ -19,6 +19,7 @@ For `codex-adversarial-gate`, also make sure the custom reviewer agent TOMLs are
 | Review a plan before execution | `codex-adversarial-gate` |
 | Close an implementation phase or slice | `codex-adversarial-gate` |
 | Recover from a skipped completion gate | `codex-adversarial-gate` |
+| Coordinate multiple related work units through fresh worktree threads | `multi-phase-orchestrator` beta |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
@@ -50,6 +51,18 @@ For implementation closeout, Codex should:
 8. Accept completion only when the critic returns `AGREE_PASS`.
 
 Do not use the plan reviewer to close implementation work.
+
+## Coordinate Multiple Work Units
+
+Use `multi-phase-orchestrator` beta only when you explicitly want Codex to coordinate multiple related units through fresh worktree threads.
+
+Ask:
+
+```text
+Use $multi-phase-orchestrator to coordinate these work units with fresh worktree threads.
+```
+
+The skill should bind the work source, route required skills into each child thread, track unit status, verify child outputs against live files and validation, then integrate completed units deliberately.
 
 ## Archive Review Output
 
@@ -142,5 +155,6 @@ If review triage has no PR context, load the PR or provide enough review context
 - [Installation](installation.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
+- [Multi-Phase Orchestrator](multi-phase-orchestrator.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

@@ -18,6 +18,7 @@ This reference describes the files, install paths, scripts, custom agents, and v
   skills/
     codex-adversarial-gate/
     git-clean-merged-branch/
+    multi-phase-orchestrator/
     triage-review-comments/
 ```
 
@@ -40,7 +41,7 @@ The manifest exposes the lightweight copied skill folders under `plugins/codex-s
 | Config path | `skills.sh.json` |
 | Repo page | `https://skills.sh/coryparrry/codex-skills` |
 | Badge | `https://skills.sh/b/coryparrry/codex-skills` |
-| Groups | `Review Gates`, `PR Review`, `Git Workflow` |
+| Groups | `Review Gates`, `PR Review`, `Beta Orchestration`, `Git Workflow` |
 
 The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service.
 
@@ -71,13 +72,14 @@ It contains one plugin entry:
 
 Use the Codex app to add this repo as a marketplace source, then install **Codex Skills** from that marketplace.
 
-Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh` when those agents are needed.
+Marketplace install exposes `codex-adversarial-gate`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh` when those agents are needed.
 
 ## Skills
 
 | Skill | Purpose | Main files |
 |---|---|---|
 | `codex-adversarial-gate` | Gate plan and implementation closeout with reviewer-plus-critic evidence | `SKILL.md`, `agents/`, `references/`, `scripts/`, `templates/` |
+| `multi-phase-orchestrator` | Beta orchestration for related work units across fresh worktree threads | `SKILL.md`, `agents/openai.yaml` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/clean_merged_branch.sh` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/triage-review-comments.md` |
 
@@ -89,7 +91,7 @@ Marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`,
 | Skills | `${CODEX_HOME:-$HOME/.codex}/skills/<skill-name>/` |
 | Codex agents | `${CODEX_HOME:-$HOME/.codex}/agents/` |
 
-`codex-adversarial-gate` needs a `skills` CLI copy first, then its local installer copies files into `CODEX_HOME`. The two utility skills need only their skill folder.
+`codex-adversarial-gate` needs a `skills` CLI copy first, then its local installer copies files into `CODEX_HOME`. The beta orchestrator and utility skills need only their skill folder.
 
 ## Repo-Level Scripts
 
@@ -200,5 +202,6 @@ plugin-eval analyze plugins/codex-skills --format markdown
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
+- [Multi-Phase Orchestrator](multi-phase-orchestrator.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

@@ -1,11 +1,11 @@
 ---
 name: multi-phase-orchestrator
-description: Explicit-invocation-only orchestration for multiple work units through fresh Codex worktree threads, per-unit skill routing, monitored review or implementation loops, validation, safe integration, and branch or PR closeout. Use only when the user explicitly names $multi-phase-orchestrator or directly asks to use this skill.
+description: Beta, explicit-invocation-only orchestration for multiple work units through fresh Codex worktree threads, per-unit skill routing, monitored review or implementation loops, validation, safe integration, and branch or PR closeout. Use only when the user explicitly names $multi-phase-orchestrator or directly asks to use this skill.
 ---
 
-# Multi-Phase Orchestrator
+# Multi-Phase Orchestrator (Beta)
 
-Do not invoke this skill implicitly. Use it only when the user explicitly names `$multi-phase-orchestrator` or directly asks to use this skill.
+Status: beta. Do not invoke this skill implicitly. Use it only when the user explicitly names `$multi-phase-orchestrator` or directly asks to use this skill.
 
 Coordinate multiple work units by creating fresh Codex worktree threads, giving each thread a narrow packet, monitoring them, verifying their outputs, and integrating completed work safely. A work unit can be a plan phase, bug finding, PR comment, review finding, adversarial-gate slice, docs task, validation task, or integration fix.
 
