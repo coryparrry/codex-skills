@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Review"
+  short_description: "Review packet PR scope and evidence"
+  default_prompt: "Use $codex-packet-review to review this packet PR against its packet record."

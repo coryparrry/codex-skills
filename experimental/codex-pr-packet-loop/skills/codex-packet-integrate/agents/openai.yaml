@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Integrate"
+  short_description: "Sequence merge-ready packet PRs"
+  default_prompt: "Use $codex-packet-integrate to recommend a safe merge order for eligible packet PRs."

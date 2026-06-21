@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Slice"
+  short_description: "Slice plans into PR packets"
+  default_prompt: "Use $codex-packet-slice to convert this approved plan into packet-loop records."

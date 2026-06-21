@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Init"
+  short_description: "Initialize packet-loop repo state"
+  default_prompt: "Use $codex-packet-init to initialize packet-loop state in this repo."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Maintain"
+  short_description: "Repair and report packet-loop state"
+  default_prompt: "Use $codex-packet-maintain to validate packet-loop state and report next safe actions."
