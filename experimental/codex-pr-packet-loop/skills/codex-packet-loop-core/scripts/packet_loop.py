@@ -430,6 +430,18 @@ def cmd_transition(args: argparse.Namespace) -> int:
 
 def cmd_lease(args: argparse.Namespace) -> int:
     repo = args.repo
+    errors = validate_repo(repo)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    manifest = load_manifest(repo)
+    active_count = sum(
+        1 for packet in load_packets(repo, manifest) if packet.get("status") in {"reserved", "in-progress"}
+    )
+    active_limit = manifest["active_packet_limit"]
+    if active_count >= active_limit:
+        raise PacketLoopError(f"active packet limit reached: {active_count}/{active_limit}")
     packet = load_packet(repo, args.packet)
     if packet["status"] != "ready":
         raise PacketLoopError(f"lease requires ready packet, got {packet['status']}")
@@ -473,6 +485,11 @@ def cmd_maintain(args: argparse.Namespace) -> int:
     if not args.expire_stale_leases:
         raise PacketLoopError("maintain requires at least one maintenance action")
     repo = args.repo
+    errors = validate_repo(repo)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
     manifest = load_manifest(repo)
     now = datetime.now(timezone.utc)
     expired = []
