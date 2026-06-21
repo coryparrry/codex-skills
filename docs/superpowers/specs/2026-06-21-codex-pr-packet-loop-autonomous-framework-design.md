@@ -180,6 +180,25 @@ The controller must stop before:
 - security-sensitive tradeoff
 - external submission beyond opening or updating a PR when the user has not authorized that action
 
+## Thread-Derived Controller Pattern
+
+Thread `019ee489-a02e-73b1-b60d-ea6350507d25` provides the closest local prototype for this framework. It coordinated multiple U-phase worktree threads, ran each through review gates, monitored their worktree status, steered only the lanes that drifted or blocked, and integrated completed results back into the primary branch.
+
+The reusable pattern is:
+
+1. Verify live repo state, current branch, existing plan, prior evidence, dirty files, and available worker tooling before dispatch.
+2. Create one isolated worker thread/worktree per phase or packet, all starting from the same clean target state.
+3. Give each worker a narrow packet boundary, known prior evidence, required gate workflow, validation route, stop conditions, branch/commit policy, and "do not push" rule unless pushing is explicitly authorized.
+4. Poll active thread summaries and each worktree's `git status` repeatedly while workers run.
+5. Inspect file names and diff shape before reading full diffs, so the controller can catch overlap or scope drift early without taking ownership of the worker's implementation.
+6. Send steering messages only to workers that need intervention: detached HEAD commit policy, scope drift, unstable validation loops, evidence privacy leaks, or ambiguous blockers.
+7. Keep the primary checkout clean until a worker has completed its packet gate and committed its scoped result.
+8. Integrate completed packet commits serially, rechecking overlap and validation between integrations.
+9. Run an integrated review/validation pass only after packet outputs are collected onto the target branch.
+10. Treat slow or stuck auxiliary agents as bounded waits, then close or bypass them when their output is no longer worth blocking the loop.
+
+This is not the exact final packet-loop style because packet-loop state should be structured and script-backed, not inferred only from thread messages and Git status. It is still a strong operating model for the controller skill: the controller must act as an active supervisor, not just a queue launcher.
+
 ## Stage Skill Contracts
 
 ### Init
@@ -250,6 +269,7 @@ Initial scenarios:
 5. **Maintenance expires stale lease.** Given an expired lease with no PR and no recent evidence, maintain returns the packet to ready and logs the repair.
 6. **Integration stops before merge.** Given merge-eligible packets, integrate produces a merge recommendation and does not merge.
 7. **Recovery reslices bad packet.** Given repeated validation failure caused by packet boundary mismatch, review or maintain routes to needs-reslice with a reason.
+8. **Controller supervises active workers.** Given multiple active packet leases, the controller polls thread summaries and worktree dirt, detects one drifting packet, sends a scoped steering message, and leaves non-drifting packets alone.
 
 These scenarios may start as deterministic CLI tests plus prompt-level fixtures. A later real eval should run agents through a small repo trial and grade traces, tool calls, state mutations, and artifacts.
 
@@ -272,6 +292,7 @@ This framework should not copy their bulk directly. It should adapt the deeper i
 - The CLI or validation script checks that required references and routing hooks exist.
 - Deterministic state operations use scripts where supported rather than hand-editing JSON.
 - The validation suite includes behavioral scenarios beyond static metadata checks.
+- The controller workflow includes active worker supervision: polling thread state, checking worktree dirt, steering drifting workers, and integrating completed packet outputs serially.
 - The design remains scoped to `experimental/codex-pr-packet-loop/` and does not modify shipped skill mirrors.
 
 ## Implementation Defaults
