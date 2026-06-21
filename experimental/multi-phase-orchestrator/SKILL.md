@@ -53,6 +53,16 @@ For plan implementation units, always pass the plan-required skills through to t
 - Integrate completed unit outputs deliberately, one unit at a time or by scoped file checkout when that is safer than merge commits.
 - Confirm all accepted worktree-thread fixes are present on the target branch before pushing, opening a PR, or claiming closeout.
 
+## Validation Authority Contract
+
+The coordinator owns resource-heavy validation. Child worktree threads must not run expensive build or test lanes unless the coordinator's packet explicitly lists that exact command as worker-allowed.
+
+For Apple-platform repositories, child threads must never run Xcode or XCTest lanes under any circumstances. Forbidden child commands include `xcodebuild`, `xctest`, Xcode test wrappers, XCTest or UI test suites, simulator test runs, and any repo script that invokes those tools. If a child believes Xcode/XCTest proof is required, it must report the required command and blocker to the coordinator instead of running it.
+
+Child threads may run only cheap, scoped checks that are explicitly allowed in their packet, such as syntax checks, metadata validation, `git diff --check`, or focused non-Xcode scripts. If a command might invoke Xcode, XCTest, simulators, broad package builds, or long-running test workers, the child must treat it as coordinator-only.
+
+The coordinator runs Xcode/XCTest and other expensive combined validation only after integrating or cherry-picking completed unit outputs onto the target branch or a dedicated integration worktree.
+
 ## Step 1: Bind Source, Skills, And Roles
 
 Before dispatching work, state the run binding:
@@ -61,7 +71,7 @@ Before dispatching work, state the run binding:
 - **Discovery/review skill**: optional skill used to produce candidate units, such as a bug review or PR-comment triage workflow.
 - **Implementation skill**: optional skill each worker must use to build or fix its assigned unit.
 - **Review or gate skill**: per-unit review, critic, adversarial gate, or triage workflow.
-- **Validation route**: repo tests, builds, scripts, UI checks, manual proof, or other checks.
+- **Validation route**: worker-allowed lightweight checks, coordinator-only checks, repo tests, builds, scripts, UI checks, manual proof, or other checks.
 - **Integration route**: merge, cherry-pick, scoped checkout, patch application, or manual consolidation.
 - **Closeout route**: commits, docs, archives, learning notes, PR replies, or branch/PR actions.
 
@@ -87,7 +97,7 @@ For each unit, record:
 - allowed write scope
 - dependencies and ordering constraints
 - whether it can run in parallel
-- likely validation commands
+- worker-allowed lightweight checks and coordinator-only validation commands
 - review, critic, adversarial gate, or triage requirements
 - required docs, archives, state files, commits, PR replies, or closeout records
 
@@ -129,11 +139,17 @@ Each child thread prompt must include:
 - allowed write scope
 - dependencies and ordering constraints
 - files and docs to inspect
-- validation commands or how to discover them
+- worker-allowed lightweight checks, coordinator-only validation commands, and forbidden commands
 - required review, adversarial gate, critic, triage, evidence, or archive records
 - commit requirements
 - closeout/reporting requirements
 - instruction not to revert, overwrite, or clean other agents' work
+
+For Apple-platform repositories, every child prompt must include:
+
+```text
+Validation boundary: do not run `xcodebuild`, `xctest`, Xcode test wrappers, XCTest/UI test suites, simulator test runs, or any repo script that invokes those tools. If Xcode/XCTest proof is needed, report the exact command and why; the coordinator will run it after integration.
+```
 
 When a child thread must use a skill, say that explicitly in the child prompt, for example:
 
@@ -161,7 +177,7 @@ Each child thread should:
 5. run configured unit review/gate;
 6. fix verified findings narrowly;
 7. rerun required review/gate when needed;
-8. run validation;
+8. run only worker-allowed lightweight checks and report coordinator-only validation still needed;
 9. update required records;
 10. commit if required;
 11. report changed files, commit hash, validation, records, and unresolved risks.
@@ -171,11 +187,13 @@ Each child thread should:
 Track child threads actively enough to prevent drift:
 
 - child thread status and latest summary
+- active terminal command or process status when available
 - worktree dirty files, staged files, untracked files, branch, and commit
 - overlapping changed files between units
 - edits outside assigned scope
 - missing required skills or skipped workflow steps
 - failed validation
+- child attempts to run coordinator-only validation
 - reviewer/critic disagreement or unresolved triage
 - stale evidence packets
 - dirty worktrees after claimed commits
@@ -189,12 +207,12 @@ Allowed non-blocking parent actions include:
 - ask a child for a concise status or exact blocker
 - remind a child to use a required skill or branch/commit discipline
 - narrow scope when a child is drifting
-- clarify acceptance criteria, evidence requirements, or validation commands
+- clarify acceptance criteria, evidence requirements, worker-allowed checks, or coordinator-only validation commands
 - route around file overlap before conflicts grow
 - pause integration of one unit while other units keep running
 - continue independent parent-side checks that do not compete with child validation or mutate child worktrees
 
-Wait for child threads to finish their current validation, review, gate, build, test, or commit step unless there is a legitimate coordination issue. Long-running tests, quiet review calls, Xcode/build output gaps, and slow subagents are normal waiting states, not reasons to interrupt or take over.
+Wait for child threads to finish their current worker-allowed check, review, gate, or commit step unless there is a legitimate coordination issue. Quiet review calls and slow subagents are normal waiting states, not reasons to interrupt or take over. Xcode/XCTest output from a child is always an intervention reason. Non-Apple build or test output is a normal waiting state only when the coordinator explicitly allowed that exact command in the packet.
 
 Legitimate intervention reasons include:
 
@@ -204,6 +222,9 @@ Legitimate intervention reasons include:
 - missing required skill usage or skipped workflow step
 - wrong branch, old worktree reuse, detached-HEAD commit risk, or dirty worktree after claimed commit
 - failed validation that needs parent routing
+- child starts or proposes forbidden Xcode/XCTest validation
+- child starts a broad build/test lane that was not explicitly worker-allowed
+- child cannot state the exact command currently running or whether it is worker-allowed
 - reviewer/critic disagreement that the child cannot resolve
 - claimed completion without visible commit, archive, evidence, or validation record
 - repeated identical failure or retry loop
@@ -241,6 +262,7 @@ After integration, run the configured combined validation and review:
 
 - focused tests for changed behavior
 - broader build/test lanes required by the repo
+- Xcode/XCTest validation for Apple-platform work, when required
 - diff hygiene checks
 - private-path, generated-artifact, and secret scans
 - integrated diff review when requested or required
