@@ -238,6 +238,21 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("reserved packet requires lease", result.stderr)
 
+    def test_validate_accepts_packet_without_optional_out_of_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+
+            packet_path = repo / ".codex/packet-loop/packets/P001.json"
+            packet = json.loads(packet_path.read_text())
+            del packet["out_of_scope"]
+            packet_path.write_text(json.dumps(packet) + "\n")
+
+            result = self.run_cli(repo, "validate")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_lease_ready_packet(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -355,6 +370,31 @@ class PacketLoopCLITests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("risk is invalid", result.stderr)
+
+    def test_rejected_packet_cannot_be_reopened_automatically(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "transition",
+                    "--packet",
+                    "P001",
+                    "--status",
+                    "rejected",
+                    "--human-approved",
+                ).returncode,
+                0,
+            )
+
+            result = self.run_cli(repo, "transition", "--packet", "P001", "--status", "candidate")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid transition", result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["status"], "rejected")
 
     def test_reviewed_packet_must_be_marked_merge_eligible_before_merge(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

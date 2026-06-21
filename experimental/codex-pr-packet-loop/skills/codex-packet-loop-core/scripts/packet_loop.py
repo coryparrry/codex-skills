@@ -47,7 +47,7 @@ ALLOWED_TRANSITIONS = {
     "blocked": {"ready", "needs-reslice", "rejected"},
     "needs-reslice": {"candidate", "rejected"},
     "merged": set(),
-    "rejected": {"candidate"},
+    "rejected": set(),
 }
 
 
@@ -265,13 +265,14 @@ def validate_packet(packet: dict[str, Any]) -> list[str]:
         "allowed_scope",
         "expected_touched_areas",
         "avoid_scope",
-        "out_of_scope",
         "dependencies",
         "evidence_paths",
         "blockers",
     ):
         if not isinstance(packet.get(field), list):
             errors.append(f"packet {packet.get('id', '<unknown>')} {field} must be a list")
+    if "out_of_scope" in packet and not isinstance(packet["out_of_scope"], list):
+        errors.append(f"packet {packet.get('id', '<unknown>')} out_of_scope must be a list")
     validation = packet.get("validation")
     if not isinstance(validation, dict):
         errors.append(f"packet {packet.get('id', '<unknown>')} validation must be an object")
