@@ -104,6 +104,65 @@ class PacketLoopCLITests(unittest.TestCase):
             validate = self.run_cli(repo, "validate")
             self.assertEqual(validate.returncode, 0, validate.stderr)
 
+    def test_rejects_packet_ids_that_can_escape_packet_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            escaped = repo / ".codex" / "leaked.json"
+
+            for unsafe_id in ("", "../../../leaked", "/tmp/leaked", "P/001", "P\\001", "P..001", ".hidden", "P 001"):
+                with self.subTest(packet_id=unsafe_id):
+                    result = self.run_cli(
+                        repo,
+                        "add-packet",
+                        "--id",
+                        unsafe_id,
+                        "--title",
+                        "Packet",
+                        "--goal",
+                        "Do one packet.",
+                        "--allowed-scope",
+                        "skills/demo",
+                        "--expected-area",
+                        "skills/demo",
+                        "--validation-command",
+                        "python3 -m unittest",
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("invalid packet id", result.stderr)
+            self.assertFalse(escaped.exists())
+            self.assertEqual(list((repo / ".codex/packet-loop/packets").iterdir()), [])
+
+            transition = self.run_cli(repo, "transition", "--packet", "../../../leaked", "--status", "ready")
+            self.assertNotEqual(transition.returncode, 0)
+            self.assertIn("invalid packet id", transition.stderr)
+            self.assertFalse(escaped.exists())
+
+            lease = self.run_cli(
+                repo,
+                "lease",
+                "--packet",
+                "../../../leaked",
+                "--owner-thread",
+                "thread-123",
+                "--branch",
+                "codex/leaked",
+                "--worktree",
+                "/tmp/leaked-worktree",
+            )
+            self.assertNotEqual(lease.returncode, 0)
+            self.assertIn("invalid packet id", lease.stderr)
+            self.assertFalse(escaped.exists())
+
+            manifest_path = repo / ".codex/packet-loop/manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["packet_order"] = ["../../../leaked"]
+            manifest_path.write_text(json.dumps(manifest) + "\n")
+            maintain = self.run_cli(repo, "maintain", "--expire-stale-leases")
+            self.assertNotEqual(maintain.returncode, 0)
+            self.assertIn("invalid packet id", maintain.stderr)
+            self.assertFalse(escaped.exists())
+
     def test_transition_rejects_invalid_status_move(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

@@ -15,6 +15,7 @@ PACKETS_DIR = STATE_DIR / "packets"
 MANIFEST_PATH = STATE_DIR / "manifest.json"
 EVENTS_PATH = STATE_DIR / "events.jsonl"
 DASHBOARD_PATH = Path("docs") / "codex" / "packet-loop.md"
+PACKET_ID_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-")
 
 STATUSES = {
     "candidate",
@@ -86,7 +87,23 @@ def dashboard_path(repo: Path) -> Path:
 
 
 def packet_path(repo: Path, packet_id: str) -> Path:
-    return packets_dir(repo) / f"{packet_id}.json"
+    safe_packet_id = validate_packet_id(packet_id)
+    return packets_dir(repo) / f"{safe_packet_id}.json"
+
+
+def validate_packet_id(packet_id: str) -> str:
+    if (
+        not isinstance(packet_id, str)
+        or not packet_id
+        or Path(packet_id).is_absolute()
+        or "/" in packet_id
+        or "\\" in packet_id
+        or ".." in packet_id
+        or not packet_id[0].isalnum()
+        or any(char not in PACKET_ID_CHARS for char in packet_id)
+    ):
+        raise PacketLoopError(f"invalid packet id: {packet_id!r}")
+    return packet_id
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -212,10 +229,15 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         for packet_id in packet_order:
             if not isinstance(packet_id, str):
                 errors.append("manifest packet_order entries must be strings")
-            elif packet_id in seen:
-                errors.append("manifest packet_order must not contain duplicates")
             else:
-                seen.add(packet_id)
+                try:
+                    validate_packet_id(packet_id)
+                except PacketLoopError as exc:
+                    errors.append(str(exc))
+                if packet_id in seen:
+                    errors.append("manifest packet_order must not contain duplicates")
+                else:
+                    seen.add(packet_id)
     return errors
 
 
@@ -223,6 +245,10 @@ def validate_packet(packet: dict[str, Any]) -> list[str]:
     errors = []
     if packet.get("schema_version") != SCHEMA_VERSION:
         errors.append(f"packet {packet.get('id', '<unknown>')} schema_version must be {SCHEMA_VERSION}")
+    try:
+        validate_packet_id(packet.get("id", ""))
+    except PacketLoopError as exc:
+        errors.append(str(exc))
     for field in ("id", "title", "goal", "status", "risk", "parallel_safe"):
         if not isinstance(packet.get(field), str) or not packet.get(field):
             errors.append(f"packet {packet.get('id', '<unknown>')} {field} must be a non-empty string")
@@ -330,8 +356,8 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_add_packet(args: argparse.Namespace) -> int:
     repo = args.repo
+    packet_id = validate_packet_id(args.id)
     manifest = load_manifest(repo)
-    packet_id = args.id
     if packet_id in manifest.get("packet_order", []):
         raise PacketLoopError(f"packet already exists: {packet_id}")
     if packet_path(repo, packet_id).exists():
