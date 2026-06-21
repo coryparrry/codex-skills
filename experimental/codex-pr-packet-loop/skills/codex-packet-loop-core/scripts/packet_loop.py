@@ -437,9 +437,7 @@ def cmd_lease(args: argparse.Namespace) -> int:
             print(error, file=sys.stderr)
         return 1
     manifest = load_manifest(repo)
-    active_count = sum(
-        1 for packet in load_packets(repo, manifest) if packet.get("status") in {"reserved", "in-progress"}
-    )
+    active_count = sum(1 for packet in load_packets(repo, manifest) if isinstance(packet.get("lease"), dict))
     active_limit = manifest["active_packet_limit"]
     if active_count >= active_limit:
         raise PacketLoopError(f"active packet limit reached: {active_count}/{active_limit}")

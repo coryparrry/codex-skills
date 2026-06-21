@@ -326,6 +326,54 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertEqual(packet["status"], "ready")
             self.assertIsNone(packet["lease"])
 
+    def test_lease_limit_counts_open_packet_with_live_lease(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(
+                self.run_cli(repo, "init", "--name", "demo", "--active-packet-limit", "1").returncode,
+                0,
+            )
+            self.assertEqual(self.add_basic_packet(repo, "P001").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo, "P002").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P002", "--status", "ready").returncode, 0)
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "lease",
+                    "--packet",
+                    "P001",
+                    "--owner-thread",
+                    "thread-001",
+                    "--branch",
+                    "codex/p001-demo",
+                    "--worktree",
+                    "/tmp/demo-p001",
+                ).returncode,
+                0,
+            )
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "in-progress").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "pr-open").returncode, 0)
+
+            result = self.run_cli(
+                repo,
+                "lease",
+                "--packet",
+                "P002",
+                "--owner-thread",
+                "thread-002",
+                "--branch",
+                "codex/p002-demo",
+                "--worktree",
+                "/tmp/demo-p002",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("active packet limit", result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P002.json").read_text())
+            self.assertEqual(packet["status"], "ready")
+            self.assertIsNone(packet["lease"])
+
     def test_maintenance_expires_reserved_packet_without_pr(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
