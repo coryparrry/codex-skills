@@ -218,9 +218,30 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     mode = manifest.get("mode")
     if mode not in MODES:
         errors.append(f"manifest mode is invalid: {mode}")
-    active_packet_limit = manifest.get("active_packet_limit")
-    if isinstance(active_packet_limit, bool) or not isinstance(active_packet_limit, int) or active_packet_limit < 1:
-        errors.append("manifest active_packet_limit must be a positive integer")
+    dispatch_policy = manifest.get("dispatch_policy")
+    if not isinstance(dispatch_policy, dict):
+        errors.append("manifest dispatch_policy must be an object")
+    else:
+        if dispatch_policy.get("mode") != "no_fixed_limit":
+            errors.append("manifest dispatch_policy.mode must be no_fixed_limit")
+        max_active = dispatch_policy.get("max_active_worktrees")
+        if max_active is not None and (isinstance(max_active, bool) or not isinstance(max_active, int) or max_active < 1):
+            errors.append("manifest dispatch_policy.max_active_worktrees must be a positive integer or null")
+    resource_lanes = manifest.get("resource_lanes")
+    if not isinstance(resource_lanes, dict):
+        errors.append("manifest resource_lanes must be an object")
+    else:
+        for lane_name in ("xctest", "computer-use"):
+            lane = resource_lanes.get(lane_name)
+            if not isinstance(lane, dict):
+                errors.append(f"manifest resource_lanes.{lane_name} must be an object")
+                continue
+            if lane.get("mode") != "serialized":
+                errors.append(f"manifest resource_lanes.{lane_name}.mode must be serialized")
+            if lane.get("active_packet") is not None and not isinstance(lane.get("active_packet"), str):
+                errors.append(f"manifest resource_lanes.{lane_name}.active_packet must be a string or null")
+            if not isinstance(lane.get("queue"), list) or any(not isinstance(item, str) for item in lane.get("queue", [])):
+                errors.append(f"manifest resource_lanes.{lane_name}.queue must be a list of strings")
     packet_order = manifest.get("packet_order")
     if not isinstance(packet_order, list):
         errors.append("manifest packet_order must be a list")
@@ -268,9 +289,39 @@ def validate_packet(packet: dict[str, Any]) -> list[str]:
         "dependencies",
         "evidence_paths",
         "blockers",
+        "reserved_areas",
+        "resource_lanes",
+        "blocked_by",
+        "overlap_notes",
+        "source_plan_refs",
     ):
         if not isinstance(packet.get(field), list):
             errors.append(f"packet {packet.get('id', '<unknown>')} {field} must be a list")
+    if not isinstance(packet.get("status_reason"), str) or not packet.get("status_reason"):
+        errors.append(f"packet {packet.get('id', '<unknown>')} status_reason must be a non-empty string")
+    if not isinstance(packet.get("human_review_required"), bool):
+        errors.append(f"packet {packet.get('id', '<unknown>')} human_review_required must be a boolean")
+    if packet.get("plan_format_status") not in {"pending", "valid", "invalid"}:
+        errors.append(f"packet {packet.get('id', '<unknown>')} plan_format_status must be pending, valid, or invalid")
+    for optional_field in ("parent_plan_path", "child_plan_path"):
+        value = packet.get(optional_field)
+        if value is not None and not isinstance(value, str):
+            errors.append(f"packet {packet.get('id', '<unknown>')} {optional_field} must be a string or null")
+    for optional_field in ("needs_reslice_reason", "last_validation", "worker_report", "review_report"):
+        value = packet.get(optional_field)
+        if value is not None and not isinstance(value, str):
+            errors.append(f"packet {packet.get('id', '<unknown>')} {optional_field} must be a string or null")
+    pr = packet.get("pr")
+    if not isinstance(pr, dict):
+        errors.append(f"packet {packet.get('id', '<unknown>')} pr must be an object")
+    else:
+        for key in ("url", "state", "head", "base"):
+            value = pr.get(key)
+            if value is not None and not isinstance(value, str):
+                errors.append(f"packet {packet.get('id', '<unknown>')} pr.{key} must be a string or null")
+        number = pr.get("number")
+        if number is not None and (isinstance(number, bool) or not isinstance(number, int)):
+            errors.append(f"packet {packet.get('id', '<unknown>')} pr.number must be an integer or null")
     if "out_of_scope" in packet and not isinstance(packet["out_of_scope"], list):
         errors.append(f"packet {packet.get('id', '<unknown>')} out_of_scope must be a list")
     validation = packet.get("validation")
@@ -336,12 +387,38 @@ def packet_list(values: list[str] | None) -> list[str]:
     return values if values is not None else []
 
 
+def optional_text(value: str | None) -> str | None:
+    return value if value else None
+
+
+def default_pr() -> dict[str, Any]:
+    return {"url": None, "number": None, "state": None, "head": None, "base": None}
+
+
+def add_unique_path(paths: list[Any], evidence_path: str | None) -> list[Any]:
+    if not evidence_path:
+        return paths
+    if evidence_path not in paths:
+        paths.append(evidence_path)
+    return paths
+
+
+def default_resource_lanes() -> dict[str, dict[str, Any]]:
+    return {
+        "xctest": {"mode": "serialized", "active_packet": None, "queue": []},
+        "computer-use": {"mode": "serialized", "active_packet": None, "queue": []},
+    }
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     repo = args.repo
     if manifest_path(repo).exists():
         raise PacketLoopError("packet-loop state already initialized")
-    if args.active_packet_limit < 1:
-        raise PacketLoopError("active_packet_limit must be a positive integer")
+    if (
+        args.max_active_worktrees is not None
+        and (isinstance(args.max_active_worktrees, bool) or args.max_active_worktrees < 1)
+    ):
+        raise PacketLoopError("max_active_worktrees must be a positive integer or null")
     state_dir(repo).mkdir(parents=True, exist_ok=True)
     packets_dir(repo).mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -352,7 +429,8 @@ def cmd_init(args: argparse.Namespace) -> int:
             "target_branch": args.target_branch,
         },
         "mode": args.mode,
-        "active_packet_limit": args.active_packet_limit,
+        "dispatch_policy": {"mode": "no_fixed_limit", "max_active_worktrees": args.max_active_worktrees},
+        "resource_lanes": default_resource_lanes(),
         "packet_order": [],
         "created_at": now_iso(),
         "updated_at": now_iso(),
@@ -381,11 +459,25 @@ def cmd_add_packet(args: argparse.Namespace) -> int:
         "status": "candidate",
         "risk": args.risk,
         "parallel_safe": args.parallel_safe,
+        "status_reason": "candidate packet created",
         "allowed_scope": packet_list(args.allowed_scope),
         "expected_touched_areas": packet_list(args.expected_area),
         "avoid_scope": packet_list(args.avoid_scope),
         "out_of_scope": packet_list(args.out_of_scope),
         "dependencies": packet_list(args.dependency),
+        "reserved_areas": packet_list(args.reserved_area),
+        "resource_lanes": packet_list(args.resource_lane),
+        "blocked_by": packet_list(args.blocked_by),
+        "overlap_notes": packet_list(args.overlap_note),
+        "parent_plan_path": optional_text(args.parent_plan_path),
+        "child_plan_path": optional_text(args.child_plan_path),
+        "source_plan_refs": packet_list(args.source_plan_ref),
+        "plan_format_status": args.plan_format_status,
+        "human_review_required": bool(args.human_review_required),
+        "needs_reslice_reason": None,
+        "last_validation": None,
+        "worker_report": None,
+        "review_report": None,
         "validation": {"commands": args.validation_command},
         "evidence_paths": [],
         "blockers": [],
@@ -394,7 +486,7 @@ def cmd_add_packet(args: argparse.Namespace) -> int:
         "lease": None,
         "branch": None,
         "worktree": None,
-        "pr": None,
+        "pr": default_pr(),
         "created_at": created_at,
         "updated_at": created_at,
     }
@@ -419,12 +511,28 @@ def cmd_transition(args: argparse.Namespace) -> int:
     if target_status not in ALLOWED_TRANSITIONS.get(current_status, set()):
         raise PacketLoopError(f"invalid transition: {current_status} -> {target_status}")
     packet["status"] = target_status
+    packet["status_reason"] = args.reason
+    evidence_paths = packet.get("evidence_paths", [])
+    if not isinstance(evidence_paths, list):
+        evidence_paths = []
+    packet["evidence_paths"] = add_unique_path(evidence_paths, args.evidence_path)
     if target_status == "ready":
         packet["lease"] = None
         packet["branch"] = None
         packet["worktree"] = None
     write_packet(repo, packet)
-    append_event(repo, "transition", {"packet": args.packet, "from": current_status, "to": target_status})
+    append_event(
+        repo,
+        "transition",
+        {
+            "packet": args.packet,
+            "from": current_status,
+            "to": target_status,
+            "actor": args.actor,
+            "reason": args.reason,
+            "evidence_path": args.evidence_path,
+        },
+    )
     render_dashboard(repo)
     return 0
 
@@ -438,8 +546,9 @@ def cmd_lease(args: argparse.Namespace) -> int:
         return 1
     manifest = load_manifest(repo)
     active_count = sum(1 for packet in load_packets(repo, manifest) if isinstance(packet.get("lease"), dict))
-    active_limit = manifest["active_packet_limit"]
-    if active_count >= active_limit:
+    dispatch_policy = manifest.get("dispatch_policy", {})
+    active_limit = dispatch_policy.get("max_active_worktrees") if isinstance(dispatch_policy, dict) else None
+    if active_limit is not None and active_count >= active_limit:
         raise PacketLoopError(f"active packet limit reached: {active_count}/{active_limit}")
     packet = load_packet(repo, args.packet)
     if packet["status"] != "ready":
@@ -467,6 +576,8 @@ def cmd_lease(args: argparse.Namespace) -> int:
 
 def packet_has_pr(packet: dict[str, Any]) -> bool:
     pr = packet.get("pr")
+    if isinstance(pr, dict):
+        return any(value is not None for value in pr.values())
     return bool(pr) or bool(packet.get("pr_url"))
 
 
@@ -530,7 +641,7 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--default-branch", default="main")
     init.add_argument("--target-branch", default="main")
     init.add_argument("--mode", choices=sorted(MODES), default="planning")
-    init.add_argument("--active-packet-limit", type=int, default=3)
+    init.add_argument("--max-active-worktrees", type=int)
     init.set_defaults(func=cmd_init)
 
     add_packet = subparsers.add_parser("add-packet", help="Add a candidate packet.")
@@ -545,6 +656,15 @@ def build_parser() -> argparse.ArgumentParser:
     add_packet.add_argument("--dependency", action="append")
     add_packet.add_argument("--avoid-scope", action="append")
     add_packet.add_argument("--out-of-scope", action="append")
+    add_packet.add_argument("--reserved-area", action="append")
+    add_packet.add_argument("--resource-lane", action="append")
+    add_packet.add_argument("--blocked-by", action="append")
+    add_packet.add_argument("--overlap-note", action="append")
+    add_packet.add_argument("--parent-plan-path")
+    add_packet.add_argument("--child-plan-path")
+    add_packet.add_argument("--source-plan-ref", action="append")
+    add_packet.add_argument("--plan-format-status", choices=("pending", "valid", "invalid"), default="pending")
+    add_packet.add_argument("--human-review-required", action="store_true")
     add_packet.add_argument("--suggested-branch")
     add_packet.add_argument("--notes")
     add_packet.set_defaults(func=cmd_add_packet)
@@ -553,6 +673,9 @@ def build_parser() -> argparse.ArgumentParser:
     transition.add_argument("--packet", required=True)
     transition.add_argument("--status", choices=sorted(STATUSES), required=True)
     transition.add_argument("--human-approved", action="store_true")
+    transition.add_argument("--actor", default="agent")
+    transition.add_argument("--reason", default="state transition requested")
+    transition.add_argument("--evidence-path")
     transition.set_defaults(func=cmd_transition)
 
     lease = subparsers.add_parser("lease", help="Reserve a ready packet for worker execution.")

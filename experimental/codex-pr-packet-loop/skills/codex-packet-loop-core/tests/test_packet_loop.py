@@ -54,8 +54,24 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertEqual(manifest["repo"]["default_branch"], "main")
             self.assertEqual(manifest["repo"]["target_branch"], "main")
             self.assertEqual(manifest["mode"], "planning")
-            self.assertEqual(manifest["active_packet_limit"], 3)
+            self.assertNotIn("active_packet_limit", manifest)
+            self.assertEqual(manifest["dispatch_policy"], {"mode": "no_fixed_limit", "max_active_worktrees": None})
             self.assertEqual(manifest["packet_order"], [])
+
+    def test_init_sets_unbounded_dispatch_policy_and_serial_resource_lanes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            result = self.run_cli(repo, "init", "--name", "demo")
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            manifest = json.loads((repo / ".codex/packet-loop/manifest.json").read_text())
+            self.assertEqual(manifest["dispatch_policy"], {"mode": "no_fixed_limit", "max_active_worktrees": None})
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["mode"], "serialized")
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["active_packet"], None)
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["queue"], [])
+            self.assertEqual(manifest["resource_lanes"]["computer-use"]["mode"], "serialized")
+            self.assertEqual(manifest["resource_lanes"]["computer-use"]["active_packet"], None)
+            self.assertEqual(manifest["resource_lanes"]["computer-use"]["queue"], [])
 
     def test_add_packet_and_validate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,6 +119,102 @@ class PacketLoopCLITests(unittest.TestCase):
 
             validate = self.run_cli(repo, "validate")
             self.assertEqual(validate.returncode, 0, validate.stderr)
+
+    def test_add_packet_sets_autonomous_contract_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            result = self.run_cli(
+                repo,
+                "add-packet",
+                "--id",
+                "P001",
+                "--title",
+                "Packet",
+                "--goal",
+                "Do one packet.",
+                "--allowed-scope",
+                "skills/demo",
+                "--expected-area",
+                "skills/demo",
+                "--reserved-area",
+                "skills/demo",
+                "--resource-lane",
+                "xctest",
+                "--overlap-note",
+                "No live overlap.",
+                "--parent-plan-path",
+                "docs/superpowers/plans/main-plan.md",
+                "--child-plan-path",
+                "docs/superpowers/plans/packet-loop/P001-packet.md",
+                "--source-plan-ref",
+                "Task 1",
+                "--human-review-required",
+                "--validation-command",
+                "python3 -m unittest",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["status_reason"], "candidate packet created")
+            self.assertEqual(packet["reserved_areas"], ["skills/demo"])
+            self.assertEqual(packet["resource_lanes"], ["xctest"])
+            self.assertEqual(packet["blocked_by"], [])
+            self.assertEqual(packet["overlap_notes"], ["No live overlap."])
+            self.assertEqual(packet["parent_plan_path"], "docs/superpowers/plans/main-plan.md")
+            self.assertEqual(packet["child_plan_path"], "docs/superpowers/plans/packet-loop/P001-packet.md")
+            self.assertEqual(packet["source_plan_refs"], ["Task 1"])
+            self.assertEqual(packet["plan_format_status"], "pending")
+            self.assertTrue(packet["human_review_required"])
+            self.assertIsNone(packet["needs_reslice_reason"])
+            self.assertIsNone(packet["last_validation"])
+            self.assertIsNone(packet["worker_report"])
+            self.assertIsNone(packet["review_report"])
+            self.assertEqual(
+                packet["pr"],
+                {"url": None, "number": None, "state": None, "head": None, "base": None},
+            )
+
+    def test_transition_records_actor_reason_and_evidence_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+
+            result = self.run_cli(
+                repo,
+                "transition",
+                "--packet",
+                "P001",
+                "--status",
+                "ready",
+                "--actor",
+                "controller",
+                "--reason",
+                "dependencies are satisfied",
+                "--evidence-path",
+                ".codex/packet-loop/evidence/P001/slice-report.md",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["status"], "ready")
+            self.assertEqual(packet["status_reason"], "dependencies are satisfied")
+            self.assertIn(".codex/packet-loop/evidence/P001/slice-report.md", packet["evidence_paths"])
+
+            events = [
+                json.loads(line)
+                for line in (repo / ".codex/packet-loop/events.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            transition_event = events[-1]
+            self.assertEqual(transition_event["event"], "transition")
+            self.assertEqual(transition_event["details"]["actor"], "controller")
+            self.assertEqual(transition_event["details"]["reason"], "dependencies are satisfied")
+            self.assertEqual(
+                transition_event["details"]["evidence_path"],
+                ".codex/packet-loop/evidence/P001/slice-report.md",
+            )
 
     def test_rejects_packet_ids_that_can_escape_packet_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -280,11 +392,11 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertEqual(packet["branch"], "codex/p001-demo")
             self.assertEqual(packet["worktree"], "/tmp/demo-worktree")
 
-    def test_lease_respects_active_packet_limit(self) -> None:
+    def test_lease_respects_max_active_worktrees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             self.assertEqual(
-                self.run_cli(repo, "init", "--name", "demo", "--active-packet-limit", "1").returncode,
+                self.run_cli(repo, "init", "--name", "demo", "--max-active-worktrees", "1").returncode,
                 0,
             )
             self.assertEqual(self.add_basic_packet(repo, "P001").returncode, 0)
@@ -326,11 +438,11 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertEqual(packet["status"], "ready")
             self.assertIsNone(packet["lease"])
 
-    def test_lease_limit_counts_open_packet_with_live_lease(self) -> None:
+    def test_max_active_worktrees_counts_open_packet_with_live_lease(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             self.assertEqual(
-                self.run_cli(repo, "init", "--name", "demo", "--active-packet-limit", "1").returncode,
+                self.run_cli(repo, "init", "--name", "demo", "--max-active-worktrees", "1").returncode,
                 0,
             )
             self.assertEqual(self.add_basic_packet(repo, "P001").returncode, 0)
