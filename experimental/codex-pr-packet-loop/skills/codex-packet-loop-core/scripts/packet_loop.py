@@ -418,6 +418,13 @@ def reserved_areas(packet: dict[str, Any]) -> set[str]:
     return {value for value in values if isinstance(value, str)}
 
 
+def packet_resource_lanes(packet: dict[str, Any]) -> set[str]:
+    values = packet.get("resource_lanes", [])
+    if not isinstance(values, list):
+        return set()
+    return {value for value in values if isinstance(value, str)}
+
+
 def find_reserved_area_collision(packet: dict[str, Any], packets: list[dict[str, Any]]) -> tuple[str, list[str]] | None:
     target_areas = reserved_areas(packet)
     if not target_areas:
@@ -430,6 +437,75 @@ def find_reserved_area_collision(packet: dict[str, Any], packets: list[dict[str,
         if collision:
             return str(other.get("id")), collision
     return None
+
+
+def find_resource_lane_collision(
+    packet: dict[str, Any],
+    packets: list[dict[str, Any]],
+    manifest: dict[str, Any],
+) -> tuple[str, str] | None:
+    lanes = manifest.get("resource_lanes", {})
+    if not isinstance(lanes, dict):
+        return None
+    packet_id = str(packet.get("id"))
+    for lane_name in sorted(packet_resource_lanes(packet)):
+        lane = lanes.get(lane_name)
+        if not isinstance(lane, dict) or lane.get("mode") != "serialized":
+            continue
+        active_packet = lane.get("active_packet")
+        if isinstance(active_packet, str) and active_packet != packet_id:
+            return lane_name, active_packet
+        for other in packets:
+            if other.get("id") == packet_id or other.get("status") not in {"reserved", "in-progress"}:
+                continue
+            if isinstance(other.get("lease"), dict) and lane_name in packet_resource_lanes(other):
+                return lane_name, str(other.get("id"))
+    return None
+
+
+def assign_resource_lanes(manifest: dict[str, Any], packet: dict[str, Any]) -> bool:
+    lanes = manifest.get("resource_lanes", {})
+    if not isinstance(lanes, dict):
+        return False
+    changed = False
+    packet_id = str(packet.get("id"))
+    for lane_name in packet_resource_lanes(packet):
+        lane = lanes.get(lane_name)
+        if not isinstance(lane, dict) or lane.get("mode") != "serialized":
+            continue
+        if lane.get("active_packet") != packet_id:
+            lane["active_packet"] = packet_id
+            changed = True
+        queue = lane.get("queue")
+        if isinstance(queue, list) and packet_id in queue:
+            lane["queue"] = [item for item in queue if item != packet_id]
+            changed = True
+    return changed
+
+
+def release_resource_lanes(manifest: dict[str, Any], packet_id: str) -> bool:
+    lanes = manifest.get("resource_lanes", {})
+    if not isinstance(lanes, dict):
+        return False
+    changed = False
+    for lane in lanes.values():
+        if not isinstance(lane, dict):
+            continue
+        if lane.get("active_packet") == packet_id:
+            lane["active_packet"] = None
+            changed = True
+        queue = lane.get("queue")
+        if isinstance(queue, list) and packet_id in queue:
+            lane["queue"] = [item for item in queue if item != packet_id]
+            changed = True
+    return changed
+
+
+def packet_has_evidence(packet: dict[str, Any]) -> bool:
+    evidence_paths = packet.get("evidence_paths", [])
+    if isinstance(evidence_paths, list) and any(isinstance(path, str) and path for path in evidence_paths):
+        return True
+    return any(bool(packet.get(field)) for field in ("last_validation", "worker_report", "review_report"))
 
 
 def default_resource_lanes() -> dict[str, dict[str, Any]]:
@@ -549,7 +625,13 @@ def cmd_transition(args: argparse.Namespace) -> int:
         packet["lease"] = None
         packet["branch"] = None
         packet["worktree"] = None
+    manifest = load_manifest(repo)
+    lanes_changed = False
+    if target_status not in {"reserved", "in-progress"}:
+        lanes_changed = release_resource_lanes(manifest, args.packet)
     write_packet(repo, packet)
+    if lanes_changed:
+        write_manifest(repo, manifest)
     append_event(
         repo,
         "transition",
@@ -590,6 +672,10 @@ def cmd_lease(args: argparse.Namespace) -> int:
             "reserved area collision with live lease "
             f"{other_packet}: {', '.join(areas)}"
         )
+    lane_collision = find_resource_lane_collision(packet, packets, manifest)
+    if lane_collision:
+        lane_name, active_packet = lane_collision
+        raise PacketLoopError(f"resource lane {lane_name} already active for packet {active_packet}")
     acquired_at = datetime.now(timezone.utc)
     expires_at = acquired_at + timedelta(hours=args.ttl_hours)
     packet["status"] = "reserved"
@@ -601,7 +687,10 @@ def cmd_lease(args: argparse.Namespace) -> int:
     }
     packet["branch"] = args.branch
     packet["worktree"] = args.worktree
+    lanes_changed = assign_resource_lanes(manifest, packet)
     write_packet(repo, packet)
+    if lanes_changed:
+        write_manifest(repo, manifest)
     append_event(
         repo,
         "lease",
@@ -723,6 +812,7 @@ def cmd_maintain(args: argparse.Namespace) -> int:
     manifest = load_manifest(repo)
     now = datetime.now(timezone.utc)
     expired = []
+    lanes_changed = False
     for packet in load_packets(repo, manifest):
         if packet.get("status") not in {"reserved", "in-progress"}:
             continue
@@ -733,13 +823,16 @@ def cmd_maintain(args: argparse.Namespace) -> int:
             expires_at = parse_time(lease["expires_at"])
         except (KeyError, ValueError):
             continue
-        if expires_at <= now and not packet_has_pr(packet):
+        if expires_at <= now and not packet_has_pr(packet) and not packet_has_evidence(packet):
             packet["status"] = "ready"
             packet["lease"] = None
             packet["branch"] = None
             packet["worktree"] = None
+            lanes_changed = release_resource_lanes(manifest, str(packet["id"])) or lanes_changed
             write_packet(repo, packet)
             expired.append(packet["id"])
+    if lanes_changed:
+        write_manifest(repo, manifest)
     if expired:
         append_event(repo, "expire-stale-leases", {"packets": expired})
     render_dashboard(repo)

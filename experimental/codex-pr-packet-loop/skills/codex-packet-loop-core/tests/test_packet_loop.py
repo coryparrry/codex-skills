@@ -541,6 +541,86 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertEqual(packet["status"], "ready")
             self.assertIsNone(packet["lease"])
 
+    def test_lease_enforces_serial_resource_lane_until_worker_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            for packet_id, area in (("P001", "skills/demo/a"), ("P002", "skills/demo/b")):
+                result = self.run_cli(
+                    repo,
+                    "add-packet",
+                    "--id",
+                    packet_id,
+                    "--title",
+                    "Packet",
+                    "--goal",
+                    "Do one packet.",
+                    "--allowed-scope",
+                    area,
+                    "--expected-area",
+                    area,
+                    "--reserved-area",
+                    area,
+                    "--resource-lane",
+                    "xctest",
+                    "--validation-command",
+                    "python3 -m unittest",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.run_cli(repo, "transition", "--packet", packet_id, "--status", "ready").returncode, 0)
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "lease",
+                    "--packet",
+                    "P001",
+                    "--owner-thread",
+                    "thread-001",
+                    "--branch",
+                    "codex/p001-demo",
+                    "--worktree",
+                    "/tmp/demo-p001",
+                ).returncode,
+                0,
+            )
+            manifest = json.loads((repo / ".codex/packet-loop/manifest.json").read_text())
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["active_packet"], "P001")
+
+            blocked = self.run_cli(
+                repo,
+                "lease",
+                "--packet",
+                "P002",
+                "--owner-thread",
+                "thread-002",
+                "--branch",
+                "codex/p002-demo",
+                "--worktree",
+                "/tmp/demo-p002",
+            )
+
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn("resource lane xctest", blocked.stderr)
+
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "in-progress").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "pr-open").returncode, 0)
+            manifest = json.loads((repo / ".codex/packet-loop/manifest.json").read_text())
+            self.assertIsNone(manifest["resource_lanes"]["xctest"]["active_packet"])
+
+            allowed = self.run_cli(
+                repo,
+                "lease",
+                "--packet",
+                "P002",
+                "--owner-thread",
+                "thread-002",
+                "--branch",
+                "codex/p002-demo",
+                "--worktree",
+                "/tmp/demo-p002",
+            )
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
     def test_lease_respects_max_active_worktrees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -663,6 +743,53 @@ class PacketLoopCLITests(unittest.TestCase):
             packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
             self.assertEqual(packet["status"], "ready")
             self.assertIsNone(packet["lease"])
+
+    def test_maintenance_keeps_expired_packet_with_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "lease",
+                    "--packet",
+                    "P001",
+                    "--owner-thread",
+                    "thread-123",
+                    "--branch",
+                    "codex/p001-demo",
+                    "--worktree",
+                    "/tmp/demo-worktree",
+                    "--ttl-hours",
+                    "0",
+                ).returncode,
+                0,
+            )
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "record-evidence",
+                    "--packet",
+                    "P001",
+                    "--kind",
+                    "worker-report",
+                    "--path",
+                    ".codex/packet-loop/evidence/P001/worker-report.md",
+                ).returncode,
+                0,
+            )
+
+            result = self.run_cli(repo, "maintain", "--expire-stale-leases")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("expired 0 stale lease(s)", result.stdout)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["status"], "reserved")
+            self.assertEqual(packet["lease"]["owner_thread"], "thread-123")
+            self.assertEqual(packet["branch"], "codex/p001-demo")
+            self.assertEqual(packet["worktree"], "/tmp/demo-worktree")
 
     def test_maintenance_rejects_invalid_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
