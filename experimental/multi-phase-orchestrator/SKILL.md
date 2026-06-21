@@ -53,6 +53,7 @@ For plan implementation units, always pass the plan-required skills through to t
 - Integrate completed unit outputs deliberately, one unit at a time or by scoped file checkout when that is safer than merge commits.
 - Commit each accepted integration on the coordinator target branch before starting the next integration or validation phase.
 - Confirm all accepted worktree-thread fixes are present on the target branch before pushing, opening a PR, or claiming closeout.
+- Do not send the final report until cleanup has been attempted for every child thread and worktree, with archive/removal results or retention blockers recorded.
 
 ## Validation Authority Contract
 
@@ -297,7 +298,13 @@ Use the repo's required PR tooling. Reply inline to review comments when applica
 
 ## Step 9: Cleanup Completed Threads And Worktrees
 
-After integration, validation, required review, and push/PR closeout are complete, clean up orchestration resources. Do not clean up before proving that the target branch contains the accepted work.
+After integration, validation, required review, and any requested push/PR closeout are complete, clean up orchestration resources before the final report. Cleanup is still required for local-only runs where no push or PR was requested. Do not clean up before proving that the target branch contains the accepted work.
+
+Before starting cleanup:
+
+- verify the coordinator target branch is clean or contains only intentional closeout changes to commit first;
+- verify every accepted unit has an integration commit or no-op record on the target branch;
+- update the matrix with each child thread and worktree cleanup status, using `archived`, `removed`, `retained`, `blocked`, or `not_available`.
 
 Before archiving a child thread:
 
@@ -305,7 +312,7 @@ Before archiving a child thread:
 - verify it is complete, blocked, or intentionally closed;
 - verify no needed result exists only in the thread summary without being recorded elsewhere.
 
-Archive completed or intentionally closed child threads using the Codex thread archive tool when available. Leave active, blocked, or user-requested follow-up threads unarchived and report why.
+Archive completed or intentionally closed child threads using the Codex thread archive tool when available. If the archive tool is unavailable, record `not_available` and leave the thread unarchived. Leave active, blocked, or user-requested follow-up threads unarchived and report why.
 
 Before removing a worktree:
 
@@ -317,6 +324,13 @@ Before removing a worktree:
 - run a final `git status --short --branch` for the worktree and target branch.
 
 Remove only worktrees that pass those checks. Do not delete phase branches unless the user explicitly asks for branch deletion. If a worktree is dirty, contains unintegrated commits, contains unique evidence, or cannot be verified, keep it and report the blocker.
+
+Cleanup is complete only when every child thread and worktree has one of these recorded outcomes:
+
+- archived thread;
+- removed worktree;
+- retained with an explicit blocker or user-requested reason;
+- not available because the required Codex thread/worktree tool was unavailable.
 
 ## Final Report
 
