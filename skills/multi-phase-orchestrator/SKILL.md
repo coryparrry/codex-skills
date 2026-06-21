@@ -1,11 +1,11 @@
 ---
 name: multi-phase-orchestrator
-description: Explicit-invocation-only orchestration for multiple work units through fresh Codex worktree threads, per-unit skill routing, monitored review or implementation loops, validation, safe integration, and branch or PR closeout. Use only when the user explicitly names $multi-phase-orchestrator or directly asks to use this skill.
+description: Beta, explicit-invocation-only orchestration for multiple work units through fresh Codex worktree threads, per-unit skill routing, monitored review or implementation loops, validation, safe integration, and branch or PR closeout. Use only when the user explicitly names $multi-phase-orchestrator or directly asks to use this skill.
 ---
 
-# Multi-Phase Orchestrator
+# Multi-Phase Orchestrator (Beta)
 
-Do not invoke this skill implicitly. Use it only when the user explicitly names `$multi-phase-orchestrator` or directly asks to use this skill.
+Status: beta. Do not invoke this skill implicitly. Use it only when the user explicitly names `$multi-phase-orchestrator` or directly asks to use this skill.
 
 Coordinate multiple work units by creating fresh Codex worktree threads, giving each thread a narrow packet, monitoring them, verifying their outputs, and integrating completed work safely. A work unit can be a plan phase, bug finding, PR comment, review finding, adversarial-gate slice, docs task, validation task, or integration fix.
 
@@ -23,7 +23,7 @@ Start from the work source the user gives. Do not invent a default source hierar
 
 If the user has not provided a source that can produce work units, ask for the source or ask whether to run a named discovery/review skill first.
 
-Named skills and workflows are first-class routing requirements. If the user names `$bug-hunt-swarm`, `$codex-adversarial-review-gate`, `$review-workflows:triage-review-comments`, `$review-swarm`, `$autoreview`, or any other skill/tool, bind it to the relevant unit role and include it in the child thread packet with the skill name and path. Do not let a supporting skill replace the orchestrator's unit tracking, monitoring, and integration responsibilities.
+Named skills and workflows are first-class routing requirements. If the user names `$bug-hunt-swarm`, `$codex-adversarial-gate`, `$review-workflows:triage-review-comments`, `$review-swarm`, `$autoreview`, or any other skill/tool, bind it to the relevant unit role and include it in the child thread packet with the skill name and path. Do not let a supporting skill replace the orchestrator's unit tracking, monitoring, and integration responsibilities.
 
 ## Skill Propagation Contract
 
@@ -157,7 +157,7 @@ When a child thread must use a skill, say that explicitly in the child prompt, f
 
 ```text
 Use $bug-hunt-swarm at ${CODEX_HOME:-$HOME/.codex}/skills/bug-hunt-swarm/SKILL.md for read-only diagnosis before proposing fixes.
-Use $codex-adversarial-review-gate at ${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-review-gate/SKILL.md for this unit's completion reviewer and critic.
+Use $codex-adversarial-gate at ${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/SKILL.md for this unit's completion reviewer and critic.
 Use $review-workflows:triage-review-comments at <resolved-skill-path> to verify PR feedback before implementing.
 ```
 

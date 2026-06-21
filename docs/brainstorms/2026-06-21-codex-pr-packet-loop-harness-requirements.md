@@ -241,7 +241,7 @@ flowchart TB
 - `experimental/codex-pr-packet-loop/README.md` and `experimental/codex-pr-packet-loop/CODEX_PR_PACKET_LOOP_PLAN.md` define the original packet-loop intent, lifecycle, and merge-risk model.
 - `experimental/codex-pr-packet-loop/CODEX_PR_PACKET_LOOP_TEMPLATES.md` provides seed prompts and queue/state templates.
 - `experimental/codex-pr-packet-loop/MERGE_OVERLAP_STRATEGY.md` defines file, area, interface, behavior, test, generated-file, and dependency overlap categories.
-- `experimental/multi-phase-orchestrator/SKILL.md` defines the existing multi-worktree orchestration substrate.
+- `skills/multi-phase-orchestrator/SKILL.md` defines the existing multi-worktree orchestration substrate.
 - `AGENTS.md` defines this repo's skill packaging, plugin mirror, and validation constraints.
 - [Anthropic: Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) grounds the workflow-plus-agent framing, orchestrator-worker pattern, evaluator-optimizer loop, ground-truth feedback, checkpoints, and stopping conditions.
 - [OpenAI Agents SDK: Runner](https://openai.github.io/openai-agents-python/ref/run/) grounds the agent loop shape: invoke, terminate on final output, hand off, or run tools and continue.

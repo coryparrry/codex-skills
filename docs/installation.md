@@ -28,7 +28,7 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adve
 bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
 ```
 
-The marketplace install exposes `codex-adversarial-gate`, `git-clean-merged-branch`, and `triage-review-comments`.
+The marketplace install exposes `codex-adversarial-gate`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`.
 
 The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
@@ -71,6 +71,12 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-
 npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
 ```
 
+## Install Multi-Phase Orchestrator Beta
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill multi-phase-orchestrator
+```
+
 Restart Codex if the new skill does not appear.
 
 ## Common Problems
@@ -88,5 +94,6 @@ If installation fails, check that `npx skills add coryparrry/codex-skills --glob
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
+- [Multi-Phase Orchestrator](multi-phase-orchestrator.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

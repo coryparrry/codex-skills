@@ -17,6 +17,13 @@
       ]
     },
     {
+      "title": "Beta Orchestration",
+      "description": "Beta skills for multi-worktree orchestration.",
+      "skills": [
+        "multi-phase-orchestrator"
+      ]
+    },
+    {
       "title": "Git Workflow",
       "description": "Skills for practical Git workflow cleanup.",
       "skills": [
