@@ -51,6 +51,7 @@ For plan implementation units, always pass the plan-required skills through to t
 - Fix narrowly; reject speculative, duplicate, stale, or out-of-scope findings.
 - Do not mark a unit complete until its configured review/gate is satisfied, validation is current, required records exist, required commits are made, and integration status is known.
 - Integrate completed unit outputs deliberately, one unit at a time or by scoped file checkout when that is safer than merge commits.
+- Commit each accepted integration on the coordinator target branch before starting the next integration or validation phase.
 - Confirm all accepted worktree-thread fixes are present on the target branch before pushing, opening a PR, or claiming closeout.
 
 ## Validation Authority Contract
@@ -252,6 +253,10 @@ After each unit integration:
 - verify the expected files and fixes are present
 - keep unrelated target-branch changes out
 - resolve conflicts minimally
+- commit the integration result on the coordinator target branch before proceeding to the next unit or combined validation
+- if a normal `git cherry-pick` already created a commit, verify and record that commit hash instead of creating an empty follow-up commit
+- if using `git cherry-pick --no-commit`, scoped checkout, manual patch application, or shared-file consolidation, create a normal coordinator commit immediately after the verification above
+- if integration is a no-op because the target branch already contains the accepted changes, record the existing commit or evidence proving there is no new diff
 - update the matrix
 
 Answer explicitly whether accepted worktree-thread fixes are now present on the local target branch.
@@ -283,6 +288,7 @@ Before pushing or opening/updating a PR:
 
 - verify the worktree is clean;
 - verify the target branch contains every accepted unit result;
+- verify every accepted integration has a recorded coordinator-branch commit or an explicit no-op record;
 - verify validation results are current;
 - verify required reviews, gates, triage, and integrated-review findings are handled;
 - prepare PR or update text from actual changes, tests, risks, and skipped checks.
@@ -321,6 +327,7 @@ Report:
 - orchestration matrix with final statuses
 - child thread IDs and unit branches
 - unit commits or integration method
+- coordinator integration commits or no-op records
 - required skill/workflow usage per unit
 - review, gate, triage, and evidence record paths
 - validation commands and results
