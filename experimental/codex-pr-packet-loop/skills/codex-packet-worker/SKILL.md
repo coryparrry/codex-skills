@@ -7,21 +7,25 @@ description: Execute exactly one leased Codex PR packet in one worktree. Use whe
 
 Use this skill inside the assigned packet worktree.
 
+## Required Context
+
+Load `$codex-packet-loop-core`, then read `references/workflow-protocol.md`, `references/state-machine.md`, `references/handoff-contracts.md`, `references/superpowers-plan-adapter.md`, `references/evidence-contract.md`, `references/overlap-policy.md`, `references/recovery-playbook.md`, and `references/autonomy-policy.md`.
+
 ## Workflow
 
-1. Read repo instructions.
-2. Load `$codex-packet-loop-core` and read its state contract.
-3. Validate the packet exists, is leased to this worker, and is `reserved`.
-4. Transition the packet to `in-progress`.
-5. Inspect only files needed for the packet.
-6. Implement the smallest change that satisfies the packet goal.
-7. Run the packet validation commands.
-8. Fix only failures caused by the packet.
-9. Stop after two failed fix attempts with the same root cause.
-10. Record evidence under `.codex/packet-loop/evidence/<packet-id>/`.
-11. Prepare or open one PR for the packet.
-12. Transition to `pr-open` only after evidence and validation are recorded.
-13. Report next valid skill: `$codex-packet-review`.
+1. Confirm the current worktree and branch match the packet lease.
+2. Read the packet child plan path from packet JSON.
+3. Invoke the Superpowers execution skill required by the child plan: `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+4. Validate state and transition `reserved` to `in-progress` with actor, reason, and evidence path when available.
+5. Follow the child plan exactly while respecting packet allowed scope.
+6. Run each packet validation command.
+7. Fix only packet-caused failures.
+8. Stop after two failed fix attempts with the same root cause.
+9. Write worker evidence under `.codex/packet-loop/evidence/<packet-id>/`.
+10. Record evidence with `packet_loop.py record-evidence`.
+11. Prepare one PR, or open/update one PR only when authorized.
+12. Record PR metadata with `packet_loop.py set-pr` when PR metadata exists.
+13. Transition to `pr-open` only after evidence and validation are recorded.
 
 ## Stop Conditions
 
@@ -35,3 +39,7 @@ Stop and mark the packet `blocked` or `needs-reslice` when:
 - security-sensitive decisions are required
 
 Do not implement adjacent packets.
+
+## Output
+
+Write `worker-report.md`, record validation and diff evidence, and report next valid skill `$codex-packet-review`.

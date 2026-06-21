@@ -7,17 +7,24 @@ description: Sequence merge-eligible Codex packet PRs, detect overlap, recommend
 
 Use this skill to prepare safe merge sequencing. Do not merge unless the human explicitly approves the merge action.
 
+## Required Context
+
+Load `$codex-packet-loop-core`, then read `references/workflow-protocol.md`, `references/state-machine.md`, `references/handoff-contracts.md`, `references/evidence-contract.md`, `references/overlap-policy.md`, and `references/autonomy-policy.md`.
+
 ## Workflow
 
-1. Read repo instructions, manifest, packet records, open PRs, changed files, and validation evidence.
-2. Load `$codex-packet-loop-core` and read its state contract.
-3. Run packet-loop validation.
-4. Build a merge matrix with file, area, interface, behavior, test, generated-file, dependency, and documentation overlap.
-5. Recommend a serial merge order.
-6. Identify packets that need refresh before merge.
-7. Stop before merge, branch deletion, PR closing, force-push, default-branch write, or security-sensitive action.
-8. After an approved merge has happened, transition only that packet to `merged` with `--human-approved`, regenerate dashboard, and re-check remaining packets.
+1. Run `packet_loop.py validate`.
+2. Read merge-eligible packet records, PR metadata, changed files, and review evidence.
+3. Build `merge-matrix.md` with stale status, conflict status, overlap categories, and serial order.
+4. Recommend one merge order.
+5. Stop before merge or destructive/external action.
+6. After the user confirms a merge happened, transition only that packet to `merged` with `--human-approved`.
+7. Re-run validation and status summary after each approved state update.
 
 ## Default Merge Policy
 
 Parallel implementation is allowed. Parallel merging is not allowed in this MVP.
+
+## Output
+
+Write `merge-matrix.md` and `integration-report.md`, then route back to `$codex-packet-loop` unless a human-approved state update remains.
