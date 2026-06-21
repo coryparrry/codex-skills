@@ -15,6 +15,7 @@ Use this skill as the controller for the packet-loop suite.
 4. Read `references/superpowers-plan-adapter.md` before slicing a Superpowers plan or dispatching a packet with a child plan.
 5. Read `references/overlap-policy.md` before dispatch or integration decisions.
 6. Read `references/handoff-contracts.md` and `references/evidence-contract.md` before creating or judging worker artifacts.
+7. For child-plan execution, preserve the Superpowers route to `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
 
 ## Controller Loop
 

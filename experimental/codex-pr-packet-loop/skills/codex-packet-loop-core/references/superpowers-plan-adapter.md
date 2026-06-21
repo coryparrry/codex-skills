@@ -10,7 +10,7 @@ Slice only from an approved Superpowers implementation plan unless the user expl
 
 ## Child Plan Requirements
 
-Each packet child plan lives under `docs/superpowers/plans/packet-loop/` and must use the standard Superpowers implementation-plan header, including the required sub-skill line. It must include packet id, parent plan path, source task references, allowed files, explicitly out-of-scope files, dependencies, branch name, validation commands, resource lanes, evidence requirements, and human-review-before-implementation status.
+Each packet child plan lives under `docs/superpowers/plans/packet-loop/` and must use the standard Superpowers implementation-plan header, including the `REQUIRED SUB-SKILL` line. It must include packet id, parent plan path, source task references, allowed files, explicitly out-of-scope files, dependencies, branch name, validation commands, resource lanes, evidence requirements, and human-review-before-implementation status.
 
 ## Verification
 

@@ -392,6 +392,155 @@ class PacketLoopCLITests(unittest.TestCase):
             self.assertEqual(packet["branch"], "codex/p001-demo")
             self.assertEqual(packet["worktree"], "/tmp/demo-worktree")
 
+    def test_status_json_reports_controller_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
+
+            result = self.run_cli(repo, "status", "--format", "json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            summary = json.loads(result.stdout)
+            self.assertTrue(summary["valid"])
+            self.assertEqual(summary["counts"]["ready"], 1)
+            self.assertEqual(summary["ready_packets"], ["P001"])
+            self.assertEqual(summary["active_leases"], [])
+            self.assertEqual(summary["packets"][0]["id"], "P001")
+
+    def test_record_evidence_updates_packet_fields_and_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+
+            result = self.run_cli(
+                repo,
+                "record-evidence",
+                "--packet",
+                "P001",
+                "--kind",
+                "worker-report",
+                "--path",
+                ".codex/packet-loop/evidence/P001/worker-report.md",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["worker_report"], ".codex/packet-loop/evidence/P001/worker-report.md")
+            self.assertIn(".codex/packet-loop/evidence/P001/worker-report.md", packet["evidence_paths"])
+            events = [
+                json.loads(line)
+                for line in (repo / ".codex/packet-loop/events.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(events[-1]["event"], "record-evidence")
+            self.assertEqual(events[-1]["details"]["kind"], "worker-report")
+
+    def test_set_pr_updates_structured_pr_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+
+            result = self.run_cli(
+                repo,
+                "set-pr",
+                "--packet",
+                "P001",
+                "--url",
+                "https://github.com/example/repo/pull/12",
+                "--number",
+                "12",
+                "--state",
+                "open",
+                "--head",
+                "codex/p001-demo",
+                "--base",
+                "main",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(
+                packet["pr"],
+                {
+                    "url": "https://github.com/example/repo/pull/12",
+                    "number": 12,
+                    "state": "open",
+                    "head": "codex/p001-demo",
+                    "base": "main",
+                },
+            )
+            events = [
+                json.loads(line)
+                for line in (repo / ".codex/packet-loop/events.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(events[-1]["event"], "set-pr")
+            self.assertEqual(events[-1]["details"]["number"], 12)
+
+    def test_lease_rejects_reserved_area_collision(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            for packet_id in ("P001", "P002"):
+                result = self.run_cli(
+                    repo,
+                    "add-packet",
+                    "--id",
+                    packet_id,
+                    "--title",
+                    "Packet",
+                    "--goal",
+                    "Do one packet.",
+                    "--allowed-scope",
+                    "skills/demo",
+                    "--expected-area",
+                    "skills/demo",
+                    "--reserved-area",
+                    "skills/demo",
+                    "--validation-command",
+                    "python3 -m unittest",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.run_cli(repo, "transition", "--packet", packet_id, "--status", "ready").returncode, 0)
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "lease",
+                    "--packet",
+                    "P001",
+                    "--owner-thread",
+                    "thread-001",
+                    "--branch",
+                    "codex/p001-demo",
+                    "--worktree",
+                    "/tmp/demo-p001",
+                ).returncode,
+                0,
+            )
+
+            result = self.run_cli(
+                repo,
+                "lease",
+                "--packet",
+                "P002",
+                "--owner-thread",
+                "thread-002",
+                "--branch",
+                "codex/p002-demo",
+                "--worktree",
+                "/tmp/demo-p002",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("reserved area collision", result.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P002.json").read_text())
+            self.assertEqual(packet["status"], "ready")
+            self.assertIsNone(packet["lease"])
+
     def test_lease_respects_max_active_worktrees(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

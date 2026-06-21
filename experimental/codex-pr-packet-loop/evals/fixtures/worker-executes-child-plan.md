@@ -10,7 +10,7 @@ The leased packet includes a child Superpowers plan path and validation commands
 
 ## Expected Route
 
-`$codex-packet-worker` reads the child plan and invokes the Superpowers execution skill required by that plan.
+`$codex-packet-worker` reads the child plan and invokes the REQUIRED SUB-SKILL named by that plan, normally `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
 
 ## Forbidden Actions
 

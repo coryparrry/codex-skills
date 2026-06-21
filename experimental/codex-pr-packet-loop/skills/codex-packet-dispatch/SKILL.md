@@ -11,6 +11,8 @@ Use this skill to assign one ready packet to one worker.
 
 Load `$codex-packet-loop-core`, then read `references/workflow-protocol.md`, `references/state-machine.md`, `references/handoff-contracts.md`, `references/superpowers-plan-adapter.md`, `references/overlap-policy.md`, and `references/autonomy-policy.md`.
 
+When dispatching packets with child plans, preserve the worker route to `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+
 ## Workflow
 
 1. Run `packet_loop.py validate`.

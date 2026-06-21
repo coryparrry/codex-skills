@@ -50,7 +50,7 @@ Do not mirror these skills into `skills/`, `plugins/codex-skills/skills/`, or pa
 
 Use `$codex-packet-loop` for normal operation. The controller validates state, runs safe maintenance, inspects status, supervises active worker lanes, and routes to the next valid stage skill. Invoke a stage skill directly only when the stage is already known.
 
-For Superpowers-driven work, give the controller an approved `docs/superpowers/plans/*.md` implementation plan. The slicer creates one Superpowers-compatible child plan per packet under `docs/superpowers/plans/packet-loop/`, verifies the child plan format, and dispatches workers to execute those plans with the normal Superpowers execution skills.
+For Superpowers-driven work, give the controller an approved `docs/superpowers/plans/*.md` implementation plan. The slicer creates one Superpowers-compatible child plan per packet under `docs/superpowers/plans/packet-loop/`, verifies the child plan format, and dispatches workers to execute those plans with `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
 
 ### Validation
 

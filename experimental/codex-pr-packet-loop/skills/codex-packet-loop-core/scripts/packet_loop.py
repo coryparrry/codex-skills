@@ -403,6 +403,35 @@ def add_unique_path(paths: list[Any], evidence_path: str | None) -> list[Any]:
     return paths
 
 
+def packet_ids_by_status(packets: list[dict[str, Any]], status: str) -> list[str]:
+    return [str(packet["id"]) for packet in packets if packet.get("status") == status]
+
+
+def packets_with_lease(packets: list[dict[str, Any]]) -> list[str]:
+    return [str(packet["id"]) for packet in packets if isinstance(packet.get("lease"), dict)]
+
+
+def reserved_areas(packet: dict[str, Any]) -> set[str]:
+    values = packet.get("reserved_areas", [])
+    if not isinstance(values, list):
+        return set()
+    return {value for value in values if isinstance(value, str)}
+
+
+def find_reserved_area_collision(packet: dict[str, Any], packets: list[dict[str, Any]]) -> tuple[str, list[str]] | None:
+    target_areas = reserved_areas(packet)
+    if not target_areas:
+        return None
+    packet_id = packet.get("id")
+    for other in packets:
+        if other.get("id") == packet_id or not isinstance(other.get("lease"), dict):
+            continue
+        collision = sorted(target_areas.intersection(reserved_areas(other)))
+        if collision:
+            return str(other.get("id")), collision
+    return None
+
+
 def default_resource_lanes() -> dict[str, dict[str, Any]]:
     return {
         "xctest": {"mode": "serialized", "active_packet": None, "queue": []},
@@ -545,7 +574,8 @@ def cmd_lease(args: argparse.Namespace) -> int:
             print(error, file=sys.stderr)
         return 1
     manifest = load_manifest(repo)
-    active_count = sum(1 for packet in load_packets(repo, manifest) if isinstance(packet.get("lease"), dict))
+    packets = load_packets(repo, manifest)
+    active_count = sum(1 for packet in packets if isinstance(packet.get("lease"), dict))
     dispatch_policy = manifest.get("dispatch_policy", {})
     active_limit = dispatch_policy.get("max_active_worktrees") if isinstance(dispatch_policy, dict) else None
     if active_limit is not None and active_count >= active_limit:
@@ -553,6 +583,13 @@ def cmd_lease(args: argparse.Namespace) -> int:
     packet = load_packet(repo, args.packet)
     if packet["status"] != "ready":
         raise PacketLoopError(f"lease requires ready packet, got {packet['status']}")
+    collision = find_reserved_area_collision(packet, packets)
+    if collision:
+        other_packet, areas = collision
+        raise PacketLoopError(
+            "reserved area collision with live lease "
+            f"{other_packet}: {', '.join(areas)}"
+        )
     acquired_at = datetime.now(timezone.utc)
     expires_at = acquired_at + timedelta(hours=args.ttl_hours)
     packet["status"] = "reserved"
@@ -569,6 +606,89 @@ def cmd_lease(args: argparse.Namespace) -> int:
         repo,
         "lease",
         {"packet": args.packet, "owner_thread": args.owner_thread, "branch": args.branch, "worktree": args.worktree},
+    )
+    render_dashboard(repo)
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    repo = args.repo
+    errors = validate_repo(repo)
+    if errors:
+        print(json.dumps({"valid": False, "errors": errors}, indent=2, sort_keys=True))
+        return 1
+    manifest = load_manifest(repo)
+    packets = load_packets(repo, manifest)
+    counts = {status: 0 for status in sorted(STATUSES)}
+    for packet in packets:
+        status = packet.get("status")
+        if isinstance(status, str):
+            counts[status] = counts.get(status, 0) + 1
+    summary = {
+        "valid": True,
+        "errors": [],
+        "manifest": manifest,
+        "counts": counts,
+        "packets": packets,
+        "active_leases": packets_with_lease(packets),
+        "ready_packets": packet_ids_by_status(packets, "ready"),
+        "blocked_packets": packet_ids_by_status(packets, "blocked"),
+        "needs_reslice_packets": packet_ids_by_status(packets, "needs-reslice"),
+        "pr_open_packets": packet_ids_by_status(packets, "pr-open"),
+        "reviewing_packets": packet_ids_by_status(packets, "reviewing"),
+        "merge_eligible_packets": packet_ids_by_status(packets, "merge-eligible"),
+    }
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_record_evidence(args: argparse.Namespace) -> int:
+    repo = args.repo
+    packet = load_packet(repo, args.packet)
+    evidence_paths = packet.get("evidence_paths", [])
+    if not isinstance(evidence_paths, list):
+        evidence_paths = []
+    packet["evidence_paths"] = add_unique_path(evidence_paths, args.path)
+    if args.kind == "worker-report":
+        packet["worker_report"] = args.path
+    elif args.kind == "review-report":
+        packet["review_report"] = args.path
+    elif args.kind == "validation":
+        packet["last_validation"] = args.path
+    errors = validate_packet(packet)
+    if errors:
+        raise PacketLoopError("; ".join(errors))
+    write_packet(repo, packet)
+    append_event(repo, "record-evidence", {"packet": args.packet, "kind": args.kind, "path": args.path})
+    render_dashboard(repo)
+    return 0
+
+
+def cmd_set_pr(args: argparse.Namespace) -> int:
+    repo = args.repo
+    packet = load_packet(repo, args.packet)
+    packet["pr"] = {
+        "url": args.url,
+        "number": args.number,
+        "state": args.state,
+        "head": args.head,
+        "base": args.base,
+    }
+    errors = validate_packet(packet)
+    if errors:
+        raise PacketLoopError("; ".join(errors))
+    write_packet(repo, packet)
+    append_event(
+        repo,
+        "set-pr",
+        {
+            "packet": args.packet,
+            "url": args.url,
+            "number": args.number,
+            "state": args.state,
+            "head": args.head,
+            "base": args.base,
+        },
     )
     render_dashboard(repo)
     return 0
@@ -685,6 +805,40 @@ def build_parser() -> argparse.ArgumentParser:
     lease.add_argument("--worktree", required=True)
     lease.add_argument("--ttl-hours", type=int, default=24)
     lease.set_defaults(func=cmd_lease)
+
+    status = subparsers.add_parser("status", help="Print packet loop status summary.")
+    status.add_argument("--format", choices=("json",), default="json")
+    status.set_defaults(func=cmd_status)
+
+    record_evidence = subparsers.add_parser("record-evidence", help="Record an evidence artifact for a packet.")
+    record_evidence.add_argument("--packet", required=True)
+    record_evidence.add_argument(
+        "--kind",
+        choices=(
+            "worker-report",
+            "review-report",
+            "validation",
+            "diffstat",
+            "scope-check",
+            "pr-state",
+            "merge-matrix",
+            "integration-report",
+            "maintenance-report",
+            "other",
+        ),
+        required=True,
+    )
+    record_evidence.add_argument("--path", required=True)
+    record_evidence.set_defaults(func=cmd_record_evidence)
+
+    set_pr = subparsers.add_parser("set-pr", help="Persist PR metadata for a packet.")
+    set_pr.add_argument("--packet", required=True)
+    set_pr.add_argument("--url", required=True)
+    set_pr.add_argument("--number", type=int, required=True)
+    set_pr.add_argument("--state", required=True)
+    set_pr.add_argument("--head", required=True)
+    set_pr.add_argument("--base", required=True)
+    set_pr.set_defaults(func=cmd_set_pr)
 
     validate = subparsers.add_parser("validate", help="Validate packet loop state.")
     validate.set_defaults(func=cmd_validate)
