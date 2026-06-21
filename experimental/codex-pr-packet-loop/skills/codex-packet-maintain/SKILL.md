@@ -23,3 +23,13 @@ Load `$codex-packet-loop-core`, then read `references/workflow-protocol.md`, `re
 ## Repair Boundary
 
 Deterministic repair may expire a stale lease for a packet without a PR. Destructive, external, or security-sensitive actions require human approval.
+
+## Output
+
+Report the next safe route explicitly:
+
+- `$codex-packet-dispatch` for ready packets with no active lease.
+- `$codex-packet-review` for packets with worker evidence ready to verify.
+- `$codex-packet-integrate` for reviewed packets with merge-eligible PR metadata.
+- `$codex-packet-slice` when state is blocked by packet shape, missing child plans, or unresolved dependency splits.
+- `$codex-packet-loop` when no stage-specific action is safe.

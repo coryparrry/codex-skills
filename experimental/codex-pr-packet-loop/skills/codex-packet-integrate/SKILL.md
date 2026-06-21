@@ -27,4 +27,4 @@ Parallel implementation is allowed. Parallel merging is not allowed in this MVP.
 
 ## Output
 
-Write `merge-matrix.md` and `integration-report.md`, then route back to `$codex-packet-loop` unless a human-approved state update remains.
+Write `merge-matrix.md` and `integration-report.md`, then route back to `$codex-packet-loop`. After any human-approved merge state update, route to `$codex-packet-maintain` for stale lease, dependency, and readiness cleanup.
