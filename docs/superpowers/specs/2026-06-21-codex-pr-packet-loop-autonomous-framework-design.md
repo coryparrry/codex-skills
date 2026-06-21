@@ -55,6 +55,7 @@ Each stage skill should stay concise and load shared references only when needed
 | `references/state-machine.md` | Statuses, allowed transitions, human-gated transitions, state probes, and refusal behavior. |
 | `references/autonomy-policy.md` | Safe autonomous actions, recommend-only actions, and hard stop conditions. |
 | `references/handoff-contracts.md` | Exact fields for slicer output, dispatch prompts, worker reports, review verdicts, integration recommendations, and maintenance reports. |
+| `references/superpowers-plan-adapter.md` | How packet-loop consumes Superpowers plans, invokes `superpowers:writing-plans`, validates child plan shape, and hands plans to workers. |
 | `references/evidence-contract.md` | Required evidence files, validation output shape, checksums or summaries, and how reviewers verify claims. |
 | `references/overlap-policy.md` | File, area, interface, behavior, test, generated-file, dependency, and documentation overlap handling. |
 | `references/recovery-playbook.md` | Stale lease recovery, blocked packet handling, failed validation loops, bad PRs, reslicing, and state repair. |
@@ -70,6 +71,7 @@ Structured state remains authoritative under `.codex/packet-loop/` in target rep
 - `.codex/packet-loop/packets/<packet-id>.json`
 - `.codex/packet-loop/events.jsonl`
 - `.codex/packet-loop/evidence/<packet-id>/`
+- `docs/superpowers/plans/packet-loop/<packet-id>-<slug>.md` as generated child implementation plans
 - `docs/codex/packet-loop.md` as generated human-readable output
 
 The manifest should include repository identity, default branch, target branch, active controller identity when known, packet order, current loop mode, dispatch policy, serialized resource lanes, and updated timestamp. There should be no default fixed active-worktree cap; dispatch is bounded by the dependency graph, review capacity, resource-lane capacity, and what the controller can actively monitor. A user- or repo-configured cap may exist only as an explicit override.
@@ -81,6 +83,7 @@ Each packet record should include:
 - scope: `allowed_scope`, `expected_touched_areas`, `avoid_scope`, `reserved_areas`
 - sequencing: `dependencies`, `blocked_by`, `parallel_safe`
 - risk: `risk`, `overlap_notes`, `human_review_required`
+- plan: `parent_plan_path`, `child_plan_path`, `source_plan_refs`, `plan_format_status`
 - execution: `validation.commands`, `branch`, `worktree`, `lease`
 - PR state: `pr.url`, `pr.number`, `pr.state`, `pr.head`, `pr.base`
 - evidence: `evidence_paths`, `last_validation`, `worker_report`, `review_report`
@@ -217,6 +220,20 @@ The reusable pattern is:
 
 The packet-loop framework should preserve this shape while moving the source of truth from ad hoc Markdown into script-backed packet JSON. Human-readable queue and build-order Markdown can still be generated or maintained as handoff artifacts, but JSON remains authoritative.
 
+## Superpowers Plan Adapter Pattern
+
+The packet loop should sit alongside Superpowers, not replace it. The main controller receives a large approved Superpowers implementation plan, uses `superpowers:writing-plans` to produce one Superpowers-compatible child plan per packet, and verifies each child plan before dispatch. Worker worktrees then execute normal Superpowers plans, so `superpowers:subagent-driven-development`, `superpowers:executing-plans`, `superpowers:test-driven-development`, code review, verification, and finishing-branch behavior keep working as intended.
+
+Adapter rules:
+
+1. The controller may slice only from an approved Superpowers implementation plan, not from a raw spec unless the user explicitly asks to create plans first.
+2. Child plans must use the standard Superpowers implementation-plan header, including the required sub-skill line.
+3. Child plans must carry parent plan path, source task or section references, packet id, branch name, dependencies, allowed files, out-of-scope files, validation commands, resource lanes, and evidence requirements.
+4. The controller verifies each child plan for required header, task checkbox syntax, no placeholders, exact file paths, exact validation commands, dependency references, and packet metadata before creating or dispatching the packet.
+5. Packet JSON stores the child plan path and source references. Workers receive the child plan path as their primary instruction, not an ad hoc prompt.
+6. A large Superpowers task may split into multiple child plans only when each child plan preserves a complete test-implementation-validation loop. The adapter must never split RED from GREEN or send a dependency consumer before its producer is merged.
+7. The controller owns orchestration around those child plans: dependency graph, worktree assignment, serialized resource lanes, worker supervision, review, and integration.
+
 ## Stage Skill Contracts
 
 ### Init
@@ -225,15 +242,15 @@ The packet-loop framework should preserve this shape while moving the source of 
 
 ### Slice
 
-`codex-packet-slice` reads an approved plan and creates packet records small enough for reviewable PRs. It must classify dependencies, parallel safety, overlap risk, allowed scope, avoid scope, validation commands, resource-lane needs, and likely human-review requirements. It should also produce or update a human-readable packet queue/build-order artifact when useful, but packet JSON remains authoritative. It should propose packet boundaries before writing records when the plan is broad or ambiguous.
+`codex-packet-slice` reads an approved Superpowers implementation plan and creates one Superpowers-compatible child implementation plan per packet. It must use `superpowers:writing-plans` for the child plan shape, then verify the resulting child plans before packet records are marked ready. It must classify dependencies, parallel safety, overlap risk, allowed scope, avoid scope, validation commands, resource-lane needs, and likely human-review requirements. It should also produce or update a human-readable packet queue/build-order artifact when useful, but packet JSON remains authoritative. It should propose packet boundaries before writing records when the plan is broad or ambiguous.
 
 ### Dispatch
 
-`codex-packet-dispatch` picks ready packets only after checking dependencies, monitoring capacity, serialized resource-lane availability, live reserved areas, expected overlap, and worker route availability. Its output is a worker handoff that names the packet id, worktree, branch, validation command, resource lane requests, allowed scope, avoid scope, evidence requirements, stop conditions, and report path.
+`codex-packet-dispatch` picks ready packets only after checking dependencies, monitoring capacity, serialized resource-lane availability, live reserved areas, expected overlap, worker route availability, and child plan validity. Its output is a worker handoff that names the packet id, child plan path, worktree, branch, validation command, resource lane requests, allowed scope, avoid scope, evidence requirements, stop conditions, and report path.
 
 ### Worker
 
-`codex-packet-worker` runs only in the assigned worktree for the leased packet. It validates the lease, transitions to `in-progress`, implements the smallest packet-scope change, runs the packet validation route, fixes only packet-caused failures, records evidence, and prepares or opens one PR. It stops after two failed fix attempts with the same root cause or immediately when scope expands beyond the packet.
+`codex-packet-worker` runs only in the assigned worktree for the leased packet. It validates the lease, reads the packet child plan, invokes the Superpowers execution skill named by that child plan, transitions to `in-progress`, implements the smallest packet-scope change, runs the packet validation route, fixes only packet-caused failures, records evidence, and prepares or opens one PR. It stops after two failed fix attempts with the same root cause or immediately when scope expands beyond the packet.
 
 ### Review
 
@@ -290,6 +307,8 @@ Initial scenarios:
 8. **Controller supervises active workers.** Given multiple active packet leases, the controller polls thread summaries and worktree dirt, detects one drifting packet, sends a scoped steering message, and leaves non-drifting packets alone.
 9. **Scheduler has no fixed worktree cap.** Given many dependency-ready packets, the controller does not stop at an arbitrary global worker count; it dispatches only as far as active monitoring, review capacity, overlap constraints, and resource lanes allow.
 10. **Validation lanes serialize scarce tools.** Given two packets that both need an XCTest or Computer Use lane, the controller lets implementation continue in parallel but grants only one matching validation/proof lane at a time.
+11. **Slicer emits valid Superpowers child plans.** Given a large approved Superpowers implementation plan, slice creates child plans with the required header, task checkboxes, source references, packet metadata, exact validation commands, and no placeholders.
+12. **Worker executes child plan, not ad hoc packet prose.** Given a ready packet with a child plan path, dispatch tells the worktree to execute that plan with the required Superpowers execution skill.
 
 These scenarios may start as deterministic CLI tests plus prompt-level fixtures. A later real eval should run agents through a small repo trial and grade traces, tool calls, state mutations, and artifacts.
 
@@ -314,6 +333,7 @@ This framework should not copy their bulk directly. It should adapt the deeper i
 - The validation suite includes behavioral scenarios beyond static metadata checks.
 - The controller workflow includes active worker supervision: polling thread state, checking worktree dirt, steering drifting workers, and integrating completed packet outputs serially.
 - The scheduler model has no default fixed active-worktree cap and includes serialized resource lanes for scarce validation or visual proof tools.
+- Packet slicing produces and verifies Superpowers-compatible child implementation plans before dispatch, preserving normal Superpowers execution inside each worktree.
 - The design remains scoped to `experimental/codex-pr-packet-loop/` and does not modify shipped skill mirrors.
 
 ## Implementation Defaults

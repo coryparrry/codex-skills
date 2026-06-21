@@ -34,6 +34,7 @@
   - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/state-machine.md`
   - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/autonomy-policy.md`
   - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/handoff-contracts.md`
+  - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/superpowers-plan-adapter.md`
   - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/evidence-contract.md`
   - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/overlap-policy.md`
   - `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/recovery-playbook.md`
@@ -61,7 +62,7 @@
 
 **Interfaces:**
 - Consumes: existing CLI commands `init`, `add-packet`, `transition`, `lease`, `validate`, `maintain`.
-- Produces: packet records with `status_reason`, `reserved_areas`, `resource_lanes`, `blocked_by`, `overlap_notes`, `human_review_required`, `needs_reslice_reason`, `last_validation`, `worker_report`, `review_report`, and structured `pr` fields.
+- Produces: packet records with `status_reason`, `reserved_areas`, `resource_lanes`, `blocked_by`, `overlap_notes`, `human_review_required`, `parent_plan_path`, `child_plan_path`, `source_plan_refs`, `plan_format_status`, `needs_reslice_reason`, `last_validation`, `worker_report`, `review_report`, and structured `pr` fields.
 - Produces: manifest records with `dispatch_policy.mode` set to `no_fixed_limit` and `resource_lanes` definitions for serialized tool lanes.
 - Produces: transition events with `actor`, `reason`, and optional `evidence_path`.
 
@@ -108,6 +109,12 @@ Append these tests to `PacketLoopCLITests` in `experimental/codex-pr-packet-loop
                 "xctest",
                 "--overlap-note",
                 "No live overlap.",
+                "--parent-plan-path",
+                "docs/superpowers/plans/main-plan.md",
+                "--child-plan-path",
+                "docs/superpowers/plans/packet-loop/P001-packet.md",
+                "--source-plan-ref",
+                "Task 1",
                 "--human-review-required",
                 "--validation-command",
                 "python3 -m unittest",
@@ -120,6 +127,10 @@ Append these tests to `PacketLoopCLITests` in `experimental/codex-pr-packet-loop
             self.assertEqual(packet["resource_lanes"], ["xctest"])
             self.assertEqual(packet["blocked_by"], [])
             self.assertEqual(packet["overlap_notes"], ["No live overlap."])
+            self.assertEqual(packet["parent_plan_path"], "docs/superpowers/plans/main-plan.md")
+            self.assertEqual(packet["child_plan_path"], "docs/superpowers/plans/packet-loop/P001-packet.md")
+            self.assertEqual(packet["source_plan_refs"], ["Task 1"])
+            self.assertEqual(packet["plan_format_status"], "pending")
             self.assertTrue(packet["human_review_required"])
             self.assertIsNone(packet["needs_reslice_reason"])
             self.assertIsNone(packet["last_validation"])
@@ -227,6 +238,10 @@ Then update `cmd_add_packet` to set these fields:
         "resource_lanes": packet_list(args.resource_lane),
         "blocked_by": packet_list(args.blocked_by),
         "overlap_notes": packet_list(args.overlap_note),
+        "parent_plan_path": optional_text(args.parent_plan_path),
+        "child_plan_path": optional_text(args.child_plan_path),
+        "source_plan_refs": packet_list(args.source_plan_ref),
+        "plan_format_status": args.plan_format_status,
         "human_review_required": bool(args.human_review_required),
         "needs_reslice_reason": None,
         "last_validation": None,
@@ -275,6 +290,7 @@ In `validate_packet`, include the list fields:
         "resource_lanes",
         "blocked_by",
         "overlap_notes",
+        "source_plan_refs",
 ```
 
 After the list-field loop, add these checks:
@@ -284,6 +300,12 @@ After the list-field loop, add these checks:
         errors.append(f"packet {packet.get('id', '<unknown>')} status_reason must be a non-empty string")
     if not isinstance(packet.get("human_review_required"), bool):
         errors.append(f"packet {packet.get('id', '<unknown>')} human_review_required must be a boolean")
+    if packet.get("plan_format_status") not in {"pending", "valid", "invalid"}:
+        errors.append(f"packet {packet.get('id', '<unknown>')} plan_format_status must be pending, valid, or invalid")
+    for optional_field in ("parent_plan_path", "child_plan_path"):
+        value = packet.get(optional_field)
+        if value is not None and not isinstance(value, str):
+            errors.append(f"packet {packet.get('id', '<unknown>')} {optional_field} must be a string or null")
     for optional_field in ("needs_reslice_reason", "last_validation", "worker_report", "review_report"):
         value = packet.get(optional_field)
         if value is not None and not isinstance(value, str):
@@ -316,6 +338,10 @@ Then add these `add-packet` flags near the existing add-packet parser setup:
     add_packet.add_argument("--resource-lane", action="append")
     add_packet.add_argument("--blocked-by", action="append")
     add_packet.add_argument("--overlap-note", action="append")
+    add_packet.add_argument("--parent-plan-path")
+    add_packet.add_argument("--child-plan-path")
+    add_packet.add_argument("--source-plan-ref", action="append")
+    add_packet.add_argument("--plan-format-status", choices=("pending", "valid", "invalid"), default="pending")
     add_packet.add_argument("--human-review-required", action="store_true")
 ```
 
@@ -798,7 +824,7 @@ git commit -m "feat(packet-loop): add evidence and controller status helpers"
 
 **Interfaces:**
 - Consumes: state model and CLI command names from Tasks 1 and 2.
-- Produces: stable reference names that every stage skill can load: `workflow-protocol.md`, `state-machine.md`, `autonomy-policy.md`, `handoff-contracts.md`, `evidence-contract.md`, `overlap-policy.md`, `recovery-playbook.md`, and `behavioral-evals.md`.
+- Produces: stable reference names that every stage skill can load: `workflow-protocol.md`, `state-machine.md`, `autonomy-policy.md`, `handoff-contracts.md`, `superpowers-plan-adapter.md`, `evidence-contract.md`, `overlap-policy.md`, `recovery-playbook.md`, and `behavioral-evals.md`.
 
 - [ ] **Step 1: Create `workflow-protocol.md`**
 
@@ -871,7 +897,35 @@ Every transition records actor, prior status, new status, reason, timestamp, and
 
 - [ ] **Step 3: Create the remaining reference files with concrete rules**
 
-Create the six remaining files with these top-level headings:
+Create the seven remaining files with these top-level headings:
+
+```markdown
+# Packet Loop Superpowers Plan Adapter
+
+## Role
+
+Packet-loop orchestrates Superpowers plans. It does not replace Superpowers planning or execution.
+
+## Source Plan
+
+Slice only from an approved Superpowers implementation plan unless the user explicitly asks to create plans first. If only a spec exists, route to `superpowers:writing-plans` before packet slicing.
+
+## Child Plan Requirements
+
+Each packet child plan lives under `docs/superpowers/plans/packet-loop/` and must use the standard Superpowers implementation-plan header, including the required sub-skill line. It must include packet id, parent plan path, source task references, allowed files, explicitly out-of-scope files, dependencies, branch name, validation commands, resource lanes, evidence requirements, and human-review-before-implementation status.
+
+## Verification
+
+Before a packet becomes `ready`, verify the child plan has the required header, checkbox tasks, exact file paths, exact validation commands, no placeholders, source references, dependency metadata, and packet id. Mark `plan_format_status` as `valid` only after this verification.
+
+## Dispatch
+
+Worker handoff points to the child plan path as the primary instruction. The worker must use the Superpowers execution skill required by that plan: `superpowers:subagent-driven-development` when tasks are independent in the current session, or `superpowers:executing-plans` when executing the plan in a separate session.
+
+## Safety
+
+Do not split a Superpowers task so that RED and GREEN steps land in different packets. Do not dispatch dependency consumers before producers are merged. Do not replace a child plan with an ad hoc packet prompt when a child Superpowers plan can be generated.
+```
 
 ```markdown
 # Packet Loop Autonomy Policy
@@ -995,6 +1049,8 @@ If a PR contains useful work but the boundary is wrong, review records `needs-re
 8. Controller supervises active workers.
 9. Scheduler has no fixed worktree cap.
 10. Validation lanes serialize scarce tools.
+11. Slicer emits valid Superpowers child plans.
+12. Worker executes child plan.
 
 Each fixture states the starting packet state, user prompt, expected skill route, forbidden actions, and required evidence.
 ```
@@ -1014,6 +1070,7 @@ Load only the references needed for the active stage:
 - `references/state-machine.md` before transitions.
 - `references/autonomy-policy.md` before acting without user confirmation.
 - `references/handoff-contracts.md` before creating worker, review, integration, or maintenance artifacts.
+- `references/superpowers-plan-adapter.md` before slicing Superpowers plans or dispatching child plans.
 - `references/evidence-contract.md` before recording or reviewing evidence.
 - `references/overlap-policy.md` before dispatch, review, or integration.
 - `references/recovery-playbook.md` when work is blocked, stale, failed, or mis-sliced.
@@ -1056,6 +1113,7 @@ This file remains as a compatibility index for older stage skills. New work shou
 - `state-machine.md` defines statuses, allowed transitions, human gates, event metadata, and refusal behavior.
 - `autonomy-policy.md` defines safe autonomous actions, recommend-only actions, and hard stops.
 - `handoff-contracts.md` defines required fields for dispatch, worker, review, integration, and maintenance artifacts.
+- `superpowers-plan-adapter.md` defines how packet-loop consumes Superpowers plans, validates child plans, and dispatches workers.
 - `evidence-contract.md` defines required evidence files and how packet records index them.
 - `overlap-policy.md` defines overlap classes and dispatch/review/integration rules.
 - `recovery-playbook.md` defines stale lease, failed validation, scope expansion, bad PR, and reslice recovery.
@@ -1111,8 +1169,9 @@ Use this skill as the controller for the packet-loop suite.
 1. Read repo and nested `AGENTS.md` instructions for the target repo.
 2. Load `$codex-packet-loop-core`.
 3. Read `references/workflow-protocol.md`, `references/state-machine.md`, `references/autonomy-policy.md`, and `references/recovery-playbook.md`.
-4. Read `references/overlap-policy.md` before dispatch or integration decisions.
-5. Read `references/handoff-contracts.md` and `references/evidence-contract.md` before creating or judging worker artifacts.
+4. Read `references/superpowers-plan-adapter.md` before slicing a Superpowers plan or dispatching a packet with a child plan.
+5. Read `references/overlap-policy.md` before dispatch or integration decisions.
+6. Read `references/handoff-contracts.md` and `references/evidence-contract.md` before creating or judging worker artifacts.
 
 ## Controller Loop
 
@@ -1124,6 +1183,7 @@ Use this skill as the controller for the packet-loop suite.
 6. Inspect active leases, ready packets, PR-open packets, reviewing packets, blocked packets, needs-reslice packets, and merge-eligible packets.
 7. Choose exactly one next stage:
    - invalid deterministic state -> `$codex-packet-maintain`
+   - approved Superpowers plan needs child plans -> `$codex-packet-slice`
    - PR-open or reviewing packets -> `$codex-packet-review`
    - dependency-ready packets fit monitoring and resource-lane capacity -> `$codex-packet-dispatch`
    - merge-eligible packets -> `$codex-packet-integrate`
@@ -1239,17 +1299,20 @@ Report created state files and route to `$codex-packet-slice` when an approved p
 
 - [ ] **Step 2: Update `codex-packet-slice`**
 
-Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-contracts.md`, `overlap-policy.md`, and `autonomy-policy.md`. Its workflow must say:
+Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-contracts.md`, `superpowers-plan-adapter.md`, `overlap-policy.md`, and `autonomy-policy.md`. Its workflow must say:
 
 ```markdown
 1. Validate existing packet-loop state.
 2. Read the approved plan and repo instructions.
-3. Propose packet boundaries before writing records when the plan is broad or ambiguous.
-4. For each packet, define goal, allowed scope, avoid scope, expected touched areas, reserved areas, resource lanes, dependencies, risk, parallel safety, validation commands, overlap notes, and human review requirement.
-5. Add each packet with `packet_loop.py add-packet`.
-6. Produce or update a human-readable packet queue/build-order artifact that includes dependency gates, dispatch waves, serialized resource lanes, human-review-first packets, and packets not suitable for blind agents.
-7. Transition a packet to `ready` only when dependencies and validation routes are clear.
-8. Report next valid skill `$codex-packet-dispatch` or `$codex-packet-loop`.
+3. If the input is not an approved Superpowers implementation plan, route to `superpowers:writing-plans` before slicing.
+4. Propose packet boundaries before writing records when the plan is broad or ambiguous.
+5. Use `superpowers:writing-plans` output shape to create one Superpowers-compatible child plan per packet under `docs/superpowers/plans/packet-loop/`.
+6. Verify each child plan has the required Superpowers header, checkbox tasks, source plan references, packet id, exact file paths, exact validation commands, dependencies, resource lanes, and no placeholders.
+7. For each packet, define goal, allowed scope, avoid scope, expected touched areas, reserved areas, resource lanes, dependencies, risk, parallel safety, validation commands, overlap notes, human review requirement, parent plan path, child plan path, source plan refs, and plan format status.
+8. Add each packet with `packet_loop.py add-packet`.
+9. Produce or update a human-readable packet queue/build-order artifact that includes dependency gates, dispatch waves, serialized resource lanes, human-review-first packets, and packets not suitable for blind agents.
+10. Transition a packet to `ready` only when dependencies and validation routes are clear and `plan_format_status` is `valid`.
+11. Report next valid skill `$codex-packet-dispatch` or `$codex-packet-loop`.
 ```
 
 Include this refusal line:
@@ -1260,37 +1323,38 @@ Refuse to hide product decisions, security tradeoffs, or broad ambiguous ownersh
 
 - [ ] **Step 3: Update `codex-packet-dispatch`**
 
-Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-contracts.md`, `overlap-policy.md`, and `autonomy-policy.md`. Its workflow must say:
+Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-contracts.md`, `superpowers-plan-adapter.md`, `overlap-policy.md`, and `autonomy-policy.md`. Its workflow must say:
 
 ```markdown
 1. Run `packet_loop.py validate`.
 2. Run `packet_loop.py status --format json`.
-3. Select one `ready` packet whose dependencies are satisfied, controller monitoring capacity is available, required serialized resource lanes can be queued, and `reserved_areas` do not collide with live leases.
+3. Select one `ready` packet whose dependencies are satisfied, child plan exists and is valid, controller monitoring capacity is available, required serialized resource lanes can be queued, and `reserved_areas` do not collide with live leases.
 4. Create a branch name `codex/<packet-id-lower>-<short-title>`.
 5. Create or request a fresh worktree/thread route.
 6. Lease the packet with `packet_loop.py lease`.
 7. Produce a worker handoff that invokes `$codex-packet-worker`.
 ```
 
-The handoff must include packet id, branch, worktree, owner thread, allowed scope, avoid scope, expected touched areas, reserved areas, resource lanes, validation commands, evidence directory, stop conditions, commit policy, PR policy, and next skill.
+The handoff must include packet id, child plan path, branch, worktree, owner thread, allowed scope, avoid scope, expected touched areas, reserved areas, resource lanes, validation commands, evidence directory, stop conditions, commit policy, PR policy, and next skill.
 
 - [ ] **Step 4: Update `codex-packet-worker`**
 
-Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-contracts.md`, `evidence-contract.md`, `overlap-policy.md`, `recovery-playbook.md`, and `autonomy-policy.md`. Its workflow must say:
+Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-contracts.md`, `superpowers-plan-adapter.md`, `evidence-contract.md`, `overlap-policy.md`, `recovery-playbook.md`, and `autonomy-policy.md`. Its workflow must say:
 
 ```markdown
 1. Confirm the current worktree and branch match the packet lease.
-2. Validate state and transition `reserved` to `in-progress` with actor, reason, and evidence path when available.
-3. Inspect only packet-scoped files.
-4. Implement the smallest packet-scoped change.
-5. Run each packet validation command.
-6. Fix only packet-caused failures.
-7. Stop after two failed fix attempts with the same root cause.
-8. Write worker evidence under `.codex/packet-loop/evidence/<packet-id>/`.
-9. Record evidence with `packet_loop.py record-evidence`.
-10. Prepare one PR, or open/update one PR only when authorized.
-11. Record PR metadata with `packet_loop.py set-pr` when PR metadata exists.
-12. Transition to `pr-open` only after evidence and validation are recorded.
+2. Read the packet child plan path from packet JSON.
+3. Invoke the Superpowers execution skill required by the child plan: `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+4. Validate state and transition `reserved` to `in-progress` with actor, reason, and evidence path when available.
+5. Follow the child plan exactly while respecting packet allowed scope.
+6. Run each packet validation command.
+7. Fix only packet-caused failures.
+8. Stop after two failed fix attempts with the same root cause.
+9. Write worker evidence under `.codex/packet-loop/evidence/<packet-id>/`.
+10. Record evidence with `packet_loop.py record-evidence`.
+11. Prepare one PR, or open/update one PR only when authorized.
+12. Record PR metadata with `packet_loop.py set-pr` when PR metadata exists.
+13. Transition to `pr-open` only after evidence and validation are recorded.
 ```
 
 - [ ] **Step 5: Update `codex-packet-review`**
@@ -1367,6 +1431,8 @@ git commit -m "docs(packet-loop): rewrite stage skills around protocol"
 - Create: `experimental/codex-pr-packet-loop/evals/fixtures/controller-supervises-active-workers.md`
 - Create: `experimental/codex-pr-packet-loop/evals/fixtures/scheduler-has-no-fixed-worktree-cap.md`
 - Create: `experimental/codex-pr-packet-loop/evals/fixtures/validation-lanes-serialize-scarce-tools.md`
+- Create: `experimental/codex-pr-packet-loop/evals/fixtures/slicer-emits-valid-superpowers-child-plans.md`
+- Create: `experimental/codex-pr-packet-loop/evals/fixtures/worker-executes-child-plan.md`
 
 **Interfaces:**
 - Consumes: skill names, reference names, and stage routing from Tasks 3 through 5.
@@ -1394,6 +1460,7 @@ REQUIRED_REFERENCES = {
     "state-machine.md",
     "autonomy-policy.md",
     "handoff-contracts.md",
+    "superpowers-plan-adapter.md",
     "evidence-contract.md",
     "overlap-policy.md",
     "recovery-playbook.md",
@@ -1411,6 +1478,13 @@ STAGE_NEXT_SKILLS = {
     "codex-packet-maintain": ["codex-packet-loop", "codex-packet-dispatch", "codex-packet-review", "codex-packet-integrate", "codex-packet-slice"],
 }
 
+STAGE_REQUIRED_REFERENCES = {
+    "codex-packet-loop": ["superpowers-plan-adapter.md"],
+    "codex-packet-slice": ["superpowers-plan-adapter.md"],
+    "codex-packet-dispatch": ["superpowers-plan-adapter.md"],
+    "codex-packet-worker": ["superpowers-plan-adapter.md"],
+}
+
 REQUIRED_FIXTURES = {
     "router-finds-next-stage.md",
     "dispatch-blocks-overlap.md",
@@ -1422,6 +1496,8 @@ REQUIRED_FIXTURES = {
     "controller-supervises-active-workers.md",
     "scheduler-has-no-fixed-worktree-cap.md",
     "validation-lanes-serialize-scarce-tools.md",
+    "slicer-emits-valid-superpowers-child-plans.md",
+    "worker-executes-child-plan.md",
 }
 ```
 
@@ -1459,6 +1535,9 @@ def validate_stage_routing() -> None:
         for next_skill in next_skills:
             if f"${next_skill}" not in text:
                 fail(f"{path} must name next skill ${next_skill}")
+        for reference in STAGE_REQUIRED_REFERENCES.get(skill_name, []):
+            if reference not in text:
+                fail(f"{path} must reference {reference}")
 
 
 def validate_behavioral_fixtures() -> None:
@@ -1530,6 +1609,8 @@ Use these scenario-specific values for the remaining nine files:
 | `controller-supervises-active-workers.md` | Controller Supervises Active Workers | `$codex-packet-loop` steers only the drifting worker. | Taking over non-drifting worker implementation. | Controller report lists thread poll, worktree status, diff shape, steering target, and untouched lanes. |
 | `scheduler-has-no-fixed-worktree-cap.md` | Scheduler Has No Fixed Worktree Cap | `$codex-packet-loop` dispatches every dependency-ready packet it can actively monitor. | Stopping at a hidden count such as three active workers when no owner cap exists. | Controller report names dependency-ready packets, active monitoring basis, review capacity, and any packet deliberately held back. |
 | `validation-lanes-serialize-scarce-tools.md` | Validation Lanes Serialize Scarce Tools | `$codex-packet-loop` queues XCTest, UI automation, or Computer Use lane requests while allowing implementation to continue. | Running two matching scarce validation/proof lanes at the same time. | Controller report names lane owner, queued packets, exact commands, and release/grant order. |
+| `slicer-emits-valid-superpowers-child-plans.md` | Slicer Emits Valid Superpowers Child Plans | `$codex-packet-slice` uses `superpowers:writing-plans` output shape for each packet child plan and marks packets ready only after validation. | Dispatching a raw packet prompt or a child plan missing the required Superpowers header. | Report lists parent plan path, child plan paths, source task refs, format checks, and any packet held as `candidate`. |
+| `worker-executes-child-plan.md` | Worker Executes Child Plan | `$codex-packet-worker` reads the child plan and invokes the Superpowers execution skill required by that plan. | Implementing from packet JSON alone when a child plan path exists. | Worker report names child plan path, execution skill used, validation commands, and evidence paths. |
 
 - [ ] **Step 5: Run validation and fix the first concrete failure only**
 
@@ -1584,6 +1665,8 @@ Add this section before `Validation`:
 ### Controller-First Flow
 
 Use `$codex-packet-loop` for normal operation. The controller validates state, runs safe maintenance, inspects status, supervises active worker lanes, and routes to the next valid stage skill. Invoke a stage skill directly only when the stage is already known.
+
+For Superpowers-driven work, give the controller an approved `docs/superpowers/plans/*.md` implementation plan. The slicer creates one Superpowers-compatible child plan per packet under `docs/superpowers/plans/packet-loop/`, verifies the child plan format, and dispatches workers to execute those plans with the normal Superpowers execution skills.
 ```
 
 - [ ] **Step 2: Update the manual first-run flow**
@@ -1606,6 +1689,8 @@ When bootstrapping a repo manually:
 3. Use `$codex-packet-loop` to advance the loop from that point.
 
 The controller may route to `$codex-packet-dispatch`, `$codex-packet-worker`, `$codex-packet-review`, `$codex-packet-integrate`, `$codex-packet-maintain`, or back to `$codex-packet-slice` depending on packet state.
+
+When the source is a Superpowers implementation plan, each packet worker receives a generated child Superpowers plan. The worker executes that plan with `superpowers:subagent-driven-development` or `superpowers:executing-plans`, so normal TDD, review, verification, and finishing-branch behavior still apply inside the worktree.
 ```
 
 - [ ] **Step 3: Add protocol summary to the manual**
@@ -1718,7 +1803,7 @@ git commit -m "chore(packet-loop): verify autonomous framework"
 
 ## Self-Review
 
-- Spec coverage: Tasks 1 and 2 cover deterministic state, dispatch policy, serialized resource lanes, transitions, evidence indexing, dashboard/status output, and overlap guards. Task 3 covers shared references. Task 4 covers the controller/router and active worker supervision. Task 5 covers stage skill contracts, queue/build-order artifacts, and resource-lane handoffs. Task 6 covers behavioral validation scenarios. Task 7 covers user-facing controller-first docs. Task 8 covers closeout verification.
-- Acceptance criteria mapping: the controller skill is created in Task 4; every stage references the shared workflow protocol in Task 5; state-machine, handoff, evidence, overlap, recovery, and behavioral references are created in Task 3; validation enforces references and routing in Task 6; script-backed state operations are extended in Tasks 1 and 2; behavioral scenarios are created in Task 6; active worker supervision appears in Task 4 and fixture coverage in Task 6; no-fixed-cap dispatch and serialized resource lanes are covered in Tasks 1, 2, 5, and 6; all framework implementation remains under the experimental path.
-- Type consistency: packet fields introduced in Task 1 are consumed by Task 2 and referenced by Tasks 3 through 6. CLI command names introduced in Task 2 are used consistently in later skill and doc tasks.
+- Spec coverage: Tasks 1 and 2 cover deterministic state, child-plan packet fields, dispatch policy, serialized resource lanes, transitions, evidence indexing, dashboard/status output, and overlap guards. Task 3 covers shared references, including the Superpowers plan adapter. Task 4 covers the controller/router and active worker supervision. Task 5 covers stage skill contracts, Superpowers child-plan slicing, queue/build-order artifacts, and resource-lane handoffs. Task 6 covers behavioral validation scenarios. Task 7 covers user-facing controller-first docs. Task 8 covers closeout verification.
+- Acceptance criteria mapping: the controller skill is created in Task 4; every stage references the shared workflow protocol in Task 5; state-machine, handoff, Superpowers adapter, evidence, overlap, recovery, and behavioral references are created in Task 3; validation enforces references and routing in Task 6; script-backed state operations are extended in Tasks 1 and 2; behavioral scenarios are created in Task 6; active worker supervision appears in Task 4 and fixture coverage in Task 6; no-fixed-cap dispatch and serialized resource lanes are covered in Tasks 1, 2, 5, and 6; child Superpowers plan generation/validation is covered in Tasks 1, 3, 5, 6, and 7; all framework implementation remains under the experimental path.
+- Type consistency: packet fields introduced in Task 1 are consumed by Task 2 and referenced by Tasks 3 through 6. Child plan fields `parent_plan_path`, `child_plan_path`, `source_plan_refs`, and `plan_format_status` are used consistently by slicer, dispatch, worker, and validation tasks. CLI command names introduced in Task 2 are used consistently in later skill and doc tasks.
 - Placeholder scan target: Task 8 includes the exact `rg` command that must return no matches before completion.
