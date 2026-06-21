@@ -37,7 +37,7 @@ The suite should expose one controller/router skill and stage-specific skills.
 | `codex-packet-loop-core` | Shared contract and deterministic CLI. Validate state, enforce transitions, manage leases, generate dashboards, and expose schema references. |
 | `codex-packet-init` | Opt a repo into packet-loop state and verify the initial state is valid. |
 | `codex-packet-slice` | Convert an approved plan into small packet records with dependencies, scope, risk, overlap notes, and validation routes. |
-| `codex-packet-dispatch` | Select ready packets, enforce active lease limits, reserve scope, create worker handoff prompts, and record leases. |
+| `codex-packet-dispatch` | Select dependency-ready packets, enforce reserved-area and resource-lane constraints, create worker handoff prompts, and record leases. |
 | `codex-packet-worker` | Execute exactly one leased packet in one worktree and record evidence before opening or preparing one PR. |
 | `codex-packet-review` | Verify packet PRs against allowed scope, actual diff, validation evidence, overlap risk, and review feedback. |
 | `codex-packet-integrate` | Sequence merge-eligible PRs, detect stale or overlapping work, recommend the next merge, and stop at human gates. |
@@ -72,7 +72,7 @@ Structured state remains authoritative under `.codex/packet-loop/` in target rep
 - `.codex/packet-loop/evidence/<packet-id>/`
 - `docs/codex/packet-loop.md` as generated human-readable output
 
-The manifest should include repository identity, default branch, target branch, active packet limit, active controller identity when known, packet order, current loop mode, and updated timestamp.
+The manifest should include repository identity, default branch, target branch, active controller identity when known, packet order, current loop mode, dispatch policy, serialized resource lanes, and updated timestamp. There should be no default fixed active-worktree cap; dispatch is bounded by the dependency graph, review capacity, resource-lane capacity, and what the controller can actively monitor. A user- or repo-configured cap may exist only as an explicit override.
 
 Each packet record should include:
 
@@ -153,7 +153,7 @@ Every transition should log an event with actor, prior status, new status, reaso
 5. Choose the next safe action in priority order:
    - repair invalid deterministic state
    - review PR-open or stale packet PRs
-   - dispatch ready packets within active lease limits
+   - dispatch dependency-ready packets that fit active monitoring and resource-lane capacity
    - prepare integration recommendation for merge-eligible packets
    - reslice or report blocked work when no safe autonomous action remains
 6. Invoke or instruct the exact next stage skill.
@@ -164,7 +164,7 @@ The controller may autonomously:
 - validate state
 - expire stale leases for packets with no PR and expired TTL
 - regenerate dashboards
-- reserve ready packets when dependencies and overlap checks pass
+- reserve ready packets when dependencies, overlap checks, and resource-lane constraints pass
 - create worker handoff prompts
 - recommend but not execute merges
 - mark packets blocked or needs-reslice when evidence supports it
@@ -199,6 +199,24 @@ The reusable pattern is:
 
 This is not the exact final packet-loop style because packet-loop state should be structured and script-backed, not inferred only from thread messages and Git status. It is still a strong operating model for the controller skill: the controller must act as an active supervisor, not just a queue launcher.
 
+## Thread-Derived PR Queue and Scheduler Pattern
+
+Thread `019eea9e-364f-7523-baca-20b71e2bfac8` provides a strong prototype for plan slicing into PR packets and an orchestrator build order. It began as a request to split one large UIShot plan into 10-20 reviewable PRs, then evolved from a simple PR list into a dispatchable scheduler contract.
+
+The reusable pattern is:
+
+1. Create a PR packet template with title, goal, allowed areas, out-of-scope areas, implementation notes, validation command, risk, parallel safety, dependencies, branch name, expected PR size, and human-review-before-implementation flag.
+2. Slice the source plan into small worktree-friendly PR packets, preferably one purpose, 1-4 files, under roughly 300 changed lines, exact validation commands, and explicit dependencies.
+3. Add an orchestrator build plan above the packet list so the controller owns dispatch, dependency tracking, merge order, review readiness, and worker rebase timing.
+4. Dispatch only after every dependency is merged into the integration base, not merely implemented in another worktree.
+5. Do not impose an arbitrary active-worktree cap. Dispatch as many dependency-ready packets as the controller can actively monitor, subject to review capacity, overlap risk, and serialized resource lanes.
+6. Serialize scarce validation or proof lanes. In the UIShot prototype, XCTest and Computer Use each had a single active lane; workers could implement and run static checks in parallel but had to request the lane before running those commands.
+7. Merge one PR at a time. After each merge, tell active downstream workers the new base commit and whether they must rebase.
+8. Treat non-parallel-safe packets as speculative only when the controller has an explicit rebase/merge gate.
+9. Mark coordinator-owned final closeout packets as not suitable for blind parallel agents when their proof depends on the final combined state.
+
+The packet-loop framework should preserve this shape while moving the source of truth from ad hoc Markdown into script-backed packet JSON. Human-readable queue and build-order Markdown can still be generated or maintained as handoff artifacts, but JSON remains authoritative.
+
 ## Stage Skill Contracts
 
 ### Init
@@ -207,11 +225,11 @@ This is not the exact final packet-loop style because packet-loop state should b
 
 ### Slice
 
-`codex-packet-slice` reads an approved plan and creates packet records small enough for reviewable PRs. It must classify dependencies, parallel safety, overlap risk, allowed scope, avoid scope, validation commands, and likely human-review requirements. It should propose packet boundaries before writing records when the plan is broad or ambiguous.
+`codex-packet-slice` reads an approved plan and creates packet records small enough for reviewable PRs. It must classify dependencies, parallel safety, overlap risk, allowed scope, avoid scope, validation commands, resource-lane needs, and likely human-review requirements. It should also produce or update a human-readable packet queue/build-order artifact when useful, but packet JSON remains authoritative. It should propose packet boundaries before writing records when the plan is broad or ambiguous.
 
 ### Dispatch
 
-`codex-packet-dispatch` picks ready packets only after checking dependencies, active lease limit, live reserved areas, expected overlap, and worker route availability. Its output is a worker handoff that names the packet id, worktree, branch, validation command, allowed scope, avoid scope, evidence requirements, stop conditions, and report path.
+`codex-packet-dispatch` picks ready packets only after checking dependencies, monitoring capacity, serialized resource-lane availability, live reserved areas, expected overlap, and worker route availability. Its output is a worker handoff that names the packet id, worktree, branch, validation command, resource lane requests, allowed scope, avoid scope, evidence requirements, stop conditions, and report path.
 
 ### Worker
 
@@ -270,6 +288,8 @@ Initial scenarios:
 6. **Integration stops before merge.** Given merge-eligible packets, integrate produces a merge recommendation and does not merge.
 7. **Recovery reslices bad packet.** Given repeated validation failure caused by packet boundary mismatch, review or maintain routes to needs-reslice with a reason.
 8. **Controller supervises active workers.** Given multiple active packet leases, the controller polls thread summaries and worktree dirt, detects one drifting packet, sends a scoped steering message, and leaves non-drifting packets alone.
+9. **Scheduler has no fixed worktree cap.** Given many dependency-ready packets, the controller does not stop at an arbitrary global worker count; it dispatches only as far as active monitoring, review capacity, overlap constraints, and resource lanes allow.
+10. **Validation lanes serialize scarce tools.** Given two packets that both need an XCTest or Computer Use lane, the controller lets implementation continue in parallel but grants only one matching validation/proof lane at a time.
 
 These scenarios may start as deterministic CLI tests plus prompt-level fixtures. A later real eval should run agents through a small repo trial and grade traces, tool calls, state mutations, and artifacts.
 
@@ -293,6 +313,7 @@ This framework should not copy their bulk directly. It should adapt the deeper i
 - Deterministic state operations use scripts where supported rather than hand-editing JSON.
 - The validation suite includes behavioral scenarios beyond static metadata checks.
 - The controller workflow includes active worker supervision: polling thread state, checking worktree dirt, steering drifting workers, and integrating completed packet outputs serially.
+- The scheduler model has no default fixed active-worktree cap and includes serialized resource lanes for scarce validation or visual proof tools.
 - The design remains scoped to `experimental/codex-pr-packet-loop/` and does not modify shipped skill mirrors.
 
 ## Implementation Defaults

@@ -14,6 +14,8 @@
 - Add no new third-party dependencies.
 - Treat `.codex/packet-loop/*.json` as authoritative state; treat `docs/codex/packet-loop.md` as generated output.
 - Use `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/scripts/packet_loop.py` for deterministic state changes when a supported command exists.
+- Do not impose a default fixed active-worktree cap. Dispatch as many dependency-ready packets as the controller can actively monitor, constrained by review capacity, overlap risk, and serialized resource lanes.
+- Serialize scarce validation or proof lanes such as XCTest, UI automation, and Computer Use while allowing implementation, static checks, and low-risk docs work to continue in parallel.
 - Human approval is required before merge, force-push, branch deletion, PR closing, default-branch writes, destructive Git operations, discarding useful work, or security-sensitive tradeoffs.
 - Worker summaries are untrusted claims until review verifies packet JSON, actual diff, PR state, validation evidence, and scope.
 - Workers prepare one PR by default; they may open or update a PR only when direct user instructions or repo-local packet-loop configuration authorizes that external action.
@@ -59,7 +61,8 @@
 
 **Interfaces:**
 - Consumes: existing CLI commands `init`, `add-packet`, `transition`, `lease`, `validate`, `maintain`.
-- Produces: packet records with `status_reason`, `reserved_areas`, `blocked_by`, `overlap_notes`, `human_review_required`, `needs_reslice_reason`, `last_validation`, `worker_report`, `review_report`, and structured `pr` fields.
+- Produces: packet records with `status_reason`, `reserved_areas`, `resource_lanes`, `blocked_by`, `overlap_notes`, `human_review_required`, `needs_reslice_reason`, `last_validation`, `worker_report`, `review_report`, and structured `pr` fields.
+- Produces: manifest records with `dispatch_policy.mode` set to `no_fixed_limit` and `resource_lanes` definitions for serialized tool lanes.
 - Produces: transition events with `actor`, `reason`, and optional `evidence_path`.
 
 - [ ] **Step 1: Add failing tests for the richer packet schema**
@@ -67,6 +70,21 @@
 Append these tests to `PacketLoopCLITests` in `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py`:
 
 ```python
+    def test_init_sets_unbounded_dispatch_policy_and_serial_resource_lanes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            result = self.run_cli(repo, "init", "--name", "demo")
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            manifest = json.loads((repo / ".codex/packet-loop/manifest.json").read_text())
+            self.assertEqual(manifest["dispatch_policy"], {"mode": "no_fixed_limit", "max_active_worktrees": None})
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["mode"], "serialized")
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["active_packet"], None)
+            self.assertEqual(manifest["resource_lanes"]["xctest"]["queue"], [])
+            self.assertEqual(manifest["resource_lanes"]["computer-use"]["mode"], "serialized")
+            self.assertEqual(manifest["resource_lanes"]["computer-use"]["active_packet"], None)
+            self.assertEqual(manifest["resource_lanes"]["computer-use"]["queue"], [])
+
     def test_add_packet_sets_autonomous_contract_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -86,6 +104,8 @@ Append these tests to `PacketLoopCLITests` in `experimental/codex-pr-packet-loop
                 "skills/demo",
                 "--reserved-area",
                 "skills/demo",
+                "--resource-lane",
+                "xctest",
                 "--overlap-note",
                 "No live overlap.",
                 "--human-review-required",
@@ -97,6 +117,7 @@ Append these tests to `PacketLoopCLITests` in `experimental/codex-pr-packet-loop
             packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
             self.assertEqual(packet["status_reason"], "candidate packet created")
             self.assertEqual(packet["reserved_areas"], ["skills/demo"])
+            self.assertEqual(packet["resource_lanes"], ["xctest"])
             self.assertEqual(packet["blocked_by"], [])
             self.assertEqual(packet["overlap_notes"], ["No live overlap."])
             self.assertTrue(packet["human_review_required"])
@@ -180,13 +201,30 @@ def add_unique_path(paths: list[Any], evidence_path: str | None) -> list[Any]:
     if evidence_path not in paths:
         paths.append(evidence_path)
     return paths
+
+
+def default_resource_lanes() -> dict[str, dict[str, Any]]:
+    return {
+        "xctest": {"mode": "serialized", "active_packet": None, "queue": []},
+        "computer-use": {"mode": "serialized", "active_packet": None, "queue": []},
+    }
 ```
+
+Update `cmd_init` so the manifest uses explicit scheduler policy instead of a default worker cap:
+
+```python
+        "dispatch_policy": {"mode": "no_fixed_limit", "max_active_worktrees": args.max_active_worktrees},
+        "resource_lanes": default_resource_lanes(),
+```
+
+Remove the default `active_packet_limit` manifest field. Keep `max_active_worktrees` nullable; it is an explicit owner override, not a hidden default cap.
 
 Then update `cmd_add_packet` to set these fields:
 
 ```python
         "status_reason": "candidate packet created",
         "reserved_areas": packet_list(args.reserved_area),
+        "resource_lanes": packet_list(args.resource_lane),
         "blocked_by": packet_list(args.blocked_by),
         "overlap_notes": packet_list(args.overlap_note),
         "human_review_required": bool(args.human_review_required),
@@ -199,12 +237,42 @@ Then update `cmd_add_packet` to set these fields:
 
 Replace the existing `"pr": None` entry in the same packet literal with the structured `pr` object above.
 
-- [ ] **Step 4: Validate the new packet fields**
+- [ ] **Step 4: Validate the new manifest and packet fields**
+
+In `validate_manifest`, replace the required positive `active_packet_limit` validation with:
+
+```python
+    dispatch_policy = manifest.get("dispatch_policy")
+    if not isinstance(dispatch_policy, dict):
+        errors.append("manifest dispatch_policy must be an object")
+    else:
+        if dispatch_policy.get("mode") != "no_fixed_limit":
+            errors.append("manifest dispatch_policy.mode must be no_fixed_limit")
+        max_active = dispatch_policy.get("max_active_worktrees")
+        if max_active is not None and (isinstance(max_active, bool) or not isinstance(max_active, int) or max_active < 1):
+            errors.append("manifest dispatch_policy.max_active_worktrees must be a positive integer or null")
+    resource_lanes = manifest.get("resource_lanes")
+    if not isinstance(resource_lanes, dict):
+        errors.append("manifest resource_lanes must be an object")
+    else:
+        for lane_name in ("xctest", "computer-use"):
+            lane = resource_lanes.get(lane_name)
+            if not isinstance(lane, dict):
+                errors.append(f"manifest resource_lanes.{lane_name} must be an object")
+                continue
+            if lane.get("mode") != "serialized":
+                errors.append(f"manifest resource_lanes.{lane_name}.mode must be serialized")
+            if lane.get("active_packet") is not None and not isinstance(lane.get("active_packet"), str):
+                errors.append(f"manifest resource_lanes.{lane_name}.active_packet must be a string or null")
+            if not isinstance(lane.get("queue"), list) or any(not isinstance(item, str) for item in lane.get("queue", [])):
+                errors.append(f"manifest resource_lanes.{lane_name}.queue must be a list of strings")
+```
 
 In `validate_packet`, include the list fields:
 
 ```python
         "reserved_areas",
+        "resource_lanes",
         "blocked_by",
         "overlap_notes",
 ```
@@ -233,12 +301,19 @@ After the list-field loop, add these checks:
             errors.append(f"packet {packet.get('id', '<unknown>')} pr.number must be an integer or null")
 ```
 
-- [ ] **Step 5: Add parser flags for packet creation and transition metadata**
+- [ ] **Step 5: Add parser flags for init policy, packet creation, and transition metadata**
 
-In `build_parser`, add these `add-packet` flags:
+In `build_parser`, add this `init` flag near the existing init parser setup:
+
+```python
+    init.add_argument("--max-active-worktrees", type=int)
+```
+
+Then add these `add-packet` flags near the existing add-packet parser setup:
 
 ```python
     add_packet.add_argument("--reserved-area", action="append")
+    add_packet.add_argument("--resource-lane", action="append")
     add_packet.add_argument("--blocked-by", action="append")
     add_packet.add_argument("--overlap-note", action="append")
     add_packet.add_argument("--human-review-required", action="store_true")
@@ -388,7 +463,7 @@ Append these tests to `PacketLoopCLITests`:
     def test_status_json_groups_packets_for_controller(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            self.assertEqual(self.run_cli(repo, "init", "--name", "demo", "--active-packet-limit", "2").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
             self.assertEqual(self.add_basic_packet(repo, "P001").returncode, 0)
             self.assertEqual(self.add_basic_packet(repo, "P002").returncode, 0)
             self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
@@ -413,8 +488,10 @@ Append these tests to `PacketLoopCLITests`:
 
             self.assertEqual(result.returncode, 0, result.stderr)
             status = json.loads(result.stdout)
-            self.assertEqual(status["active_packet_limit"], 2)
+            self.assertEqual(status["dispatch_policy"]["mode"], "no_fixed_limit")
             self.assertEqual(status["active_lease_count"], 1)
+            self.assertEqual(status["resource_lanes"]["xctest"]["mode"], "serialized")
+            self.assertEqual(status["resource_lanes"]["computer-use"]["mode"], "serialized")
             self.assertEqual(status["groups"]["reserved"], ["P001"])
             self.assertEqual(status["groups"]["ready"], ["P002"])
             self.assertEqual(status["next_actions"][0]["skill"], "codex-packet-dispatch")
@@ -422,7 +499,7 @@ Append these tests to `PacketLoopCLITests`:
     def test_lease_rejects_reserved_area_collision(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            self.assertEqual(self.run_cli(repo, "init", "--name", "demo", "--active-packet-limit", "2").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
             for packet_id in ("P001", "P002"):
                 self.assertEqual(
                     self.run_cli(
@@ -577,8 +654,8 @@ def build_status_summary(repo: Path) -> dict[str, Any]:
         next_actions.append({"skill": "codex-packet-maintain", "reason": "state validation failed"})
     elif groups["pr-open"] or groups["reviewing"]:
         next_actions.append({"skill": "codex-packet-review", "reason": "packet PRs need verification"})
-    elif groups["ready"] and active_lease_count < int(manifest["active_packet_limit"]):
-        next_actions.append({"skill": "codex-packet-dispatch", "reason": "ready packet capacity is available"})
+    elif groups["ready"]:
+        next_actions.append({"skill": "codex-packet-dispatch", "reason": "dependency-ready packets are available"})
     elif groups["merge-eligible"]:
         next_actions.append({"skill": "codex-packet-integrate", "reason": "merge-eligible packets require human-gated sequencing"})
     elif groups["blocked"] or groups["needs-reslice"]:
@@ -588,7 +665,8 @@ def build_status_summary(repo: Path) -> dict[str, Any]:
     return {
         "valid": not errors,
         "errors": errors,
-        "active_packet_limit": manifest.get("active_packet_limit"),
+        "dispatch_policy": manifest.get("dispatch_policy", {"mode": "no_fixed_limit"}),
+        "resource_lanes": manifest.get("resource_lanes", {}),
         "active_lease_count": active_lease_count,
         "groups": groups,
         "next_actions": next_actions,
@@ -601,7 +679,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(json.dumps(summary, indent=2, sort_keys=True))
     else:
         print(f"valid: {summary['valid']}")
-        print(f"active leases: {summary['active_lease_count']}/{summary['active_packet_limit']}")
+        print(f"active leases: {summary['active_lease_count']}")
+        print(f"dispatch policy: {summary['dispatch_policy'].get('mode')}")
         for action in summary["next_actions"]:
             print(f"next: ${action['skill']} - {action['reason']}")
     return 0 if summary["valid"] else 1
@@ -745,7 +824,7 @@ JSON state wins over generated Markdown when the two disagree.
 | No `.codex/packet-loop/manifest.json` exists | `$codex-packet-init` |
 | Manifest exists but there are no packet records | `$codex-packet-slice` |
 | Invalid packet-loop JSON or expired deterministic lease | `$codex-packet-maintain` |
-| Ready packet capacity is available | `$codex-packet-dispatch` |
+| Dependency-ready packets fit monitoring and resource-lane capacity | `$codex-packet-dispatch` |
 | Packet is leased to the current worker | `$codex-packet-worker` |
 | Packet has PR state or status `pr-open` or `reviewing` | `$codex-packet-review` |
 | Packet is `merge-eligible` | `$codex-packet-integrate` |
@@ -802,7 +881,7 @@ Create the six remaining files with these top-level headings:
 - Validate packet-loop state.
 - Expire stale leases when the lease TTL has passed and no PR metadata exists.
 - Regenerate generated dashboards through the CLI.
-- Reserve ready packets when dependencies, active limit, and reserved-area checks pass.
+- Reserve ready packets when dependencies, monitoring capacity, serialized resource-lane constraints, and reserved-area checks pass.
 - Record evidence paths and PR metadata through the CLI.
 - Recommend merge order without performing the merge.
 
@@ -914,6 +993,8 @@ If a PR contains useful work but the boundary is wrong, review records `needs-re
 6. Integration stops before merge.
 7. Recovery reslices bad packet.
 8. Controller supervises active workers.
+9. Scheduler has no fixed worktree cap.
+10. Validation lanes serialize scarce tools.
 
 Each fixture states the starting packet state, user prompt, expected skill route, forbidden actions, and required evidence.
 ```
@@ -1044,7 +1125,7 @@ Use this skill as the controller for the packet-loop suite.
 7. Choose exactly one next stage:
    - invalid deterministic state -> `$codex-packet-maintain`
    - PR-open or reviewing packets -> `$codex-packet-review`
-   - ready packet capacity available -> `$codex-packet-dispatch`
+   - dependency-ready packets fit monitoring and resource-lane capacity -> `$codex-packet-dispatch`
    - merge-eligible packets -> `$codex-packet-integrate`
    - blocked or needs-reslice packets -> `$codex-packet-slice` or user decision
    - no safe action -> report state and stop
@@ -1065,7 +1146,7 @@ When active leases exist, supervise before dispatching more work:
 - Validate packet state.
 - Expire deterministic stale leases.
 - Regenerate dashboards through the core CLI.
-- Reserve ready packets when dependency, active limit, and overlap checks pass.
+- Reserve ready packets when dependency, monitoring capacity, resource-lane constraints, and overlap checks pass.
 - Create worker handoff prompts.
 - Record status reports and evidence paths through the core CLI.
 - Recommend merge order.
@@ -1164,10 +1245,11 @@ Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-cont
 1. Validate existing packet-loop state.
 2. Read the approved plan and repo instructions.
 3. Propose packet boundaries before writing records when the plan is broad or ambiguous.
-4. For each packet, define goal, allowed scope, avoid scope, expected touched areas, reserved areas, dependencies, risk, parallel safety, validation commands, overlap notes, and human review requirement.
+4. For each packet, define goal, allowed scope, avoid scope, expected touched areas, reserved areas, resource lanes, dependencies, risk, parallel safety, validation commands, overlap notes, and human review requirement.
 5. Add each packet with `packet_loop.py add-packet`.
-6. Transition a packet to `ready` only when dependencies and validation routes are clear.
-7. Report next valid skill `$codex-packet-dispatch` or `$codex-packet-loop`.
+6. Produce or update a human-readable packet queue/build-order artifact that includes dependency gates, dispatch waves, serialized resource lanes, human-review-first packets, and packets not suitable for blind agents.
+7. Transition a packet to `ready` only when dependencies and validation routes are clear.
+8. Report next valid skill `$codex-packet-dispatch` or `$codex-packet-loop`.
 ```
 
 Include this refusal line:
@@ -1183,14 +1265,14 @@ Make the skill require `workflow-protocol.md`, `state-machine.md`, `handoff-cont
 ```markdown
 1. Run `packet_loop.py validate`.
 2. Run `packet_loop.py status --format json`.
-3. Select one `ready` packet whose dependencies are satisfied, active limit has capacity, and `reserved_areas` do not collide with live leases.
+3. Select one `ready` packet whose dependencies are satisfied, controller monitoring capacity is available, required serialized resource lanes can be queued, and `reserved_areas` do not collide with live leases.
 4. Create a branch name `codex/<packet-id-lower>-<short-title>`.
 5. Create or request a fresh worktree/thread route.
 6. Lease the packet with `packet_loop.py lease`.
 7. Produce a worker handoff that invokes `$codex-packet-worker`.
 ```
 
-The handoff must include packet id, branch, worktree, owner thread, allowed scope, avoid scope, expected touched areas, reserved areas, validation commands, evidence directory, stop conditions, commit policy, PR policy, and next skill.
+The handoff must include packet id, branch, worktree, owner thread, allowed scope, avoid scope, expected touched areas, reserved areas, resource lanes, validation commands, evidence directory, stop conditions, commit policy, PR policy, and next skill.
 
 - [ ] **Step 4: Update `codex-packet-worker`**
 
@@ -1283,6 +1365,8 @@ git commit -m "docs(packet-loop): rewrite stage skills around protocol"
 - Create: `experimental/codex-pr-packet-loop/evals/fixtures/integration-stops-before-merge.md`
 - Create: `experimental/codex-pr-packet-loop/evals/fixtures/recovery-reslices-bad-packet.md`
 - Create: `experimental/codex-pr-packet-loop/evals/fixtures/controller-supervises-active-workers.md`
+- Create: `experimental/codex-pr-packet-loop/evals/fixtures/scheduler-has-no-fixed-worktree-cap.md`
+- Create: `experimental/codex-pr-packet-loop/evals/fixtures/validation-lanes-serialize-scarce-tools.md`
 
 **Interfaces:**
 - Consumes: skill names, reference names, and stage routing from Tasks 3 through 5.
@@ -1336,6 +1420,8 @@ REQUIRED_FIXTURES = {
     "integration-stops-before-merge.md",
     "recovery-reslices-bad-packet.md",
     "controller-supervises-active-workers.md",
+    "scheduler-has-no-fixed-worktree-cap.md",
+    "validation-lanes-serialize-scarce-tools.md",
 }
 ```
 
@@ -1412,7 +1498,7 @@ Create each fixture using this exact structure, replacing title, prompt, route, 
 
 ## Starting State
 
-The repo has valid packet-loop state, one ready packet, no active leases, no PR-open packets, and active packet capacity available.
+The repo has valid packet-loop state, one ready packet, no active leases, no PR-open packets, and enough controller monitoring/resource-lane capacity for dispatch.
 
 ## Prompt
 
@@ -1431,7 +1517,7 @@ The controller must not edit packet JSON by hand, merge PRs, or dispatch a packe
 The final report names validation status, maintenance action, active packet count, selected next skill, and routing reason.
 ```
 
-Use these scenario-specific values for the remaining seven files:
+Use these scenario-specific values for the remaining nine files:
 
 | File | Title | Expected Route | Forbidden Action | Required Evidence |
 |---|---|---|---|---|
@@ -1442,6 +1528,8 @@ Use these scenario-specific values for the remaining seven files:
 | `integration-stops-before-merge.md` | Integration Stops Before Merge | `$codex-packet-integrate` writes a merge recommendation and stops. | Running merge, deleting branch, or closing PR. | Merge matrix names order, overlap categories, and human gate. |
 | `recovery-reslices-bad-packet.md` | Recovery Reslices Bad Packet | `$codex-packet-review` or `$codex-packet-maintain` routes to `$codex-packet-slice`. | Repeatedly fixing the same boundary mismatch. | Report records `needs_reslice_reason`. |
 | `controller-supervises-active-workers.md` | Controller Supervises Active Workers | `$codex-packet-loop` steers only the drifting worker. | Taking over non-drifting worker implementation. | Controller report lists thread poll, worktree status, diff shape, steering target, and untouched lanes. |
+| `scheduler-has-no-fixed-worktree-cap.md` | Scheduler Has No Fixed Worktree Cap | `$codex-packet-loop` dispatches every dependency-ready packet it can actively monitor. | Stopping at a hidden count such as three active workers when no owner cap exists. | Controller report names dependency-ready packets, active monitoring basis, review capacity, and any packet deliberately held back. |
+| `validation-lanes-serialize-scarce-tools.md` | Validation Lanes Serialize Scarce Tools | `$codex-packet-loop` queues XCTest, UI automation, or Computer Use lane requests while allowing implementation to continue. | Running two matching scarce validation/proof lanes at the same time. | Controller report names lane owner, queued packets, exact commands, and release/grant order. |
 
 - [ ] **Step 5: Run validation and fix the first concrete failure only**
 
@@ -1617,20 +1705,20 @@ git status --short
 git diff --stat HEAD
 ```
 
-Expected: changes are limited to `experimental/codex-pr-packet-loop/` and `docs/superpowers/plans/2026-06-21-codex-pr-packet-loop-autonomous-framework.md`, with pre-existing untracked `docs/brainstorms/` left untouched.
+Expected: changes are limited to `experimental/codex-pr-packet-loop/`, `docs/superpowers/specs/2026-06-21-codex-pr-packet-loop-autonomous-framework-design.md`, and `docs/superpowers/plans/2026-06-21-codex-pr-packet-loop-autonomous-framework.md`, with pre-existing untracked `docs/brainstorms/` left untouched.
 
 - [ ] **Step 6: Final commit if any closeout edits were made**
 
 Run this only if Task 8 changed files:
 
 ```bash
-git add experimental/codex-pr-packet-loop docs/superpowers/plans/2026-06-21-codex-pr-packet-loop-autonomous-framework.md
+git add experimental/codex-pr-packet-loop docs/superpowers/specs/2026-06-21-codex-pr-packet-loop-autonomous-framework-design.md docs/superpowers/plans/2026-06-21-codex-pr-packet-loop-autonomous-framework.md
 git commit -m "chore(packet-loop): verify autonomous framework"
 ```
 
 ## Self-Review
 
-- Spec coverage: Tasks 1 and 2 cover deterministic state, transitions, evidence indexing, dashboard/status output, and overlap guards. Task 3 covers shared references. Task 4 covers the controller/router and active worker supervision. Task 5 covers stage skill contracts. Task 6 covers behavioral validation scenarios. Task 7 covers user-facing controller-first docs. Task 8 covers closeout verification.
-- Acceptance criteria mapping: the controller skill is created in Task 4; every stage references the shared workflow protocol in Task 5; state-machine, handoff, evidence, overlap, recovery, and behavioral references are created in Task 3; validation enforces references and routing in Task 6; script-backed state operations are extended in Tasks 1 and 2; behavioral scenarios are created in Task 6; active worker supervision appears in Task 4 and fixture coverage in Task 6; all work remains under the experimental path except this implementation plan.
+- Spec coverage: Tasks 1 and 2 cover deterministic state, dispatch policy, serialized resource lanes, transitions, evidence indexing, dashboard/status output, and overlap guards. Task 3 covers shared references. Task 4 covers the controller/router and active worker supervision. Task 5 covers stage skill contracts, queue/build-order artifacts, and resource-lane handoffs. Task 6 covers behavioral validation scenarios. Task 7 covers user-facing controller-first docs. Task 8 covers closeout verification.
+- Acceptance criteria mapping: the controller skill is created in Task 4; every stage references the shared workflow protocol in Task 5; state-machine, handoff, evidence, overlap, recovery, and behavioral references are created in Task 3; validation enforces references and routing in Task 6; script-backed state operations are extended in Tasks 1 and 2; behavioral scenarios are created in Task 6; active worker supervision appears in Task 4 and fixture coverage in Task 6; no-fixed-cap dispatch and serialized resource lanes are covered in Tasks 1, 2, 5, and 6; all framework implementation remains under the experimental path.
 - Type consistency: packet fields introduced in Task 1 are consumed by Task 2 and referenced by Tasks 3 through 6. CLI command names introduced in Task 2 are used consistently in later skill and doc tasks.
 - Placeholder scan target: Task 8 includes the exact `rg` command that must return no matches before completion.
