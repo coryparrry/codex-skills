@@ -23,7 +23,7 @@ Start from the work source the user gives. Do not invent a default source hierar
 
 If the user has not provided a source that can produce work units, ask for the source or ask whether to run a named discovery/review skill first.
 
-Named skills and workflows are first-class routing requirements. If the user names `$bug-hunt-swarm`, `$codex-adversarial-review-gate`, `$review-workflows:triage-review-comments`, `$review-swarm`, `$autoreview`, or any other skill/tool, bind it to the relevant unit role and include it in the child thread packet with the skill name and path. Do not let a supporting skill replace the orchestrator's unit tracking, monitoring, and integration responsibilities.
+Named skills and workflows are first-class routing requirements. If the user names `$bug-hunt-swarm`, `$codex-adversarial-gate`, `$review-workflows:triage-review-comments`, `$review-swarm`, `$autoreview`, or any other skill/tool, bind it to the relevant unit role and include it in the child thread packet with the skill name and path. Do not let a supporting skill replace the orchestrator's unit tracking, monitoring, and integration responsibilities.
 
 ## Skill Propagation Contract
 
@@ -139,7 +139,7 @@ When a child thread must use a skill, say that explicitly in the child prompt, f
 
 ```text
 Use $bug-hunt-swarm at ${CODEX_HOME:-$HOME/.codex}/skills/bug-hunt-swarm/SKILL.md for read-only diagnosis before proposing fixes.
-Use $codex-adversarial-review-gate at ${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-review-gate/SKILL.md for this unit's completion reviewer and critic.
+Use $codex-adversarial-gate at ${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/SKILL.md for this unit's completion reviewer and critic.
 Use $review-workflows:triage-review-comments at <resolved-skill-path> to verify PR feedback before implementing.
 ```
 
