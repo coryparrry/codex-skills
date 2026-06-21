@@ -1,0 +1,4 @@
+interface:
+  display_name: "Packet Dispatch"
+  short_description: "Lease packets to worker threads"
+  default_prompt: "Use $codex-packet-dispatch to reserve the next safe packet and prepare a worker prompt."

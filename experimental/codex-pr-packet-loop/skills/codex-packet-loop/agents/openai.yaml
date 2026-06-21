@@ -1,0 +1,4 @@
+interface:
+  display_name: Codex Packet Loop
+  short_description: Controller and router for experimental packet-loop automation.
+  default_prompt: "Use $codex-packet-loop to inspect packet-loop state, run safe maintenance, supervise active packet workers, and route to the next valid packet-loop stage."
