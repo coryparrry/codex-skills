@@ -27,3 +27,28 @@ First, inspect the repo structure and current agent instructions.
 Then propose the minimum set of files and rules needed to run a 3-packet trial.
 Do not implement yet.
 ```
+
+## Experimental Skill Suite
+
+The first packet-loop harness lives entirely under this `experimental/codex-pr-packet-loop/` directory.
+
+Do not mirror these skills into `skills/`, `plugins/codex-skills/skills/`, or package metadata until a separate promotion plan is approved.
+
+### Skills
+
+- `codex-packet-loop-core` validates packet-loop JSON state, leases, transitions, and dashboard output.
+- `codex-packet-init` initializes packet-loop state in a target repo.
+- `codex-packet-slice` converts approved plans into scoped PR packet records.
+- `codex-packet-dispatch` reserves ready packets and prepares worker prompts.
+- `codex-packet-worker` executes one leased packet in one worktree.
+- `codex-packet-review` reviews packet PRs against scope, validation, and overlap risk.
+- `codex-packet-integrate` recommends merge order and stops before human-gated actions.
+- `codex-packet-maintain` validates, repairs deterministic lease drift, and regenerates packet dashboards.
+
+### Validation
+
+Run the experimental validation command from the repo root:
+
+```bash
+python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
+```
