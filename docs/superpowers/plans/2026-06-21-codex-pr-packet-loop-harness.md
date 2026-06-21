@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the first shippable Codex PR packet loop harness as a validated skill suite with durable repo state, packet leases, scoped worker execution, packet PR review, and merge recommendation flows.
+**Goal:** Build the first experimental Codex PR packet loop harness as a validated skill suite with durable repo state, packet leases, scoped worker execution, packet PR review, and merge recommendation flows.
 
-**Architecture:** Use JSON files under `.codex/packet-loop/` as the source of truth, generated Markdown under `docs/codex/packet-loop.md` for humans, and a Python standard-library CLI for deterministic validation, transitions, leases, and dashboard generation. Dedicated stage skills stay small and route agents through the shared core contract instead of duplicating state rules.
+**Architecture:** Keep the entire MVP under `experimental/codex-pr-packet-loop/` until it proves out. Use JSON files under `.codex/packet-loop/` as the source of truth in target repos, generated Markdown under `docs/codex/packet-loop.md` for humans, and a Python standard-library CLI for deterministic validation, transitions, leases, and dashboard generation. Dedicated experimental stage skills stay small and route agents through the shared core contract instead of duplicating state rules.
 
 **Tech Stack:** Codex skills in Markdown, `agents/openai.yaml` metadata, Python 3 standard library, `unittest`, Bash validation scripts, JSON schema-style validation without third-party dependencies.
 
@@ -24,26 +24,29 @@ This plan builds the manual MVP that can run a 3-packet trial safely:
 
 This plan does not create scheduled multi-repo automation. It creates `codex-packet-maintain` so a local automation can invoke the maintenance workflow once the manual loop is proven.
 
+All implementation files for this MVP must live under `experimental/codex-pr-packet-loop/`. Do not add root `skills/` entries, plugin mirror entries, root package metadata, or root user-facing docs in this plan. Promotion into shipped skills is a separate follow-up after the experimental loop passes a real trial.
+
 ## File Structure
 
-Create these source skill directories:
+Create these experimental skill directories:
 
-- `skills/codex-packet-loop-core/`: shared state contract, deterministic CLI, tests, and validation instructions.
-- `skills/codex-packet-init/`: initialize packet-loop state in a repo.
-- `skills/codex-packet-slice/`: convert an approved plan into packet JSON records.
-- `skills/codex-packet-dispatch/`: reserve a ready packet and produce a worker prompt.
-- `skills/codex-packet-worker/`: execute exactly one leased packet in a worktree.
-- `skills/codex-packet-review/`: review or refresh a packet PR against packet scope and evidence.
-- `skills/codex-packet-integrate/`: sequence merge candidates and stop before human-gated actions.
-- `skills/codex-packet-maintain/`: validate state, expire deterministic stale leases, and regenerate dashboard output.
-
-Mirror all eight skill directories into:
-
-- `plugins/codex-skills/skills/<skill-name>/`
+- `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/`: shared state contract, deterministic CLI, tests, and validation instructions.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-init/`: initialize packet-loop state in a repo.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-slice/`: convert an approved plan into packet JSON records.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-dispatch/`: reserve a ready packet and produce a worker prompt.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-worker/`: execute exactly one leased packet in a worktree.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-review/`: review or refresh a packet PR against packet scope and evidence.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-integrate/`: sequence merge candidates and stop before human-gated actions.
+- `experimental/codex-pr-packet-loop/skills/codex-packet-maintain/`: validate state, expire deterministic stale leases, and regenerate dashboard output.
 
 Add shared validation:
 
-- `scripts/validate_skill_bundle.py`: validates skill frontmatter, `agents/openai.yaml`, package mirror parity, packet-loop CLI tests, and package JSON.
+- `experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py`: validates experimental skill frontmatter, `agents/openai.yaml`, and packet-loop CLI tests.
+
+Add experimental documentation only:
+
+- `experimental/codex-pr-packet-loop/README.md`
+- `experimental/codex-pr-packet-loop/docs/manual.md`
 
 Target repo packet-loop state created by the skills:
 
@@ -83,14 +86,14 @@ Packet shape:
   "title": "short packet title",
   "status": "candidate",
   "goal": "One sentence outcome.",
-  "allowed_scope": ["skills/example/SKILL.md"],
-  "expected_touched_areas": ["skills/example"],
-  "avoid_scope": ["plugins/codex-skills/skills/example"],
+  "allowed_scope": ["experimental/codex-pr-packet-loop/skills/example/SKILL.md"],
+  "expected_touched_areas": ["experimental/codex-pr-packet-loop/skills/example"],
+  "avoid_scope": ["skills/example", "plugins/codex-skills/skills/example"],
   "dependencies": [],
   "risk": "low",
   "parallel_safe": "yes",
   "validation": {
-    "commands": ["python3 -m unittest skills/example/tests/test_example.py"]
+    "commands": ["python3 -m unittest experimental/codex-pr-packet-loop/skills/example/tests/test_example.py"]
   },
   "lease": null,
   "branch": null,
@@ -149,28 +152,28 @@ any status requiring branch deletion, PR closing, force-push, default-branch wri
 ### Task 1: Add Core CLI Tests First
 
 **Files:**
-- Create: `skills/codex-packet-loop-core/tests/test_packet_loop.py`
-- Create: `skills/codex-packet-loop-core/tests/fixtures/plan.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/fixtures/plan.md`
 
 - [ ] **Step 1: Create the plan fixture**
 
-Create `skills/codex-packet-loop-core/tests/fixtures/plan.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/fixtures/plan.md`:
 
 ```markdown
 # Example Plan
 
 ## Phase 1
 
-Create a small source skill with metadata and validation.
+Create a small experimental skill with metadata and validation.
 
 ## Phase 2
 
-Mirror the skill into the plugin bundle after the source skill validates.
+Document the experimental workflow after the experimental skill validates.
 ```
 
 - [ ] **Step 2: Write failing core CLI tests**
 
-Create `skills/codex-packet-loop-core/tests/test_packet_loop.py`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py`:
 
 ```python
 import json
@@ -223,11 +226,11 @@ class PacketLoopCLITests(unittest.TestCase):
                 "--goal",
                 "Create the core packet-loop skill.",
                 "--allowed-scope",
-                "skills/codex-packet-loop-core",
+                "experimental/codex-pr-packet-loop/skills/codex-packet-loop-core",
                 "--expected-area",
-                "skills/codex-packet-loop-core",
+                "experimental/codex-pr-packet-loop/skills/codex-packet-loop-core",
                 "--validation-command",
-                "python3 -m unittest skills/codex-packet-loop-core/tests/test_packet_loop.py",
+                "python3 -m unittest experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py",
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
@@ -363,7 +366,7 @@ class PacketLoopCLITests(unittest.TestCase):
 Run:
 
 ```bash
-python3 skills/codex-packet-loop-core/tests/test_packet_loop.py
+python3 experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py
 ```
 
 Expected result:
@@ -383,12 +386,12 @@ No such file or directory: .../scripts/packet_loop.py
 ### Task 2: Implement Core Packet Loop CLI
 
 **Files:**
-- Create: `skills/codex-packet-loop-core/scripts/packet_loop.py`
-- Modify: `skills/codex-packet-loop-core/tests/test_packet_loop.py`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/scripts/packet_loop.py`
+- Modify: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py`
 
 - [ ] **Step 1: Create the CLI script**
 
-Create `skills/codex-packet-loop-core/scripts/packet_loop.py` with these public commands:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/scripts/packet_loop.py` with these public commands:
 
 ```python
 #!/usr/bin/env python3
@@ -785,7 +788,7 @@ if __name__ == "__main__":
 Run:
 
 ```bash
-chmod +x skills/codex-packet-loop-core/scripts/packet_loop.py
+chmod +x experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/scripts/packet_loop.py
 ```
 
 - [ ] **Step 3: Run the core tests**
@@ -793,7 +796,7 @@ chmod +x skills/codex-packet-loop-core/scripts/packet_loop.py
 Run:
 
 ```bash
-python3 skills/codex-packet-loop-core/tests/test_packet_loop.py
+python3 experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py
 ```
 
 Expected result:
@@ -807,9 +810,9 @@ OK
 - [ ] **Step 4: Commit**
 
 ```bash
-git add skills/codex-packet-loop-core/tests/test_packet_loop.py \
-  skills/codex-packet-loop-core/tests/fixtures/plan.md \
-  skills/codex-packet-loop-core/scripts/packet_loop.py
+git add experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py \
+  experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/fixtures/plan.md \
+  experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/scripts/packet_loop.py
 git commit -m "test(packet-loop): add core state CLI coverage"
 ```
 
@@ -818,13 +821,13 @@ git commit -m "test(packet-loop): add core state CLI coverage"
 ### Task 3: Add Core Skill Contract And Metadata
 
 **Files:**
-- Create: `skills/codex-packet-loop-core/SKILL.md`
-- Create: `skills/codex-packet-loop-core/agents/openai.yaml`
-- Create: `skills/codex-packet-loop-core/references/state-contract.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/state-contract.md`
 
 - [ ] **Step 1: Create the state contract reference**
 
-Create `skills/codex-packet-loop-core/references/state-contract.md` with:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/state-contract.md` with:
 
 ````markdown
 # Packet Loop State Contract
@@ -874,7 +877,7 @@ python3 <core-skill>/scripts/packet_loop.py --repo <repo> maintain --expire-stal
 
 - [ ] **Step 2: Create core SKILL.md**
 
-Create `skills/codex-packet-loop-core/SKILL.md` with:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/SKILL.md` with:
 
 ````markdown
 ---
@@ -912,7 +915,7 @@ python3 <skill-dir>/scripts/packet_loop.py --repo <repo> maintain --expire-stale
 
 - [ ] **Step 3: Create core metadata**
 
-Create `skills/codex-packet-loop-core/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -926,8 +929,8 @@ interface:
 Run:
 
 ```bash
-python3 /Users/coryparry/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/codex-packet-loop-core
-python3 skills/codex-packet-loop-core/tests/test_packet_loop.py
+python3 /Users/coryparry/.codex/skills/.system/skill-creator/scripts/quick_validate.py experimental/codex-pr-packet-loop/skills/codex-packet-loop-core
+python3 experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py
 ```
 
 Expected result:
@@ -942,9 +945,9 @@ OK
 - [ ] **Step 5: Commit**
 
 ```bash
-git add skills/codex-packet-loop-core/SKILL.md \
-  skills/codex-packet-loop-core/agents/openai.yaml \
-  skills/codex-packet-loop-core/references/state-contract.md
+git add experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/SKILL.md \
+  experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/agents/openai.yaml \
+  experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/references/state-contract.md
 git commit -m "feat(packet-loop): add core state contract skill"
 ```
 
@@ -953,24 +956,24 @@ git commit -m "feat(packet-loop): add core state contract skill"
 ### Task 4: Add Stage Skills
 
 **Files:**
-- Create: `skills/codex-packet-init/SKILL.md`
-- Create: `skills/codex-packet-init/agents/openai.yaml`
-- Create: `skills/codex-packet-slice/SKILL.md`
-- Create: `skills/codex-packet-slice/agents/openai.yaml`
-- Create: `skills/codex-packet-dispatch/SKILL.md`
-- Create: `skills/codex-packet-dispatch/agents/openai.yaml`
-- Create: `skills/codex-packet-worker/SKILL.md`
-- Create: `skills/codex-packet-worker/agents/openai.yaml`
-- Create: `skills/codex-packet-review/SKILL.md`
-- Create: `skills/codex-packet-review/agents/openai.yaml`
-- Create: `skills/codex-packet-integrate/SKILL.md`
-- Create: `skills/codex-packet-integrate/agents/openai.yaml`
-- Create: `skills/codex-packet-maintain/SKILL.md`
-- Create: `skills/codex-packet-maintain/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-init/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-init/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-slice/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-slice/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-dispatch/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-dispatch/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-worker/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-worker/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-review/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-review/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-integrate/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-integrate/agents/openai.yaml`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-maintain/SKILL.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-maintain/agents/openai.yaml`
 
 - [ ] **Step 1: Create `codex-packet-init`**
 
-Create `skills/codex-packet-init/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-init/SKILL.md`:
 
 ````markdown
 ---
@@ -1002,7 +1005,7 @@ python3 <core-skill>/scripts/packet_loop.py --repo <repo> validate
 6. Report the created files and next valid skill: `$codex-packet-slice`.
 ````
 
-Create `skills/codex-packet-init/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-init/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1013,7 +1016,7 @@ interface:
 
 - [ ] **Step 2: Create `codex-packet-slice`**
 
-Create `skills/codex-packet-slice/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-slice/SKILL.md`:
 
 ```markdown
 ---
@@ -1052,7 +1055,7 @@ Use this skill after packet-loop state is initialized and a plan has been approv
 - Do not hide ambiguous owner decisions inside packet text.
 ```
 
-Create `skills/codex-packet-slice/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-slice/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1063,7 +1066,7 @@ interface:
 
 - [ ] **Step 3: Create `codex-packet-dispatch`**
 
-Create `skills/codex-packet-dispatch/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-dispatch/SKILL.md`:
 
 ````markdown
 ---
@@ -1105,7 +1108,7 @@ python3 <core-skill>/scripts/packet_loop.py --repo <repo> lease --packet <packet
 - Refuse dispatch when no fresh worktree/thread route is available.
 ````
 
-Create `skills/codex-packet-dispatch/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-dispatch/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1116,7 +1119,7 @@ interface:
 
 - [ ] **Step 4: Create `codex-packet-worker`**
 
-Create `skills/codex-packet-worker/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-worker/SKILL.md`:
 
 ```markdown
 ---
@@ -1158,7 +1161,7 @@ Stop and mark the packet `blocked` or `needs-reslice` when:
 Do not implement adjacent packets.
 ```
 
-Create `skills/codex-packet-worker/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-worker/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1169,7 +1172,7 @@ interface:
 
 - [ ] **Step 5: Create `codex-packet-review`**
 
-Create `skills/codex-packet-review/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-review/SKILL.md`:
 
 ```markdown
 ---
@@ -1204,7 +1207,7 @@ Use this skill after a packet PR exists or a packet branch needs scoped refresh.
 - Treat worker summaries as claims until verified against files, diffs, checks, PR state, and evidence.
 ```
 
-Create `skills/codex-packet-review/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-review/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1215,7 +1218,7 @@ interface:
 
 - [ ] **Step 6: Create `codex-packet-integrate`**
 
-Create `skills/codex-packet-integrate/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-integrate/SKILL.md`:
 
 ```markdown
 ---
@@ -1243,7 +1246,7 @@ Use this skill to prepare safe merge sequencing. Do not merge unless the human e
 Parallel implementation is allowed. Parallel merging is not allowed in this MVP.
 ```
 
-Create `skills/codex-packet-integrate/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-integrate/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1254,7 +1257,7 @@ interface:
 
 - [ ] **Step 7: Create `codex-packet-maintain`**
 
-Create `skills/codex-packet-maintain/SKILL.md`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-maintain/SKILL.md`:
 
 ````markdown
 ---
@@ -1289,7 +1292,7 @@ python3 <core-skill>/scripts/packet_loop.py --repo <repo> maintain --expire-stal
 Deterministic repair may expire a stale lease for a packet without a PR. Destructive, external, or security-sensitive actions require human approval.
 ````
 
-Create `skills/codex-packet-maintain/agents/openai.yaml`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-maintain/agents/openai.yaml`:
 
 ```yaml
 interface:
@@ -1313,33 +1316,31 @@ Expected result: each skill prints `Skill is valid`.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add skills/codex-packet-init \
-  skills/codex-packet-slice \
-  skills/codex-packet-dispatch \
-  skills/codex-packet-worker \
-  skills/codex-packet-review \
-  skills/codex-packet-integrate \
-  skills/codex-packet-maintain
+git add experimental/codex-pr-packet-loop/skills/codex-packet-init \
+  experimental/codex-pr-packet-loop/skills/codex-packet-slice \
+  experimental/codex-pr-packet-loop/skills/codex-packet-dispatch \
+  experimental/codex-pr-packet-loop/skills/codex-packet-worker \
+  experimental/codex-pr-packet-loop/skills/codex-packet-review \
+  experimental/codex-pr-packet-loop/skills/codex-packet-integrate \
+  experimental/codex-pr-packet-loop/skills/codex-packet-maintain
 git commit -m "feat(packet-loop): add stage workflow skills"
 ```
 
 ---
 
-### Task 5: Add Repo-Level Skill Bundle Validation
+### Task 5: Add Experimental Skill Validation
 
 **Files:**
-- Create: `scripts/validate_skill_bundle.py`
-- Modify: `README.md`
+- Create: `experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py`
 
 - [ ] **Step 1: Create validation script**
 
-Create `scripts/validate_skill_bundle.py`:
+Create `experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py`:
 
 ```python
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -1347,7 +1348,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
-PLUGIN_SKILLS = ROOT / "plugins" / "codex-skills" / "skills"
 REQUIRED_AGENT_KEYS = {"display_name", "short_description", "default_prompt"}
 
 
@@ -1406,45 +1406,27 @@ def validate_skill(skill_dir: Path) -> None:
         fail(f"{metadata} default_prompt must mention ${expected_name}")
 
 
-def validate_json(path: Path) -> None:
-    json.loads(path.read_text())
-
-
-def validate_plugin_mirror() -> None:
-    if not PLUGIN_SKILLS.exists():
-        fail("plugin skills directory missing")
-    for source in sorted(SKILLS.iterdir()):
-        if not source.is_dir():
-            continue
-        mirror = PLUGIN_SKILLS / source.name
-        if not mirror.exists():
-            fail(f"missing plugin mirror for {source.name}")
-        source_files = sorted(p.relative_to(source) for p in source.rglob("*") if p.is_file())
-        mirror_files = sorted(p.relative_to(mirror) for p in mirror.rglob("*") if p.is_file())
-        if source_files != mirror_files:
-            fail(f"plugin mirror file list mismatch for {source.name}")
-        for rel in source_files:
-            if (source / rel).read_bytes() != (mirror / rel).read_bytes():
-                fail(f"plugin mirror content mismatch for {source.name}/{rel}")
-
-
 def run_core_tests() -> None:
-    test_path = SKILLS / "codex-packet-loop-core" / "tests" / "test_packet_loop.py"
-    if test_path.exists():
+    test_paths = [
+        SKILLS / "codex-packet-loop-core" / "tests" / "test_packet_loop.py",
+        SKILLS / "codex-packet-loop-core" / "tests" / "test_packet_loop_trial.py",
+    ]
+    for test_path in test_paths:
+        if not test_path.exists():
+            continue
         result = subprocess.run([sys.executable, str(test_path)], cwd=ROOT)
         if result.returncode != 0:
             raise SystemExit(result.returncode)
 
 
 def main() -> int:
+    if not (ROOT / "README.md").is_file():
+        fail("experimental README.md is missing")
     for skill_dir in sorted(SKILLS.iterdir()):
         if skill_dir.is_dir():
             validate_skill(skill_dir)
-    validate_json(ROOT / "skills.sh.json")
-    validate_json(ROOT / "plugins" / "codex-skills" / ".codex-plugin" / "plugin.json")
-    validate_plugin_mirror()
     run_core_tests()
-    print("Skill bundle validation passed")
+    print("Experimental packet-loop validation passed")
     return 0
 
 
@@ -1457,153 +1439,90 @@ if __name__ == "__main__":
 Run:
 
 ```bash
-chmod +x scripts/validate_skill_bundle.py
+chmod +x experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
 ```
 
-- [ ] **Step 3: Add README validation command**
-
-Add this command to the README validation list:
-
-```bash
-python3 scripts/validate_skill_bundle.py
-```
-
-- [ ] **Step 4: Run validation before plugin mirror exists**
+- [ ] **Step 3: Run experimental validation**
 
 Run:
 
 ```bash
-python3 scripts/validate_skill_bundle.py
+python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
 ```
 
 Expected result:
 
 ```text
-missing plugin mirror for codex-packet-loop-core
+Ran 5 tests
+
+OK
+Experimental packet-loop validation passed
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/validate_skill_bundle.py README.md
-git commit -m "test(skills): add bundle validation script"
+git add experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
+git commit -m "test(packet-loop): add experimental validation script"
 ```
 
 ---
 
-### Task 6: Mirror New Skills Into Plugin Bundle And Package Metadata
+### Task 6: Update Experimental README
 
 **Files:**
-- Create: `plugins/codex-skills/skills/codex-packet-loop-core/...`
-- Create: `plugins/codex-skills/skills/codex-packet-init/...`
-- Create: `plugins/codex-skills/skills/codex-packet-slice/...`
-- Create: `plugins/codex-skills/skills/codex-packet-dispatch/...`
-- Create: `plugins/codex-skills/skills/codex-packet-worker/...`
-- Create: `plugins/codex-skills/skills/codex-packet-review/...`
-- Create: `plugins/codex-skills/skills/codex-packet-integrate/...`
-- Create: `plugins/codex-skills/skills/codex-packet-maintain/...`
-- Modify: `skills.sh.json`
-- Modify: `plugins/codex-skills/.codex-plugin/plugin.json`
-- Modify: `README.md`
+- Modify: `experimental/codex-pr-packet-loop/README.md`
 
-- [ ] **Step 1: Copy source skills into plugin mirror**
+- [ ] **Step 1: Add experimental-only boundary**
+
+Append this section to `experimental/codex-pr-packet-loop/README.md`:
+
+````markdown
+## Experimental Skill Suite
+
+The first packet-loop harness lives entirely under this `experimental/codex-pr-packet-loop/` directory.
+
+Do not mirror these skills into `skills/`, `plugins/codex-skills/skills/`, or package metadata until a separate promotion plan is approved.
+
+### Skills
+
+- `codex-packet-loop-core` validates packet-loop JSON state, leases, transitions, and dashboard output.
+- `codex-packet-init` initializes packet-loop state in a target repo.
+- `codex-packet-slice` converts approved plans into scoped PR packet records.
+- `codex-packet-dispatch` reserves ready packets and prepares worker prompts.
+- `codex-packet-worker` executes one leased packet in one worktree.
+- `codex-packet-review` reviews packet PRs against scope, validation, and overlap risk.
+- `codex-packet-integrate` recommends merge order and stops before human-gated actions.
+- `codex-packet-maintain` validates, repairs deterministic lease drift, and regenerates packet dashboards.
+
+### Validation
+
+Run the experimental validation command from the repo root:
+
+```bash
+python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
+```
+````
+
+- [ ] **Step 2: Run experimental validation**
 
 Run:
 
 ```bash
-for skill in codex-packet-loop-core codex-packet-init codex-packet-slice codex-packet-dispatch codex-packet-worker codex-packet-review codex-packet-integrate codex-packet-maintain; do
-  mkdir -p "plugins/codex-skills/skills/$skill"
-  cp -R "skills/$skill/." "plugins/codex-skills/skills/$skill/"
-done
-```
-
-- [ ] **Step 2: Update skills.sh grouping**
-
-Add a grouping to `skills.sh.json`:
-
-```json
-{
-  "title": "PR Packet Loop",
-  "description": "Skills for packetized Codex PR orchestration.",
-  "skills": [
-    "codex-packet-loop-core",
-    "codex-packet-init",
-    "codex-packet-slice",
-    "codex-packet-dispatch",
-    "codex-packet-worker",
-    "codex-packet-review",
-    "codex-packet-integrate",
-    "codex-packet-maintain"
-  ]
-}
-```
-
-- [ ] **Step 3: Update plugin manifest copy**
-
-Update `plugins/codex-skills/.codex-plugin/plugin.json`:
-
-```json
-"description": "Codex skills for adversarial review gates, branch cleanup, PR review triage, and packetized PR orchestration."
-```
-
-Update `interface.shortDescription`:
-
-```json
-"Review gates, PR triage, branch cleanup, and packet loops."
-```
-
-Add a `defaultPrompt` entry:
-
-```json
-"Use codex-packet-init to initialize packet-loop state, then codex-packet-slice to turn a large plan into small PR packets."
-```
-
-- [ ] **Step 4: Update README skill list**
-
-Add these bullets under the README skills section:
-
-```markdown
-- **codex-packet-loop-core** validates packet-loop JSON state, leases, transitions, and dashboard output.
-- **codex-packet-init** initializes packet-loop state in a target repo.
-- **codex-packet-slice** converts approved plans into scoped PR packet records.
-- **codex-packet-dispatch** reserves ready packets and prepares worker prompts.
-- **codex-packet-worker** executes one leased packet in one worktree.
-- **codex-packet-review** reviews packet PRs against scope, validation, and overlap risk.
-- **codex-packet-integrate** recommends merge order and stops before human-gated actions.
-- **codex-packet-maintain** validates, repairs deterministic lease drift, and regenerates packet dashboards.
-```
-
-- [ ] **Step 5: Run bundle validation**
-
-Run:
-
-```bash
-python3 scripts/validate_skill_bundle.py
-python3 -m json.tool skills.sh.json >/dev/null
-python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
 ```
 
 Expected result:
 
 ```text
-Skill bundle validation passed
+Experimental packet-loop validation passed
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add plugins/codex-skills/skills/codex-packet-loop-core \
-  plugins/codex-skills/skills/codex-packet-init \
-  plugins/codex-skills/skills/codex-packet-slice \
-  plugins/codex-skills/skills/codex-packet-dispatch \
-  plugins/codex-skills/skills/codex-packet-worker \
-  plugins/codex-skills/skills/codex-packet-review \
-  plugins/codex-skills/skills/codex-packet-integrate \
-  plugins/codex-skills/skills/codex-packet-maintain \
-  skills.sh.json \
-  plugins/codex-skills/.codex-plugin/plugin.json \
-  README.md
-git commit -m "feat(packet-loop): publish packet loop skills in plugin bundle"
+git add experimental/codex-pr-packet-loop/README.md
+git commit -m "docs(packet-loop): document experimental skill suite"
 ```
 
 ---
@@ -1611,14 +1530,12 @@ git commit -m "feat(packet-loop): publish packet loop skills in plugin bundle"
 ### Task 7: Add Usage Documentation And Trial Script
 
 **Files:**
-- Create: `docs/codex-pr-packet-loop.md`
-- Create: `skills/codex-packet-loop-core/tests/test_packet_loop_trial.py`
-- Modify: `docs/usage.md`
-- Modify: `docs/reference.md`
+- Create: `experimental/codex-pr-packet-loop/docs/manual.md`
+- Create: `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop_trial.py`
 
 - [ ] **Step 1: Write user documentation**
 
-Create `docs/codex-pr-packet-loop.md`:
+Create `experimental/codex-pr-packet-loop/docs/manual.md`:
 
 ````markdown
 # Codex PR Packet Loop
@@ -1680,7 +1597,7 @@ Structured state lives under `.codex/packet-loop/`. The generated dashboard live
 
 - [ ] **Step 2: Add a 3-packet trial test**
 
-Create `skills/codex-packet-loop-core/tests/test_packet_loop_trial.py`:
+Create `experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop_trial.py`:
 
 ```python
 import json
@@ -1710,9 +1627,9 @@ class PacketLoopTrialTests(unittest.TestCase):
             repo = Path(tmp)
             self.assertEqual(self.run_cli(repo, "init", "--name", "trial").returncode, 0)
             packets = [
-                ("P001", "Core", "skills/codex-packet-loop-core"),
-                ("P002", "Slice", "skills/codex-packet-slice"),
-                ("P003", "Review", "skills/codex-packet-review"),
+                ("P001", "Core", "experimental/codex-pr-packet-loop/skills/codex-packet-loop-core"),
+                ("P002", "Slice", "experimental/codex-pr-packet-loop/skills/codex-packet-slice"),
+                ("P003", "Review", "experimental/codex-pr-packet-loop/skills/codex-packet-review"),
             ]
             for packet_id, title, area in packets:
                 self.assertEqual(
@@ -1730,7 +1647,7 @@ class PacketLoopTrialTests(unittest.TestCase):
                         "--expected-area",
                         area,
                         "--validation-command",
-                        "python3 scripts/validate_skill_bundle.py",
+                        "python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py",
                     ).returncode,
                     0,
                 )
@@ -1763,21 +1680,13 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 3: Link docs from usage and reference**
-
-Add a `Codex PR Packet Loop` link to `docs/usage.md` and `docs/reference.md`:
-
-```markdown
-- [Codex PR Packet Loop](codex-pr-packet-loop.md)
-```
-
-- [ ] **Step 4: Run documentation and trial checks**
+- [ ] **Step 3: Run documentation and trial checks**
 
 Run:
 
 ```bash
-python3 skills/codex-packet-loop-core/tests/test_packet_loop_trial.py
-python3 scripts/validate_skill_bundle.py
+python3 experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop_trial.py
+python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
 git diff --check
 ```
 
@@ -1787,16 +1696,14 @@ Expected result:
 Ran 1 test
 
 OK
-Skill bundle validation passed
+Experimental packet-loop validation passed
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add docs/codex-pr-packet-loop.md \
-  docs/usage.md \
-  docs/reference.md \
-  skills/codex-packet-loop-core/tests/test_packet_loop_trial.py
+git add experimental/codex-pr-packet-loop/docs/manual.md \
+  experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop_trial.py
 git commit -m "docs(packet-loop): document manual packet loop trial"
 ```
 
@@ -1819,9 +1726,9 @@ python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
-python3 skills/codex-packet-loop-core/tests/test_packet_loop.py
-python3 skills/codex-packet-loop-core/tests/test_packet_loop_trial.py
-python3 scripts/validate_skill_bundle.py
+python3 experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop.py
+python3 experimental/codex-pr-packet-loop/skills/codex-packet-loop-core/tests/test_packet_loop_trial.py
+python3 experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
 git diff --check
 ```
 
@@ -1829,7 +1736,7 @@ Expected result:
 
 ```text
 Install tests passed
-Skill bundle validation passed
+Experimental packet-loop validation passed
 ```
 
 and every Python test exits with status 0.
@@ -1856,15 +1763,10 @@ git diff --stat
 Expected changed areas:
 
 ```text
-skills/codex-packet-*
-plugins/codex-skills/skills/codex-packet-*
-scripts/validate_skill_bundle.py
-skills.sh.json
-plugins/codex-skills/.codex-plugin/plugin.json
-README.md
-docs/codex-pr-packet-loop.md
-docs/usage.md
-docs/reference.md
+experimental/codex-pr-packet-loop/skills/codex-packet-*
+experimental/codex-pr-packet-loop/scripts/validate_experimental_packet_loop.py
+experimental/codex-pr-packet-loop/docs/manual.md
+experimental/codex-pr-packet-loop/README.md
 ```
 
 - [ ] **Step 4: Final commit**
@@ -1894,7 +1796,8 @@ Report:
 ## Self-Review Checklist
 
 - Every new skill has `SKILL.md` and `agents/openai.yaml`.
-- Source skills and plugin mirror files match byte-for-byte.
+- Every MVP file remains under `experimental/codex-pr-packet-loop/`.
+- Root `skills/`, plugin mirror, package metadata, and root docs remain unchanged by this plan.
 - Core state changes are made through `packet_loop.py` where supported.
 - Workers can update only their packet record and packet evidence.
 - Human-gated actions stop before merge, branch deletion, PR close, force-push, default-branch write, and security-sensitive changes.
