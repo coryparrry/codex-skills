@@ -51,7 +51,19 @@ For plan implementation units, always pass the plan-required skills through to t
 - Fix narrowly; reject speculative, duplicate, stale, or out-of-scope findings.
 - Do not mark a unit complete until its configured review/gate is satisfied, validation is current, required records exist, required commits are made, and integration status is known.
 - Integrate completed unit outputs deliberately, one unit at a time or by scoped file checkout when that is safer than merge commits.
+- Commit each accepted integration on the coordinator target branch before starting the next integration or validation phase.
 - Confirm all accepted worktree-thread fixes are present on the target branch before pushing, opening a PR, or claiming closeout.
+- Do not send the final report until cleanup has been attempted for every child thread and worktree, with archive/removal results or retention blockers recorded.
+
+## Validation Authority Contract
+
+The coordinator owns resource-heavy validation. Child worktree threads must not run expensive build or test lanes unless the coordinator's packet explicitly lists that exact command as worker-allowed.
+
+For Apple-platform repositories, child threads must never run Xcode or XCTest lanes under any circumstances. Forbidden child commands include `xcodebuild`, `xctest`, Xcode test wrappers, XCTest or UI test suites, simulator test runs, and any repo script that invokes those tools. If a child believes Xcode/XCTest proof is required, it must report the required command and blocker to the coordinator instead of running it.
+
+Child threads may run only cheap, scoped checks that are explicitly allowed in their packet, such as syntax checks, metadata validation, `git diff --check`, or focused non-Xcode scripts. If a command might invoke Xcode, XCTest, simulators, broad package builds, or long-running test workers, the child must treat it as coordinator-only.
+
+The coordinator runs Xcode/XCTest and other expensive combined validation only after integrating or cherry-picking completed unit outputs onto the target branch or a dedicated integration worktree.
 
 ## Step 1: Bind Source, Skills, And Roles
 
@@ -61,7 +73,7 @@ Before dispatching work, state the run binding:
 - **Discovery/review skill**: optional skill used to produce candidate units, such as a bug review or PR-comment triage workflow.
 - **Implementation skill**: optional skill each worker must use to build or fix its assigned unit.
 - **Review or gate skill**: per-unit review, critic, adversarial gate, or triage workflow.
-- **Validation route**: repo tests, builds, scripts, UI checks, manual proof, or other checks.
+- **Validation route**: worker-allowed lightweight checks, coordinator-only checks, repo tests, builds, scripts, UI checks, manual proof, or other checks.
 - **Integration route**: merge, cherry-pick, scoped checkout, patch application, or manual consolidation.
 - **Closeout route**: commits, docs, archives, learning notes, PR replies, or branch/PR actions.
 
@@ -87,7 +99,7 @@ For each unit, record:
 - allowed write scope
 - dependencies and ordering constraints
 - whether it can run in parallel
-- likely validation commands
+- worker-allowed lightweight checks and coordinator-only validation commands
 - review, critic, adversarial gate, or triage requirements
 - required docs, archives, state files, commits, PR replies, or closeout records
 
@@ -129,11 +141,17 @@ Each child thread prompt must include:
 - allowed write scope
 - dependencies and ordering constraints
 - files and docs to inspect
-- validation commands or how to discover them
+- worker-allowed lightweight checks, coordinator-only validation commands, and forbidden commands
 - required review, adversarial gate, critic, triage, evidence, or archive records
 - commit requirements
 - closeout/reporting requirements
 - instruction not to revert, overwrite, or clean other agents' work
+
+For Apple-platform repositories, every child prompt must include:
+
+```text
+Validation boundary: do not run `xcodebuild`, `xctest`, Xcode test wrappers, XCTest/UI test suites, simulator test runs, or any repo script that invokes those tools. If Xcode/XCTest proof is needed, report the exact command and why; the coordinator will run it after integration.
+```
 
 When a child thread must use a skill, say that explicitly in the child prompt, for example:
 
@@ -161,7 +179,7 @@ Each child thread should:
 5. run configured unit review/gate;
 6. fix verified findings narrowly;
 7. rerun required review/gate when needed;
-8. run validation;
+8. run only worker-allowed lightweight checks and report coordinator-only validation still needed;
 9. update required records;
 10. commit if required;
 11. report changed files, commit hash, validation, records, and unresolved risks.
@@ -171,11 +189,13 @@ Each child thread should:
 Track child threads actively enough to prevent drift:
 
 - child thread status and latest summary
+- active terminal command or process status when available
 - worktree dirty files, staged files, untracked files, branch, and commit
 - overlapping changed files between units
 - edits outside assigned scope
 - missing required skills or skipped workflow steps
 - failed validation
+- child attempts to run coordinator-only validation
 - reviewer/critic disagreement or unresolved triage
 - stale evidence packets
 - dirty worktrees after claimed commits
@@ -189,12 +209,12 @@ Allowed non-blocking parent actions include:
 - ask a child for a concise status or exact blocker
 - remind a child to use a required skill or branch/commit discipline
 - narrow scope when a child is drifting
-- clarify acceptance criteria, evidence requirements, or validation commands
+- clarify acceptance criteria, evidence requirements, worker-allowed checks, or coordinator-only validation commands
 - route around file overlap before conflicts grow
 - pause integration of one unit while other units keep running
 - continue independent parent-side checks that do not compete with child validation or mutate child worktrees
 
-Wait for child threads to finish their current validation, review, gate, build, test, or commit step unless there is a legitimate coordination issue. Long-running tests, quiet review calls, Xcode/build output gaps, and slow subagents are normal waiting states, not reasons to interrupt or take over.
+Wait for child threads to finish their current worker-allowed check, review, gate, or commit step unless there is a legitimate coordination issue. Quiet review calls and slow subagents are normal waiting states, not reasons to interrupt or take over. Xcode/XCTest output from a child is always an intervention reason. Non-Apple build or test output is a normal waiting state only when the coordinator explicitly allowed that exact command in the packet.
 
 Legitimate intervention reasons include:
 
@@ -204,6 +224,9 @@ Legitimate intervention reasons include:
 - missing required skill usage or skipped workflow step
 - wrong branch, old worktree reuse, detached-HEAD commit risk, or dirty worktree after claimed commit
 - failed validation that needs parent routing
+- child starts or proposes forbidden Xcode/XCTest validation
+- child starts a broad build/test lane that was not explicitly worker-allowed
+- child cannot state the exact command currently running or whether it is worker-allowed
 - reviewer/critic disagreement that the child cannot resolve
 - claimed completion without visible commit, archive, evidence, or validation record
 - repeated identical failure or retry loop
@@ -231,6 +254,10 @@ After each unit integration:
 - verify the expected files and fixes are present
 - keep unrelated target-branch changes out
 - resolve conflicts minimally
+- commit the integration result on the coordinator target branch before proceeding to the next unit or combined validation
+- if a normal `git cherry-pick` already created a commit, verify and record that commit hash instead of creating an empty follow-up commit
+- if using `git cherry-pick --no-commit`, scoped checkout, manual patch application, or shared-file consolidation, create a normal coordinator commit immediately after the verification above
+- if integration is a no-op because the target branch already contains the accepted changes, record the existing commit or evidence proving there is no new diff
 - update the matrix
 
 Answer explicitly whether accepted worktree-thread fixes are now present on the local target branch.
@@ -241,6 +268,7 @@ After integration, run the configured combined validation and review:
 
 - focused tests for changed behavior
 - broader build/test lanes required by the repo
+- Xcode/XCTest validation for Apple-platform work, when required
 - diff hygiene checks
 - private-path, generated-artifact, and secret scans
 - integrated diff review when requested or required
@@ -261,6 +289,7 @@ Before pushing or opening/updating a PR:
 
 - verify the worktree is clean;
 - verify the target branch contains every accepted unit result;
+- verify every accepted integration has a recorded coordinator-branch commit or an explicit no-op record;
 - verify validation results are current;
 - verify required reviews, gates, triage, and integrated-review findings are handled;
 - prepare PR or update text from actual changes, tests, risks, and skipped checks.
@@ -269,7 +298,13 @@ Use the repo's required PR tooling. Reply inline to review comments when applica
 
 ## Step 9: Cleanup Completed Threads And Worktrees
 
-After integration, validation, required review, and push/PR closeout are complete, clean up orchestration resources. Do not clean up before proving that the target branch contains the accepted work.
+After integration, validation, required review, and any requested push/PR closeout are complete, clean up orchestration resources before the final report. Cleanup is still required for local-only runs where no push or PR was requested. Do not clean up before proving that the target branch contains the accepted work.
+
+Before starting cleanup:
+
+- verify the coordinator target branch is clean or contains only intentional closeout changes to commit first;
+- verify every accepted unit has an integration commit or no-op record on the target branch;
+- update the matrix with each child thread and worktree cleanup status, using `archived`, `removed`, `retained`, `blocked`, or `not_available`.
 
 Before archiving a child thread:
 
@@ -277,7 +312,7 @@ Before archiving a child thread:
 - verify it is complete, blocked, or intentionally closed;
 - verify no needed result exists only in the thread summary without being recorded elsewhere.
 
-Archive completed or intentionally closed child threads using the Codex thread archive tool when available. Leave active, blocked, or user-requested follow-up threads unarchived and report why.
+Archive completed or intentionally closed child threads using the Codex thread archive tool when available. If the archive tool is unavailable, record `not_available` and leave the thread unarchived. Leave active, blocked, or user-requested follow-up threads unarchived and report why.
 
 Before removing a worktree:
 
@@ -290,6 +325,13 @@ Before removing a worktree:
 
 Remove only worktrees that pass those checks. Do not delete phase branches unless the user explicitly asks for branch deletion. If a worktree is dirty, contains unintegrated commits, contains unique evidence, or cannot be verified, keep it and report the blocker.
 
+Cleanup is complete only when every child thread and worktree has one of these recorded outcomes:
+
+- archived thread;
+- removed worktree;
+- retained with an explicit blocker or user-requested reason;
+- not available because the required Codex thread/worktree tool was unavailable.
+
 ## Final Report
 
 Report:
@@ -299,6 +341,7 @@ Report:
 - orchestration matrix with final statuses
 - child thread IDs and unit branches
 - unit commits or integration method
+- coordinator integration commits or no-op records
 - required skill/workflow usage per unit
 - review, gate, triage, and evidence record paths
 - validation commands and results

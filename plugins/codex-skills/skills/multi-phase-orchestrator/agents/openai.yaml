@@ -1,7 +1,7 @@
 interface:
   display_name: "Multi-Phase Orchestrator (Beta)"
   short_description: "Beta worktree-thread orchestration"
-  default_prompt: "Use $multi-phase-orchestrator to coordinate these work units with fresh worktree threads, required skills per unit, validation, and safe integration."
+  default_prompt: "Use $multi-phase-orchestrator to coordinate these work units with fresh worktree threads, required skills per unit, coordinator-owned validation, committed integration, and cleanup."
 
 policy:
   allow_implicit_invocation: false

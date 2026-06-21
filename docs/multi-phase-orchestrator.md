@@ -89,7 +89,7 @@ Give the parent thread enough information to avoid inventing a source or routing
 - **Target branch:** the branch the final integrated work should land on.
 - **Required skills:** any workflows that must be used inside units.
 - **Allowed scope:** files, directories, or behavior each unit may touch.
-- **Validation:** commands, manual checks, UI checks, or evidence required before integration.
+- **Validation:** worker-allowed lightweight checks, coordinator-only checks, forbidden commands, manual checks, UI checks, or evidence required before integration.
 - **Review gates:** adversarial review, PR review triage, code review, or other closeout requirements.
 - **Integration preference:** merge, cherry-pick, scoped checkout, manual consolidation, or local commit only.
 - **Closeout:** what to report, commit, archive, push, or leave unpushed.
@@ -102,9 +102,10 @@ Use $multi-phase-orchestrator to implement the approved plan in docs/plans/impor
 Target branch: codex/import-cleanup.
 Required skills: use $codex-adversarial-gate for each implementation slice closeout.
 Scope: importer code, importer tests, and docs/imports.md only.
-Validation: npm test -- imports and npm run typecheck.
+Worker-allowed validation: git diff --check and focused metadata checks.
+Coordinator-only validation: npm test -- imports and npm run typecheck.
 Integration: keep one commit per completed slice, then integrate locally.
-Closeout: report child thread IDs, commits, validation, review archive paths, and any skipped checks.
+Closeout: report child thread IDs, commits, validation, review archive paths, cleanup outcomes, and any skipped checks.
 ```
 
 ## Run The Orchestration
@@ -119,7 +120,7 @@ Include:
 - discovery or review skill, if any;
 - implementation skill, if any;
 - review or gate skill;
-- validation route;
+- validation route, including worker-allowed checks and coordinator-only checks;
 - integration route;
 - closeout route.
 
@@ -133,7 +134,7 @@ Track units in a matrix:
 
 | Unit | Source Ref | Status | Required Skills | Child Thread | Worktree | Branch | Scope | Review/Gate | Validation | Commit | Integrated |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Import parser tests | Plan section 2 | planned | `$codex-adversarial-gate` | pending | pending | pending | importer tests | required | `npm test -- imports` | pending | no |
+| Import parser tests | Plan section 2 | planned | `$codex-adversarial-gate` | pending | pending | pending | importer tests | required | Worker: `git diff --check`; coordinator: `npm test -- imports` | pending | no |
 
 Use statuses that show actual state, such as `planned`, `running`, `needs_steer`, `validated`, `ready_to_integrate`, `integrated`, `blocked`, or `done`.
 
@@ -166,12 +167,16 @@ Include:
 | Acceptance criteria | Defines when the unit is complete |
 | Allowed write scope | Prevents drift into unrelated files |
 | Dependencies | Shows what must wait or what can run in parallel |
-| Validation commands | Tells the child what proof is expected |
+| Worker-allowed checks | Tells the child what validation it may run itself |
+| Coordinator-only checks | Tells the child what proof to report as needed, not run |
+| Forbidden commands | Prevents child threads from starting expensive or scarce validation lanes |
 | Review or gate requirements | Keeps closeout from being skipped |
 | Commit requirements | Makes unit output durable |
 | Reporting requirements | Gives the parent enough evidence to integrate |
 
 Also tell every child thread that other agents may be working in parallel and that it must not revert, overwrite, or clean other agents' work.
+
+For Apple-platform repositories, child packets must forbid `xcodebuild`, `xctest`, Xcode wrappers, simulator test runs, and repo scripts that invoke those tools. The child should report the needed command; the coordinator runs it after integration.
 
 ### 5. Monitor Actively
 
@@ -184,7 +189,7 @@ Monitor:
 - file overlap between units;
 - edits outside assigned scope;
 - missing required skill usage;
-- skipped validation;
+- skipped validation or attempts to run coordinator-only validation;
 - stale or missing evidence packets;
 - review or critic disagreement;
 - claims of completion without commits, archives, or test output.
@@ -207,9 +212,13 @@ Choose the safest integration method for the actual output:
 
 After each integration, verify that the accepted fix is present on the target branch. Do not rely on the child branch alone.
 
+Commit each accepted integration on the coordinator target branch before starting the next integration or combined validation phase. If an integration is a no-op because the target branch already contains the change, record the existing commit or evidence proving there is no new diff.
+
 ### 7. Validate Integrated Work
 
 Run the combined validation route after integration. Unit-level validation does not prove the integrated state.
+
+The coordinator owns resource-heavy validation. Child threads should run only explicitly allowed lightweight checks; broad builds, expensive test lanes, Xcode/XCTest, simulator tests, and scarce UI validation stay with the coordinator.
 
 Use the checks named in the request and any repo-required checks. Also check:
 
@@ -231,7 +240,7 @@ The final report should say:
 - required skills used per unit;
 - validation commands and results;
 - review, gate, triage, and evidence paths;
-- cleanup performed or intentionally skipped;
+- cleanup performed, retained, blocked, or unavailable;
 - remaining risks, blockers, or unvalidated areas.
 
 Do not delete worktrees or archive child threads until the target branch contains the accepted work and no required evidence exists only in the child worktree or thread summary.
