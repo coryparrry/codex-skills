@@ -21,10 +21,28 @@ class PacketLoopCLITests(unittest.TestCase):
             timeout=10,
         )
 
+    def add_basic_packet(self, repo: Path, packet_id: str = "P001") -> subprocess.CompletedProcess[str]:
+        return self.run_cli(
+            repo,
+            "add-packet",
+            "--id",
+            packet_id,
+            "--title",
+            "Packet",
+            "--goal",
+            "Do one packet.",
+            "--allowed-scope",
+            "skills/demo",
+            "--expected-area",
+            "skills/demo",
+            "--validation-command",
+            "python3 -m unittest",
+        )
+
     def test_init_creates_manifest_events_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            result = self.run_cli(repo, "init", "--name", "demo", "--target-branch", "main")
+            result = self.run_cli(repo, "init", "--name", "demo")
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((repo / ".codex/packet-loop/manifest.json").is_file())
             self.assertTrue((repo / ".codex/packet-loop/events.jsonl").is_file())
@@ -33,6 +51,10 @@ class PacketLoopCLITests(unittest.TestCase):
             manifest = json.loads((repo / ".codex/packet-loop/manifest.json").read_text())
             self.assertEqual(manifest["schema_version"], "0.1.0")
             self.assertEqual(manifest["repo"]["name"], "demo")
+            self.assertEqual(manifest["repo"]["default_branch"], "main")
+            self.assertEqual(manifest["repo"]["target_branch"], "main")
+            self.assertEqual(manifest["mode"], "planning")
+            self.assertEqual(manifest["active_packet_limit"], 3)
             self.assertEqual(manifest["packet_order"], [])
 
     def test_add_packet_and_validate(self) -> None:
@@ -57,9 +79,27 @@ class PacketLoopCLITests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["schema_version"], "0.1.0")
             self.assertEqual(packet["status"], "candidate")
             self.assertEqual(packet["risk"], "medium")
             self.assertEqual(packet["parallel_safe"], "maybe")
+            self.assertEqual(
+                packet["expected_touched_areas"],
+                ["experimental/codex-pr-packet-loop/skills/codex-packet-loop-core"],
+            )
+            self.assertNotIn("expected_area", packet)
+            self.assertEqual(
+                packet["validation"],
+                {
+                    "commands": [
+                        "python3 -m unittest experimental/codex-pr-packet-loop/skills/"
+                        "codex-packet-loop-core/tests/test_packet_loop.py"
+                    ]
+                },
+            )
+            self.assertNotIn("validation_command", packet)
+            self.assertEqual(packet["evidence_paths"], [])
+            self.assertEqual(packet["blockers"], [])
 
             validate = self.run_cli(repo, "validate")
             self.assertEqual(validate.returncode, 0, validate.stderr)
@@ -95,25 +135,7 @@ class PacketLoopCLITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
-            self.assertEqual(
-                self.run_cli(
-                    repo,
-                    "add-packet",
-                    "--id",
-                    "P001",
-                    "--title",
-                    "Packet",
-                    "--goal",
-                    "Do one packet.",
-                    "--allowed-scope",
-                    "skills/demo",
-                    "--expected-area",
-                    "skills/demo",
-                    "--validation-command",
-                    "python3 -m unittest",
-                ).returncode,
-                0,
-            )
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
             self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
             result = self.run_cli(
                 repo,
@@ -140,25 +162,7 @@ class PacketLoopCLITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
-            self.assertEqual(
-                self.run_cli(
-                    repo,
-                    "add-packet",
-                    "--id",
-                    "P001",
-                    "--title",
-                    "Packet",
-                    "--goal",
-                    "Do one packet.",
-                    "--allowed-scope",
-                    "skills/demo",
-                    "--expected-area",
-                    "skills/demo",
-                    "--validation-command",
-                    "python3 -m unittest",
-                ).returncode,
-                0,
-            )
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
             self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
             self.assertEqual(
                 self.run_cli(
@@ -182,6 +186,76 @@ class PacketLoopCLITests(unittest.TestCase):
             packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
             self.assertEqual(packet["status"], "ready")
             self.assertIsNone(packet["lease"])
+
+    def test_reviewed_packet_must_be_marked_merge_eligible_before_merge(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.assertEqual(self.run_cli(repo, "init", "--name", "demo").returncode, 0)
+            self.assertEqual(self.add_basic_packet(repo).returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "ready").returncode, 0)
+            self.assertEqual(
+                self.run_cli(
+                    repo,
+                    "lease",
+                    "--packet",
+                    "P001",
+                    "--owner-thread",
+                    "thread-123",
+                    "--branch",
+                    "codex/p001-demo",
+                    "--worktree",
+                    "/tmp/demo-worktree",
+                ).returncode,
+                0,
+            )
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "in-progress").returncode, 0)
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "pr-open").returncode, 0)
+            pr_open_merge = self.run_cli(
+                repo,
+                "transition",
+                "--packet",
+                "P001",
+                "--status",
+                "merged",
+                "--human-approved",
+            )
+            self.assertNotEqual(pr_open_merge.returncode, 0)
+            self.assertIn("invalid transition", pr_open_merge.stderr)
+
+            self.assertEqual(self.run_cli(repo, "transition", "--packet", "P001", "--status", "reviewing").returncode, 0)
+
+            direct_merge = self.run_cli(
+                repo,
+                "transition",
+                "--packet",
+                "P001",
+                "--status",
+                "merged",
+                "--human-approved",
+            )
+            self.assertNotEqual(direct_merge.returncode, 0)
+            self.assertIn("invalid transition", direct_merge.stderr)
+
+            self.assertEqual(
+                self.run_cli(repo, "transition", "--packet", "P001", "--status", "merge-eligible").returncode,
+                0,
+            )
+            ungated_merge = self.run_cli(repo, "transition", "--packet", "P001", "--status", "merged")
+            self.assertNotEqual(ungated_merge.returncode, 0)
+            self.assertIn("human-gated", ungated_merge.stderr)
+
+            gated_merge = self.run_cli(
+                repo,
+                "transition",
+                "--packet",
+                "P001",
+                "--status",
+                "merged",
+                "--human-approved",
+            )
+            self.assertEqual(gated_merge.returncode, 0, gated_merge.stderr)
+            packet = json.loads((repo / ".codex/packet-loop/packets/P001.json").read_text())
+            self.assertEqual(packet["status"], "merged")
 
 
 if __name__ == "__main__":

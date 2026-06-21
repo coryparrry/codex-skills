@@ -23,6 +23,7 @@ STATUSES = {
     "in-progress",
     "pr-open",
     "reviewing",
+    "merge-eligible",
     "needs-fix",
     "blocked",
     "needs-reslice",
@@ -31,14 +32,16 @@ STATUSES = {
 }
 RISKS = {"low", "medium", "high"}
 PARALLEL_SAFE = {"yes", "no", "maybe"}
+MODES = {"planning"}
 HUMAN_GATED_STATUSES = {"merged", "rejected"}
 ALLOWED_TRANSITIONS = {
     "candidate": {"ready", "blocked", "needs-reslice", "rejected"},
     "ready": {"reserved", "blocked", "needs-reslice", "rejected"},
     "reserved": {"ready", "in-progress", "blocked", "needs-reslice", "rejected"},
     "in-progress": {"ready", "pr-open", "needs-fix", "blocked", "needs-reslice", "rejected"},
-    "pr-open": {"reviewing", "needs-fix", "blocked", "merged", "rejected"},
-    "reviewing": {"needs-fix", "blocked", "merged", "rejected"},
+    "pr-open": {"reviewing", "needs-fix", "blocked", "rejected"},
+    "reviewing": {"merge-eligible", "needs-fix", "blocked", "rejected"},
+    "merge-eligible": {"needs-fix", "blocked", "merged", "rejected"},
     "needs-fix": {"in-progress", "blocked", "needs-reslice", "rejected"},
     "blocked": {"ready", "needs-reslice", "rejected"},
     "needs-reslice": {"candidate", "rejected"},
@@ -191,8 +194,16 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     else:
         if not isinstance(repo.get("name"), str) or not repo.get("name"):
             errors.append("manifest repo.name must be a non-empty string")
+        if not isinstance(repo.get("default_branch"), str) or not repo.get("default_branch"):
+            errors.append("manifest repo.default_branch must be a non-empty string")
         if not isinstance(repo.get("target_branch"), str) or not repo.get("target_branch"):
             errors.append("manifest repo.target_branch must be a non-empty string")
+    mode = manifest.get("mode")
+    if mode not in MODES:
+        errors.append(f"manifest mode is invalid: {mode}")
+    active_packet_limit = manifest.get("active_packet_limit")
+    if isinstance(active_packet_limit, bool) or not isinstance(active_packet_limit, int) or active_packet_limit < 1:
+        errors.append("manifest active_packet_limit must be a positive integer")
     packet_order = manifest.get("packet_order")
     if not isinstance(packet_order, list):
         errors.append("manifest packet_order must be a list")
@@ -210,7 +221,9 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
 
 def validate_packet(packet: dict[str, Any]) -> list[str]:
     errors = []
-    for field in ("id", "title", "goal", "status", "risk", "parallel_safe", "validation_command"):
+    if packet.get("schema_version") != SCHEMA_VERSION:
+        errors.append(f"packet {packet.get('id', '<unknown>')} schema_version must be {SCHEMA_VERSION}")
+    for field in ("id", "title", "goal", "status", "risk", "parallel_safe"):
         if not isinstance(packet.get(field), str) or not packet.get(field):
             errors.append(f"packet {packet.get('id', '<unknown>')} {field} must be a non-empty string")
     status = packet.get("status")
@@ -222,9 +235,28 @@ def validate_packet(packet: dict[str, Any]) -> list[str]:
     parallel_safe = packet.get("parallel_safe")
     if parallel_safe not in PARALLEL_SAFE:
         errors.append(f"packet {packet.get('id', '<unknown>')} parallel_safe is invalid: {parallel_safe}")
-    for field in ("allowed_scope", "expected_area", "avoid_scope", "out_of_scope", "dependencies"):
+    for field in (
+        "allowed_scope",
+        "expected_touched_areas",
+        "avoid_scope",
+        "out_of_scope",
+        "dependencies",
+        "evidence_paths",
+        "blockers",
+    ):
         if not isinstance(packet.get(field), list):
             errors.append(f"packet {packet.get('id', '<unknown>')} {field} must be a list")
+    validation = packet.get("validation")
+    if not isinstance(validation, dict):
+        errors.append(f"packet {packet.get('id', '<unknown>')} validation must be an object")
+    else:
+        commands = validation.get("commands")
+        if (
+            not isinstance(commands, list)
+            or not commands
+            or any(not isinstance(command, str) or not command for command in commands)
+        ):
+            errors.append(f"packet {packet.get('id', '<unknown>')} validation.commands must be non-empty strings")
     lease = packet.get("lease")
     if lease is not None:
         if not isinstance(lease, dict):
@@ -272,14 +304,19 @@ def packet_list(values: list[str] | None) -> list[str]:
 
 def cmd_init(args: argparse.Namespace) -> int:
     repo = args.repo
+    if args.active_packet_limit < 1:
+        raise PacketLoopError("active_packet_limit must be a positive integer")
     state_dir(repo).mkdir(parents=True, exist_ok=True)
     packets_dir(repo).mkdir(parents=True, exist_ok=True)
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "repo": {
             "name": args.name,
+            "default_branch": args.default_branch,
             "target_branch": args.target_branch,
         },
+        "mode": args.mode,
+        "active_packet_limit": args.active_packet_limit,
         "packet_order": [],
         "created_at": now_iso(),
         "updated_at": now_iso(),
@@ -301,6 +338,7 @@ def cmd_add_packet(args: argparse.Namespace) -> int:
         raise PacketLoopError(f"packet file already exists: {packet_id}")
     created_at = now_iso()
     packet = {
+        "schema_version": SCHEMA_VERSION,
         "id": packet_id,
         "title": args.title,
         "goal": args.goal,
@@ -308,11 +346,13 @@ def cmd_add_packet(args: argparse.Namespace) -> int:
         "risk": args.risk,
         "parallel_safe": args.parallel_safe,
         "allowed_scope": packet_list(args.allowed_scope),
-        "expected_area": packet_list(args.expected_area),
+        "expected_touched_areas": packet_list(args.expected_area),
         "avoid_scope": packet_list(args.avoid_scope),
         "out_of_scope": packet_list(args.out_of_scope),
         "dependencies": packet_list(args.dependency),
-        "validation_command": args.validation_command,
+        "validation": {"commands": args.validation_command},
+        "evidence_paths": [],
+        "blockers": [],
         "suggested_branch": args.suggested_branch,
         "notes": args.notes,
         "lease": None,
@@ -436,7 +476,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     init = subparsers.add_parser("init", help="Initialize packet loop state.")
     init.add_argument("--name", required=True)
+    init.add_argument("--default-branch", default="main")
     init.add_argument("--target-branch", default="main")
+    init.add_argument("--mode", choices=sorted(MODES), default="planning")
+    init.add_argument("--active-packet-limit", type=int, default=3)
     init.set_defaults(func=cmd_init)
 
     add_packet = subparsers.add_parser("add-packet", help="Add a candidate packet.")
@@ -445,7 +488,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_packet.add_argument("--goal", required=True)
     add_packet.add_argument("--allowed-scope", action="append", required=True)
     add_packet.add_argument("--expected-area", action="append", required=True)
-    add_packet.add_argument("--validation-command", required=True)
+    add_packet.add_argument("--validation-command", action="append", required=True)
     add_packet.add_argument("--risk", choices=sorted(RISKS), default="medium")
     add_packet.add_argument("--parallel-safe", choices=sorted(PARALLEL_SAFE), default="maybe")
     add_packet.add_argument("--dependency", action="append")
