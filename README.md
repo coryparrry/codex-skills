@@ -7,31 +7,103 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> A small Codex skill bundle for adversarial review gates, bounded Codex automation loops, beta multi-agent orchestration, safe Git branch cleanup, and practical PR feedback triage.
+Small Codex skills for real workflow pressure: adversarial completion gates, bounded loops, beta multi-worktree orchestration, branch cleanup, and PR review triage.
 
-## 📌 Overview
+These skills are meant to stay narrow. Each one handles one recurring failure mode, keeps the main `SKILL.md` readable, and moves heavier process detail into local references, templates, scripts, or user-facing docs.
 
-`codex-skills` packages focused Codex skills that solve repeatable engineering workflow problems without bringing along a heavy process framework.
+## Quickstart (30-second setup)
 
-The main skill in this repo is `codex-adversarial-gate`. It keeps implementation work open until:
+Install the full bundle with `skills.sh`:
 
-1. An independent completion reviewer returns `PASS`.
-2. A critic reviews that `PASS` and returns `AGREE_PASS`.
-3. Both exact review outputs are archived under `docs/Adversarial Reviews/`.
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
+```
 
-The repo also includes utility skills for writing bounded Codex loops, beta multi-worktree orchestration, safe merged-branch cleanup, and PR review feedback triage.
+If you use `codex-adversarial-gate`, also install its local reviewer agents:
 
-## ✨ Skills
+```bash
+bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
+```
 
-- 🧠 **codex-adversarial-gate** gates plan and implementation closeout with reviewer-plus-critic evidence.
-- 🔁 [**writing-codex-loops**](docs/writing-codex-loops.md) designs or creates bounded Codex automations, heartbeats, retry loops, and follow-up workflows.
-- 🧭 [**multi-phase-orchestrator** (beta)](docs/multi-phase-orchestrator.md#multi-phase-orchestrator-beta) coordinates multiple work units through fresh Codex worktree threads.
-- 🌿 **git-clean-merged-branch** returns a repo to its default branch and deletes merged local and remote branches after safety checks.
-- 🔎 **triage-review-comments** inventories PR comments, removes noise, deduplicates findings, and classifies real review work.
-- 🧾 **Codex marketplace plugin** exposes the bundle through `plugins/codex-skills`.
-- ✅ **Install smoke tests** verify the bundle installer, shipped skill copies, and adversarial gate custom-agent flow.
+Then invoke the skill you need:
 
-## 🧰 What Is Included
+```text
+Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
+Use $writing-codex-loops to create a bounded heartbeat for this PR.
+Use $triage-review-comments to triage the review comments on this PR.
+```
+
+You can also install through the Codex app by adding this repository as a marketplace source and installing **Codex Skills**. See [Install Codex Skills](docs/installation.md).
+
+## Why These Skills Exist
+
+### #1: Codex Marks Work Complete Too Early
+
+**The problem.** Implementation threads can confuse confidence, passing local checks, or a tidy summary with actual completion. That loses dissent, skips evidence, and makes review archives impossible to reconstruct later.
+
+**The fix.** Use [`codex-adversarial-gate`](docs/codex-adversarial-gate.md). It keeps a phase or slice open until an independent reviewer returns `PASS`, a critic returns `AGREE_PASS`, and both exact outputs are archived under `docs/Adversarial Reviews/`.
+
+### #2: Loops Drift Or Run Forever
+
+**The problem.** "Keep checking" and "continue until done" prompts are under-specified. Without state, retry limits, stop conditions, and escalation, repeated work becomes unbounded or impossible to resume.
+
+**The fix.** Use [`writing-codex-loops`](docs/writing-codex-loops.md). It turns recurring work into a loop contract with observable state, cadence, feedback, progress checks, retry rules, success stops, blocked stops, and a concrete escalation question.
+
+### #3: Parallel Work Loses Control
+
+**The problem.** Multi-thread or multi-worktree work can overlap edits, drop validation ownership, or merge child outputs based on summaries instead of live files.
+
+**The fix.** Use [`multi-phase-orchestrator`](docs/multi-phase-orchestrator.md) when you explicitly want beta orchestration. It routes each work unit into a fresh worktree thread, monitors status, verifies output against live files and checks, and integrates deliberately.
+
+### #4: PR Review Noise Hides Real Bugs
+
+**The problem.** Bot comments, stale review threads, duplicate findings, and preference-only feedback can bury the issues that should actually block a PR.
+
+**The fix.** Use [`triage-review-comments`](docs/triage-review-comments.md). It inventories review comments, verifies current-code reachability, rejects false positives, classifies real findings, and recommends prevention checks.
+
+### #5: Merged Branch Cleanup Is Easy To Get Wrong
+
+**The problem.** After a PR merge, local state can stay on a stale branch, default branch updates can be skipped, and unsafe deletion can remove work that was not actually merged.
+
+**The fix.** Use [`git-clean-merged-branch`](docs/git-clean-merged-branch.md). It fetches, resolves the default branch, checks cleanliness, updates the default branch, and deletes only the branch it can safely clean up.
+
+## Reference
+
+These skills split by invocation discipline and risk, not by folder name.
+
+### Everyday Model-Invoked Skills
+
+- **[`codex-adversarial-gate`](skills/codex-adversarial-gate/SKILL.md)** - Use when reviewing Codex plans, closing implementation phases or slices, or auditing completion claims.
+- **[`writing-codex-loops`](skills/writing-codex-loops/SKILL.md)** - Use when designing, writing, repairing, or scheduling Codex work loops and automations.
+- **[`triage-review-comments`](skills/triage-review-comments/SKILL.md)** - Use when PR review comments, bot findings, stale threads, or prevention checks need triage.
+- **[`git-clean-merged-branch`](skills/git-clean-merged-branch/SKILL.md)** - Use when a merged GitHub branch should be cleaned up safely; short prompts like `sort git` or `clean merged branch` intentionally route here.
+
+### Explicit Beta Skill
+
+- **[`multi-phase-orchestrator`](skills/multi-phase-orchestrator/SKILL.md)** - Use only when the user explicitly names `$multi-phase-orchestrator` or directly asks for this beta orchestration flow.
+
+### Packaging Surface
+
+- **Source skills:** [`skills/`](skills/)
+- **Installable plugin mirror:** [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/)
+- **Codex plugin manifest:** [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json)
+- **skills.sh grouping metadata:** [`skills.sh.json`](skills.sh.json)
+- **Codex marketplace entry:** [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json)
+- **Experimental work:** [`experimental/`](experimental/) stays outside the shipped bundle until explicitly promoted.
+
+## Choose A Skill
+
+| Situation | Skill |
+|---|---|
+| Review a plan before execution | `codex-adversarial-gate` |
+| Close an implementation phase or slice | `codex-adversarial-gate` |
+| Recover from a skipped completion gate | `codex-adversarial-gate` |
+| Design or create a bounded Codex automation loop | `writing-codex-loops` |
+| Coordinate related work units through fresh worktree threads | `multi-phase-orchestrator` beta |
+| Clean up one merged local Git branch | `git-clean-merged-branch` |
+| Classify PR review feedback | `triage-review-comments` |
+
+## What Is Included
 
 ```text
 .
@@ -47,6 +119,8 @@ The repo also includes utility skills for writing bounded Codex loops, beta mult
 │   ├── triage-review-comments.md
 │   ├── usage.md
 │   └── writing-codex-loops.md
+├── experimental/
+│   └── codex-pr-packet-loop/
 ├── plugins/
 │   └── codex-skills/
 │       ├── .codex-plugin/
@@ -63,139 +137,65 @@ The repo also includes utility skills for writing bounded Codex loops, beta mult
     └── writing-codex-loops/
 ```
 
-## 🧩 Codex Marketplace
+## Install
 
-The repo marketplace lives at [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). The Codex plugin manifest lives at [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json), and it exposes the lightweight installable skills under [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/).
-
-Install through the Codex app:
+### Codex Marketplace
 
 1. Open **Plugins** in the Codex app.
 2. Click **Add marketplace**.
 3. Add this repository as the marketplace source: `https://github.com/coryparrry/codex-skills`.
-4. Open the **Codex Skills** entry and click the plus button or **Add to Codex**.
+4. Open **Codex Skills** and click the plus button or **Add to Codex**.
 
-If you use `codex-adversarial-gate`, also install the skill with the `skills` CLI and run its local agent installer:
+Marketplace install exposes the shipped skills, but it does not copy the adversarial gate custom reviewer TOMLs into `~/.codex/agents`. Run the adversarial gate installer when those agents are needed.
 
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
-bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
-```
+### skills.sh
 
-Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`.
-
-The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
-
-## ⚡ Quick Usage
-
-Run the adversarial completion gate:
-
-```text
-Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
-```
-
-Design or create a bounded Codex loop:
-
-```text
-Use $writing-codex-loops to create a heartbeat that checks this PR every 10 minutes until CI passes, fails repeatedly, or needs owner input.
-```
-
-Clean up a branch after GitHub merge:
-
-```text
-git-clean-merged-branch
-```
-
-Triage PR review comments:
-
-```text
-Use $triage-review-comments to triage the review comments on this PR.
-```
-
-Coordinate related work units through fresh worktree threads:
-
-```text
-Use $multi-phase-orchestrator to coordinate these work units with fresh worktree threads.
-```
-
-## 📖 Documentation
-
-- [Installation](docs/installation.md)
-- [Usage Guide](docs/usage.md)
-- [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
-- [Writing Codex Loops](docs/writing-codex-loops.md)
-- [Multi-Phase Orchestrator](docs/multi-phase-orchestrator.md)
-- [Reference](docs/reference.md)
-- [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
-- [Triage Review Comments](docs/triage-review-comments.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
-
-## 🚀 Install
-
-### Prerequisites
-
-- Codex with local skills enabled
-- `skills` CLI support through `npx`
-- Python 3 for the adversarial review archive helper
-
-### Install With skills.sh
-
-Install the repo skills for Codex with the `skills` CLI:
+Install every shipped skill:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
 ```
 
-The `skills` CLI stores global Codex skill copies under `~/.codex/skills/` when installed with `--agent codex`.
-
-If you use `codex-adversarial-gate`, also run its agent installer:
+Install a single skill:
 
 ```bash
-bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
+npx skills add coryparrry/codex-skills --global --agent codex --skill writing-codex-loops
+npx skills add coryparrry/codex-skills --global --agent codex --skill multi-phase-orchestrator
+npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
+npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
 ```
 
-From a trusted local checkout, install all repo skills into `${CODEX_HOME:-$HOME/.codex}` and install the adversarial gate custom agents:
+The `skills` CLI stores global Codex skill copies under `~/.codex/skills/` when installed with `--agent codex`.
+
+### Trusted Local Checkout
+
+From a trusted checkout, install all repo skills into `${CODEX_HOME:-$HOME/.codex}` and install the adversarial gate custom agents:
 
 ```bash
 bash scripts/install.sh
 ```
 
-### Install A Skill
+Do not pipe this installer from a remote URL. It intentionally expects a trusted local checkout.
 
-Install `codex-adversarial-gate`:
+## Maintaining This Bundle
 
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
-bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
-```
+Changes to shipped skill behavior must update the surfaces that future agents and users actually load.
 
-Install `git-clean-merged-branch`:
+| Surface | Rule |
+|---|---|
+| `skills/<skill>/` | Source of truth for the shipped skill. |
+| `plugins/codex-skills/skills/<skill>/` | Keep this mirror synchronized for Codex marketplace installs. |
+| `skills/<skill>/agents/openai.yaml` | Keep OpenAI skill metadata aligned with `SKILL.md`. |
+| `docs/<skill>.md`, `docs/usage.md`, `docs/reference.md` | Update when workflow behavior, install steps, or user-facing invocation changes. |
+| `README.md`, `skills.sh.json`, `.agents/plugins/marketplace.json`, `plugins/codex-skills/.codex-plugin/plugin.json` | Update when shipped skills, grouping, marketplace discovery, plugin prompts, or packaging metadata changes. |
+| `scripts/` and skill-local `scripts/` | Update tests and installers when packaging behavior changes. |
 
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
-```
+Preserve the adversarial gate invariant: implementation closeout requires reviewer `PASS`, critic `AGREE_PASS`, and exact archived evidence. Preserve the loop-writing invariant: repeated Codex work needs observable state, retry limits, stop conditions, and escalation.
 
-Install `writing-codex-loops`:
+Do not mirror or list experimental skills as shipped until a promotion change explicitly moves them into `skills/`, `plugins/codex-skills/skills/`, package metadata, and the public docs together.
 
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill writing-codex-loops
-```
-
-Install `triage-review-comments`:
-
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
-```
-
-Install `multi-phase-orchestrator` beta:
-
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill multi-phase-orchestrator
-```
-
-Restart Codex if the new skills or agents do not appear immediately.
-
-## 🧪 Validation
+## Validation
 
 Run the install smoke test:
 
@@ -226,16 +226,23 @@ Run a plugin packaging check when `plugin-eval` is available:
 plugin-eval analyze plugins/codex-skills --format markdown
 ```
 
-## 🤝 Contributing
+## Documentation
 
-Contributions should keep each skill small, installable, and generic. Changes to shipped skills should keep source and plugin mirror copies synchronized. Changes to `codex-adversarial-gate` should preserve the central invariant: implementation work is not complete until reviewer `PASS`, critic `AGREE_PASS`, and both exact review outputs are archived.
+- [Installation](docs/installation.md)
+- [Usage Guide](docs/usage.md)
+- [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
+- [Writing Codex Loops](docs/writing-codex-loops.md)
+- [Multi-Phase Orchestrator](docs/multi-phase-orchestrator.md)
+- [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
+- [Triage Review Comments](docs/triage-review-comments.md)
+- [Reference](docs/reference.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+## Security
 
-## 🛡️ Security
+Do not commit secrets, tokens, private paths, or sensitive diagnostics. Do not archive review output that contains credentials. See [SECURITY.md](SECURITY.md).
 
-Do not archive review output that contains credentials, tokens, private paths, or sensitive diagnostics. See [SECURITY.md](SECURITY.md).
+## License
 
-## 📄 License
-
-Distributed under the MIT License. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

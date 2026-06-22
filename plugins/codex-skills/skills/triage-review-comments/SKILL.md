@@ -22,7 +22,7 @@ The report must include:
 - false-positive disproof for every `Fix now`, `Fix if cheap`, and `Defer` item
 - why each ignored false positive, stale claim, or unverified concern was rejected
 - prevention guidance for every real, non-ignored finding
-- a fix packet for every `Fix now` item
+- a review fix brief for every `Fix now` item
 - approved-execution status when the user gives the go-ahead to fix review comments
 - resolved-thread actions or blockers when thread resolution is relevant
 - deferred tracking actions or blockers when deferred work is real
@@ -83,17 +83,31 @@ Security boundary, authorization, permission, data loss, privacy, and cross-work
    - Do not add false positives, stale claims, duplicates, preference-only comments, or unverified concerns to deferred tracking.
    - Use [INTEGRATION.md](references/INTEGRATION.md) for the Binder deferred-bugs checklist format.
 
-## Fix Packet
+## Generated Document Shape
+
+Write the report as a durable triage document, not a stream-of-consciousness review reply.
+
+- Lead with the inventory and bucket verdicts.
+- For actionable work, describe behavior and contracts rather than line-by-line instructions.
+- Include file, function, or type names only when they are evidence or stable interfaces; avoid line numbers.
+- Give every `Fix now` item a complete review fix brief with acceptance criteria and scope boundaries.
+- Keep false positives and unverified claims in `Ignore` with the disproof or missing proof.
+
+## Review Fix Brief
 
 For every `Fix now` item, include:
-- `Bug`: concrete wrong behavior
-- `Trigger`: smallest reachable scenario
-- `If not fixed`: likely consequence before/after merge
-- `Patch scope`: likely file/module
-- `Prevention first`: smallest failing test/check
-- `Fix shape`: minimum practical code change
-- `Validation`: exact command/workflow to prove it
-- `Risk`: adjacent behavior that could break
+
+- `Category`: bug, security, data loss, privacy, reliability, API contract, UX, or other concrete category.
+- `Summary`: one-line description of what needs to happen.
+- `Current behavior`: what the PR does now and why that is wrong or incomplete.
+- `Desired behavior`: what should be true after the fix, including edge cases and error conditions.
+- `Trigger`: smallest reachable scenario proving the issue.
+- `Key interfaces`: stable types, functions, commands, schemas, routes, UI states, or configuration contracts involved. Avoid stale line-level directions.
+- `Acceptance criteria`: independently testable criteria for completion.
+- `Prevention first`: smallest failing test/check or validation lane that should catch the issue.
+- `Validation`: exact command/workflow to prove the fix.
+- `Out of scope`: adjacent work that should not be bundled into this fix.
+- `Risk`: adjacent behavior that could break.
 
 ## Output Format
 
@@ -113,7 +127,20 @@ For every `Fix now` item, include:
   - False-positive check: <what was checked to rule out stale, unreachable, already-guarded, duplicate, or preference-only feedback>
   - Evidence: <file/function/path and why reachable>
   - If not fixed: <consequence>
-  - Fix packet: <bug, trigger, patch scope, prevention first, validation>
+  - Review fix brief:
+    - Category: <bug/security/data loss/privacy/reliability/API contract/UX/other>
+    - Summary: <one-line fix target>
+    - Current behavior: <what the PR does now>
+    - Desired behavior: <what should happen>
+    - Trigger: <smallest reachable scenario>
+    - Key interfaces: <stable contracts, types, commands, schemas, routes, UI states, or config>
+    - Acceptance criteria:
+      - [ ] <criterion>
+      - [ ] <criterion>
+    - Prevention first: <smallest failing test/check>
+    - Validation: <exact command/workflow>
+    - Out of scope: <what not to change>
+    - Risk: <adjacent behavior that could break>
 
 ## Fix if cheap
 - <title> - <reason>
