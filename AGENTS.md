@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository packages a small Codex skill bundle. Source skills live under `skills/`, with one directory per skill such as `skills/codex-adversarial-gate/` and `skills/git-clean-merged-branch/`. Each skill keeps its entrypoint in `SKILL.md`; supporting files belong in local `agents/`, `references/`, `templates/`, `scripts/`, or `tests/` subdirectories.
+This repository packages a small Codex skill bundle. Source skills live under `skills/`, with one directory per skill such as `skills/codex-adversarial-gate/`, `skills/writing-codex-loops/`, and `skills/git-clean-merged-branch/`. Each skill keeps its entrypoint in `SKILL.md`; supporting files belong in local `agents/`, `references/`, `templates/`, `scripts/`, or `tests/` subdirectories.
 
 The installable plugin mirror lives under `plugins/codex-skills/skills/`, and plugin metadata is in `plugins/codex-skills/.codex-plugin/plugin.json`. Keep mirrored skill files synchronized when changing shipped skill behavior. User-facing documentation belongs in `docs/`; repository install helpers live in `scripts/`.
 
@@ -30,4 +30,4 @@ Recent commits use concise imperative messages, often Conventional Commit style 
 
 ## Security & Agent-Specific Instructions
 
-Do not commit secrets, private paths, tokens, or organization-specific workflow assumptions. Preserve the adversarial gate invariant: implementation closeout requires reviewer `PASS`, critic `AGREE_PASS`, and exact archived evidence.
+Do not commit secrets, private paths, tokens, or organization-specific workflow assumptions. Preserve the adversarial gate invariant: implementation closeout requires reviewer `PASS`, critic `AGREE_PASS`, and exact archived evidence. Preserve the loop-writing invariant: recurring or repeated Codex work needs observable state, retry limits, stop conditions, and escalation.

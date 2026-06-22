@@ -24,4 +24,4 @@ If review output contains sensitive material, stop and report it instead of arch
 
 ## Security-Sensitive Changes
 
-Changes touching reviewer permissions, archive behavior, fallback prompts, or custom agent sandbox settings should receive extra scrutiny. The reviewer and critic roles should remain read-only.
+Changes touching reviewer permissions, archive behavior, fallback prompts, automation prompts, loop stop conditions, escalation gates, or custom agent sandbox settings should receive extra scrutiny. The reviewer and critic roles should remain read-only, and recurring loops should keep approval gates for destructive, paid, credentialed, or security-sensitive actions.

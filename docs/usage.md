@@ -19,6 +19,7 @@ For `codex-adversarial-gate`, also make sure the custom reviewer agent TOMLs are
 | Review a plan before execution | `codex-adversarial-gate` |
 | Close an implementation phase or slice | `codex-adversarial-gate` |
 | Recover from a skipped completion gate | `codex-adversarial-gate` |
+| Design or create a bounded Codex automation loop | `writing-codex-loops` |
 | Coordinate multiple related work units through fresh worktree threads | `multi-phase-orchestrator` beta |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
@@ -51,6 +52,34 @@ For implementation closeout, Codex should:
 8. Accept completion only when the critic returns `AGREE_PASS`.
 
 Do not use the plan reviewer to close implementation work.
+
+## Write A Codex Loop
+
+Use `writing-codex-loops` when a workflow needs explicit state, cadence, feedback, retry rules, stop conditions, and escalation.
+
+For an actual automation, ask:
+
+```text
+Use $writing-codex-loops to create a heartbeat that checks this PR every 10 minutes until CI passes, the same failure repeats three times, or owner input is needed.
+```
+
+For a draft-only contract, ask:
+
+```text
+Use $writing-codex-loops to draft a bounded loop contract for weekly dependency review, but do not create the automation.
+```
+
+The skill should classify the request before acting:
+
+1. Actual loop requests create or update a Codex Automation.
+2. Draft-only requests return a loop contract and do not create an automation.
+3. Same-thread or sub-hour follow-ups normally use a thread heartbeat.
+4. Independent recurring project scans need durable state outside chat context.
+5. Immediate repetition in the current turn is an in-thread loop, not an automation.
+
+If the Codex automation tool is unavailable, the skill should return the loop contract with `BLOCKED_AUTOMATION_TOOL_UNAVAILABLE` and state that no automation was created.
+
+Every loop should include live observation, progress checks, idempotency, retry limits, success stops, blocked stops, and a concrete escalation question.
 
 ## Coordinate Multiple Work Units
 
@@ -146,6 +175,8 @@ The skill classifies review work. It does not implement fixes by itself.
 
 If a completion gate was skipped, use `codex-adversarial-gate` to freeze the current artifact, reopen the status, run reviewer and critic, archive both outputs, and only then restore completion.
 
+If a loop request says only "keep going until done", use `writing-codex-loops` to replace it with observable continue, success, blocked, and no-progress predicates.
+
 If branch cleanup stops on local changes, commit, stash, or discard those changes before rerunning the skill.
 
 If review triage has no PR context, load the PR or provide enough review context before invoking the skill.
@@ -155,6 +186,7 @@ If review triage has no PR context, load the PR or provide enough review context
 - [Installation](installation.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
+- [Writing Codex Loops](writing-codex-loops.md)
 - [Multi-Phase Orchestrator](multi-phase-orchestrator.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

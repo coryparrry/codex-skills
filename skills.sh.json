@@ -10,6 +10,13 @@
       ]
     },
     {
+      "title": "Automation Loops",
+      "description": "Skills for bounded Codex automations and recurring workflows.",
+      "skills": [
+        "writing-codex-loops"
+      ]
+    },
+    {
       "title": "PR Review",
       "description": "Skills for PR feedback triage.",
       "skills": [

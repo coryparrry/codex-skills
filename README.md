@@ -2,11 +2,12 @@
 
 ![Codex Skill Bundle](https://img.shields.io/badge/Codex-Skill_Bundle-111827?style=for-the-badge)
 ![Review Gate](https://img.shields.io/badge/Review_Gate-Adversarial-b91c1c?style=for-the-badge)
-![Git Workflow](https://img.shields.io/badge/Git-Workflow-2563eb?style=for-the-badge)
+![Automation Loops](https://img.shields.io/badge/Automation-Loops-2563eb?style=for-the-badge)
+![Git Workflow](https://img.shields.io/badge/Git-Workflow-047857?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> A small Codex skill bundle for adversarial review gates, beta multi-agent orchestration, safe Git branch cleanup, and practical PR feedback triage.
+> A small Codex skill bundle for adversarial review gates, bounded Codex automation loops, beta multi-agent orchestration, safe Git branch cleanup, and practical PR feedback triage.
 
 ## 📌 Overview
 
@@ -18,16 +19,17 @@ The main skill in this repo is `codex-adversarial-gate`. It keeps implementation
 2. A critic reviews that `PASS` and returns `AGREE_PASS`.
 3. Both exact review outputs are archived under `docs/Adversarial Reviews/`.
 
-The repo also includes utility skills for beta multi-worktree orchestration, safe merged-branch cleanup, and PR review feedback triage.
+The repo also includes utility skills for writing bounded Codex loops, beta multi-worktree orchestration, safe merged-branch cleanup, and PR review feedback triage.
 
 ## ✨ Skills
 
 - 🧠 **codex-adversarial-gate** gates plan and implementation closeout with reviewer-plus-critic evidence.
+- 🔁 [**writing-codex-loops**](docs/writing-codex-loops.md) designs or creates bounded Codex automations, heartbeats, retry loops, and follow-up workflows.
 - 🧭 [**multi-phase-orchestrator** (beta)](docs/multi-phase-orchestrator.md#multi-phase-orchestrator-beta) coordinates multiple work units through fresh Codex worktree threads.
 - 🌿 **git-clean-merged-branch** returns a repo to its default branch and deletes merged local and remote branches after safety checks.
 - 🔎 **triage-review-comments** inventories PR comments, removes noise, deduplicates findings, and classifies real review work.
 - 🧾 **Codex marketplace plugin** exposes the bundle through `plugins/codex-skills`.
-- ✅ **Install smoke tests** verify the adversarial gate installer and custom-agent copy flow.
+- ✅ **Install smoke tests** verify the bundle installer, shipped skill copies, and adversarial gate custom-agent flow.
 
 ## 🧰 What Is Included
 
@@ -43,7 +45,8 @@ The repo also includes utility skills for beta multi-worktree orchestration, saf
 │   ├── multi-phase-orchestrator.md
 │   ├── reference.md
 │   ├── triage-review-comments.md
-│   └── usage.md
+│   ├── usage.md
+│   └── writing-codex-loops.md
 ├── plugins/
 │   └── codex-skills/
 │       ├── .codex-plugin/
@@ -56,7 +59,8 @@ The repo also includes utility skills for beta multi-worktree orchestration, saf
     ├── codex-adversarial-gate/
     ├── git-clean-merged-branch/
     ├── multi-phase-orchestrator/
-    └── triage-review-comments/
+    ├── triage-review-comments/
+    └── writing-codex-loops/
 ```
 
 ## 🧩 Codex Marketplace
@@ -74,10 +78,10 @@ If you use `codex-adversarial-gate`, also install the skill with the `skills` CL
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
-bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
+bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
 ```
 
-Marketplace install exposes `codex-adversarial-gate`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`.
+Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`.
 
 The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
@@ -87,6 +91,12 @@ Run the adversarial completion gate:
 
 ```text
 Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
+```
+
+Design or create a bounded Codex loop:
+
+```text
+Use $writing-codex-loops to create a heartbeat that checks this PR every 10 minutes until CI passes, fails repeatedly, or needs owner input.
 ```
 
 Clean up a branch after GitHub merge:
@@ -112,6 +122,7 @@ Use $multi-phase-orchestrator to coordinate these work units with fresh worktree
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
 - [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
+- [Writing Codex Loops](docs/writing-codex-loops.md)
 - [Multi-Phase Orchestrator](docs/multi-phase-orchestrator.md)
 - [Reference](docs/reference.md)
 - [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
@@ -135,12 +146,18 @@ Install the repo skills for Codex with the `skills` CLI:
 npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
 ```
 
-The `skills` CLI stores global Codex skill copies under `~/.agents/skills/`.
+The `skills` CLI stores global Codex skill copies under `~/.codex/skills/` when installed with `--agent codex`.
 
 If you use `codex-adversarial-gate`, also run its agent installer:
 
 ```bash
-bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
+bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
+```
+
+From a trusted local checkout, install all repo skills into `${CODEX_HOME:-$HOME/.codex}` and install the adversarial gate custom agents:
+
+```bash
+bash scripts/install.sh
 ```
 
 ### Install A Skill
@@ -149,13 +166,19 @@ Install `codex-adversarial-gate`:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
-bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
+bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
 ```
 
 Install `git-clean-merged-branch`:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
+```
+
+Install `writing-codex-loops`:
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill writing-codex-loops
 ```
 
 Install `triage-review-comments`:
@@ -188,6 +211,7 @@ bash -n skills/codex-adversarial-gate/scripts/install.sh
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/writing-codex-loops
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
@@ -204,7 +228,7 @@ plugin-eval analyze plugins/codex-skills --format markdown
 
 ## 🤝 Contributing
 
-Contributions should keep each skill small, installable, and generic. Changes to `codex-adversarial-gate` should preserve the central invariant: implementation work is not complete until reviewer `PASS`, critic `AGREE_PASS`, and both exact review outputs are archived.
+Contributions should keep each skill small, installable, and generic. Changes to shipped skills should keep source and plugin mirror copies synchronized. Changes to `codex-adversarial-gate` should preserve the central invariant: implementation work is not complete until reviewer `PASS`, critic `AGREE_PASS`, and both exact review outputs are archived.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
 

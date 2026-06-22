@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Codex Loops"
+  short_description: "Create bounded Codex automation loops"
+  default_prompt: "Use $writing-codex-loops to create a bounded Codex automation loop with state, cadence, validation, and stop conditions."
