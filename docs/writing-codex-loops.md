@@ -16,8 +16,6 @@ The skill turns vague loop requests into a concrete loop contract. A good loop n
 
 If the user asks for a loop that should actually run, the skill should create or update a Codex Automation. If the user asks only for a draft, it should return a loop contract without creating an automation.
 
-Actual automation creation depends on the Codex automation tool being available in the current environment. If the tool is unavailable, the skill should return `BLOCKED_AUTOMATION_TOOL_UNAVAILABLE`, include the complete loop contract, and say that no automation was created.
-
 ## Before You Start
 
 You need:
@@ -25,7 +23,6 @@ You need:
 - the `writing-codex-loops` skill installed;
 - a clear goal or workflow to loop over;
 - a source of truth for live state, such as a thread, repo path, PR, issue, dashboard, logs, or external API;
-- an available Codex automation tool, if the loop should actually be scheduled;
 - enough permission context to know whether the loop may create an automation, edit files, post comments, run checks, or ask before acting.
 
 The skill should stop and ask when the loop would require destructive actions, broad scope expansion, paid operations, credentials, unclear product judgment, or security tradeoffs.

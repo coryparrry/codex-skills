@@ -77,8 +77,6 @@ The skill should classify the request before acting:
 4. Independent recurring project scans need durable state outside chat context.
 5. Immediate repetition in the current turn is an in-thread loop, not an automation.
 
-If the Codex automation tool is unavailable, the skill should return the loop contract with `BLOCKED_AUTOMATION_TOOL_UNAVAILABLE` and state that no automation was created.
-
 Every loop should include live observation, progress checks, idempotency, retry limits, success stops, blocked stops, and a concrete escalation question.
 
 ## Coordinate Multiple Work Units

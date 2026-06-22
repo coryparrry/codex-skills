@@ -14,8 +14,8 @@ If the request depends on unfamiliar loop theory, read [references/loop-principl
 ## Workflow
 
 1. Classify the user's intent.
-   - Actual loop request: "create", "set up", "watch", "monitor", "keep checking", "wake up", "check back", "continue later", "make sure it loops", or any recurring/scheduled wording means create or update a Codex Automation with the available automation tool.
-   - Draft-only request: "write a prompt", "draft", "design", "what would it do", or "do not create" means return a loop contract and do not call automation tools.
+   - Actual loop request: "create", "set up", "watch", "monitor", "keep checking", "wake up", "check back", "continue later", "make sure it loops", or any recurring/scheduled wording means create or update a Codex Automation with `automation_update`.
+   - Draft-only request: "write a prompt", "draft", "design", "what would it do", or "do not create" means return a loop contract and do not call `automation_update`.
    - Same thread context or sub-hour follow-up: thread automation / heartbeat.
    - Independent recurring run, multi-project scan, or Triage findings: standalone/project automation.
    - Immediate work inside this turn only: in-thread work loop, not an automation.
@@ -71,11 +71,9 @@ Do not:
 ```
 
 4. For actual loop requests, create or update the automation.
-   - Resolve the available Codex automation tool first. In Codex Desktop, search for `automation_update` if it is not already in the active tool surface.
-   - If no automation tool is available, do not claim the loop exists. Return the loop contract and stop blocked with the exact missing capability and the command/user action needed to create it later.
-   - When the tool is available, use it; do not stop after drafting a prompt.
-   - For same-thread follow-up, create a heartbeat automation with `destination=thread`.
-   - For independent recurring project/workspace jobs, create a cron/project automation with `cwds` and the correct execution environment.
+   - Use `automation_update`; do not stop after drafting a prompt.
+   - For same-thread follow-up, call `automation_update` with `kind=heartbeat` and `destination=thread`.
+   - For independent recurring project/workspace jobs, call `automation_update` with `kind=cron`, `cwds`, and the correct execution environment.
    - Prefer `suggested_create` or `suggested_update` when proposing worktree automations with local environment setup config.
    - Inspect existing automations first when the user asks to change an existing loop, and update rather than duplicating.
    - Make prompts durable: describe each wake-up action, reporting threshold, stop condition, and when to ask.
@@ -134,8 +132,6 @@ Do not:
 ```
 
 If the user asked to make this loop run, create a heartbeat automation with this prompt. Do not merely paste the contract back to the user.
-
-If the automation tool is unavailable, report `BLOCKED_AUTOMATION_TOOL_UNAVAILABLE`, include the complete loop contract, and say that no automation was created.
 
 ## Common Mistakes
 
