@@ -12,6 +12,7 @@ handover.md
 **/*.local.md
 
 # Local Codex/agent artifacts
+.superpowers/sdd/
 .superpowers/ssd/
 .codex-local/
 **/.codex-local/
