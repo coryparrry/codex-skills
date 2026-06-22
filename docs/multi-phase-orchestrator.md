@@ -293,3 +293,4 @@ The quality of the run depends heavily on the input packet. If the work source, 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Writing Codex Loops](writing-codex-loops.md)

@@ -107,3 +107,4 @@ skills/git-clean-merged-branch/
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
+- [Writing Codex Loops](writing-codex-loops.md)

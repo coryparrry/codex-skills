@@ -21,7 +21,7 @@ Install with the skill script because the marketplace install does not copy the 
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
-bash ~/.agents/skills/codex-adversarial-gate/scripts/install.sh
+bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
 ```
 
 ## Use The Gate For Implementation Closeout
@@ -141,3 +141,4 @@ skills/codex-adversarial-gate/
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Writing Codex Loops](writing-codex-loops.md)

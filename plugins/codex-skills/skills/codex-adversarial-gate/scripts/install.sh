@@ -79,7 +79,7 @@ Install the skill first:
   npx skills add coryparrry/codex-skills --global --agent codex --skill $SKILL_NAME
 
 Then run:
-  bash ~/.agents/skills/$SKILL_NAME/scripts/install.sh
+  bash "\${CODEX_HOME:-\$HOME/.codex}/skills/$SKILL_NAME/scripts/install.sh"
 EOF
   exit 1
 fi
