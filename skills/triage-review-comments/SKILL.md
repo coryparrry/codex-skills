@@ -24,7 +24,7 @@ The report must include:
 - prevention guidance for every real, non-ignored finding
 - a review fix brief for every `Fix now` item
 - approved-execution status when the user gives the go-ahead to fix review comments
-- resolved-thread actions or blockers when thread resolution is relevant
+- resolved-thread actions, remote refetch evidence, or blockers when thread resolution is relevant
 - deferred tracking actions or blockers when deferred work is real
 
 Security boundary, authorization, permission, data loss, privacy, and cross-workspace isolation bugs default to `Fix now` when reachable from current code.
@@ -74,10 +74,13 @@ Security boundary, authorization, permission, data loss, privacy, and cross-work
 
 9. Approved-fix workflow after the user gives the go-ahead.
    - Hand the verified `Fix now`, `Fix if cheap`, `Defer`, and `Ignore` decisions to `$ce-resolve-pr-feedback` as the PR feedback execution lane.
+   - Give `$ce-resolve-pr-feedback` an explicit closeout requirement: after each fixed inline review thread is implemented, validated, and visible in the current PR state, it must reply to the thread when a reply surface is available, resolve the GitHub review thread, refetch the thread, and report the fetched resolved state.
    - Fix every verified `Fix now` item.
    - Fix every verified `Fix if cheap` item when the patch remains small, low-risk, and inside the reviewed scope; if it stops being cheap, move it to `Defer` and record why.
    - Add the prevention test/check for each fixed item before or alongside the implementation when practical.
    - Validate every touched surface with the repo's own commands; do not claim completion from one unrelated passing lane.
+   - Do not stop at a local patch, commit, or push when an open inline review thread was fixed. Resolve every high-confidence fixed thread remotely, or list it under `Should resolve but not resolved` with the exact blocker, such as missing GitHub authentication, missing thread ID, ambiguous thread state, no push permission, or a failed mutation.
+   - Refetch GitHub review-thread state after every resolve attempt. Count a thread as resolved only when the refetch shows `isResolved: true` or GitHub already showed it resolved before the run.
    - For Binder deferred items, create or update `docs/Deferred bugs.md` in the Binder repo. If `docs/` or the file does not exist, create them.
    - Write Binder deferred items as a Markdown checklist so a later Codex run can check them off when resolved.
    - Do not add false positives, stale claims, duplicates, preference-only comments, or unverified concerns to deferred tracking.
@@ -162,10 +165,10 @@ For every `Fix now` item, include:
 - <title> - <reason, including false-positive/stale/unverified basis>
 
 ## Review threads resolved
-- <thread/comment title> - <already resolved or resolved during this run>
+- <thread/comment title> - <already resolved or resolved during this run; include reply/resolve/refetch evidence when resolved during this run>
 
 ## Should resolve but not resolved
-- <thread/comment title> - <why fixed and why not resolved remotely>
+- <thread/comment title> - <why fixed and why not resolved remotely; include the exact blocker and the next command/action needed>
 
 ## Prevention tests
 - <title> - <test/check type, location, and failure it catches>
@@ -206,6 +209,7 @@ gh issue list --search '<repo/pr keywords>' --state open --json number,title,url
 ```
 
 Do not call a review thread resolved unless GitHub already had it resolved or the resolve operation succeeded.
+After approved fixes, do not call the GitHub portion complete until fixed inline threads have been replied to when possible, resolved remotely, refetched, and reported, or explicitly listed as blocked.
 
 ## Worked Example
 
@@ -220,7 +224,7 @@ See [EXAMPLE.md](references/EXAMPLE.md) for a claim -> code verification -> buck
 - Unverified claims are not actionable findings.
 - Pull current PR comments first when possible.
 - Prove inventory completeness before trusting final counts.
-- Actually resolve high-confidence fixed inline review threads when tooling is available.
+- Actually reply to, resolve, refetch, and report high-confidence fixed inline review threads when tooling is available.
 - Create or link Linear issues only for real deferred non-Binder work.
 - For Binder, record real deferred bugs in `docs/Deferred bugs.md` as checklist items after the user approves fixes.
 - Use `$ce-resolve-pr-feedback` for approved PR review feedback execution; do not use `$binder-review-fix` as the automatic follow-on from this skill.
