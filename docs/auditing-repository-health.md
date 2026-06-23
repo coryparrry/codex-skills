@@ -1,12 +1,12 @@
 # Audit Repository Health
 
-This how-to guide explains how to use `auditing-repository-health` to check whether a repository is ready for safe repeated work.
+This how-to guide explains how to use `auditing-repository-health` to run a read-only audit of whether a repository has the foundations needed for safe repeated work.
 
 ## Purpose
 
 Use this skill before onboarding, planning, coding, debugging, cleanup, packaging, release, CI repair, or adding another shipped skill.
 
-The audit checks:
+The bundled auditor checks:
 
 - live Git and worktree state;
 - repository instructions and entry points;
@@ -14,7 +14,7 @@ The audit checks:
 - validation and packaging surfaces;
 - generated-file and ignore hygiene;
 - repository size or history risks;
-- documentation rendering, stale docs, and public/private leakage risks.
+- documentation links, duplicate docs, and public/private leakage risks.
 
 ## Install The Skill
 
@@ -34,6 +34,18 @@ From inside the repository you want audited, ask Codex:
 Use $auditing-repository-health to audit this repository before starting work.
 ```
 
+The skill runs the bundled script first:
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/auditing-repository-health/scripts/audit_repository_health.py" --repo "$PWD"
+```
+
+For automation, use JSON output:
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/auditing-repository-health/scripts/audit_repository_health.py" --repo "$PWD" --format json
+```
+
 For missing script checks, ask:
 
 ```text
@@ -48,7 +60,11 @@ Expected sections:
 
 - `Verdict`
 - `Findings`
-- `Operating Surface`
+- `Repository Shape`
+- `Documentation`
+- `Scripts`
+- `Validation`
+- `Packaging`
 - `Hygiene`
 - `Commands Run`
 - `Not Checked`
@@ -57,7 +73,7 @@ Expected sections:
 
 ## Script Readiness
 
-The skill uses the scripts-to-rule-them-all pattern as a reference vocabulary, not a mandatory structure. It maps the repo's actual commands to equivalent responsibilities:
+The auditor uses the scripts-to-rule-them-all pattern as a reference vocabulary, not a mandatory structure. It maps the repo's actual commands to equivalent responsibilities:
 
 | Responsibility | Common script name |
 |---|---|
@@ -69,7 +85,7 @@ The skill uses the scripts-to-rule-them-all pattern as a reference vocabulary, n
 | Run the CI or closeout gate | `script/cibuild` |
 | Open a project console | `script/console` |
 
-If the repo uses `scripts/test_install.sh`, `npm test`, `make validate`, `just ci`, or another local convention, the skill should respect that convention and report missing equivalents rather than forcing new names.
+If the repo uses `scripts/test_install.sh`, `npm test`, `make validate`, or another local convention, the auditor should respect that convention and report missing equivalents rather than forcing new names.
 
 ## What The Skill Will Not Do
 
@@ -88,6 +104,10 @@ skills/auditing-repository-health/
   SKILL.md
   agents/
     openai.yaml
+  scripts/
+    audit_repository_health.py
+  tests/
+    test_audit_repository_health.py
 ```
 
 ## Related Docs

@@ -15,6 +15,7 @@ assert_installed() {
 
   test -f "$codex_home/skills/auditing-repository-health/SKILL.md"
   test -f "$codex_home/skills/auditing-repository-health/agents/openai.yaml"
+  test -f "$codex_home/skills/auditing-repository-health/scripts/audit_repository_health.py"
   test -f "$codex_home/skills/codex-adversarial-gate/SKILL.md"
   test -f "$codex_home/skills/codex-adversarial-gate/agents/openai.yaml"
   test -f "$codex_home/skills/git-clean-merged-branch/SKILL.md"

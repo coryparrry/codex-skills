@@ -90,7 +90,7 @@ Ask:
 Use $auditing-repository-health to audit this repository before starting work.
 ```
 
-The skill should inspect live repo state, instructions, existing scripts, validation commands, package surfaces, ignore hygiene, repo size/history risk, and docs rendering health. It should report a readiness verdict, ranked findings, mapped script responsibilities, commands run, and anything not checked.
+The skill runs a bundled read-only audit script over live repo state, instructions, existing scripts, validation commands, package surfaces, ignore hygiene, repo size/history risk, and docs link health. It reports a readiness verdict, ranked findings, mapped script responsibilities, commands run, and anything not checked.
 
 For missing standard scripts, ask:
 

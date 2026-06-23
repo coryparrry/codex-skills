@@ -66,7 +66,7 @@ You can also install through the Codex app by adding this repository as a market
 
 **The problem.** A clean branch or one passing test can hide missing setup scripts, undocumented validation gates, source/package drift, generated-file churn, stale docs, or repo-size problems.
 
-**The fix.** Use [`auditing-repository-health`](docs/auditing-repository-health.md). It audits live Git state, normalized script responsibilities, validation surfaces, packaging/mirror health, generated-file hygiene, docs rendering, and size/history risks before work starts.
+**The fix.** Use [`auditing-repository-health`](docs/auditing-repository-health.md). It runs a read-only audit of live Git state, normalized script responsibilities, validation surfaces, packaging/mirror health, generated-file hygiene, docs links, and size/history risks before work starts.
 
 ### #6: Merged Branch Cleanup Is Easy To Get Wrong
 
@@ -224,10 +224,14 @@ python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/writing-codex-loops
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/auditing-repository-health
+python3 skills/auditing-repository-health/tests/test_audit_repository_health.py
+python3 skills/auditing-repository-health/scripts/audit_repository_health.py --repo . --format json | python3 -m json.tool >/dev/null
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
-  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py \
+  skills/auditing-repository-health/scripts/audit_repository_health.py \
+  skills/auditing-repository-health/tests/test_audit_repository_health.py
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 git diff --check
 ```

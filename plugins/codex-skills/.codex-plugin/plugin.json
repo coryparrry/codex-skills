@@ -33,7 +33,7 @@
     "privacyPolicyURL": "https://github.com/coryparrry/codex-skills/security/policy",
     "termsOfServiceURL": "https://github.com/coryparrry/codex-skills/blob/main/LICENSE",
     "defaultPrompt": [
-      "Use auditing-repository-health before repo work to check scripts, validation, hygiene, docs, and packaging.",
+      "Use auditing-repository-health before repo work to run the read-only repo health audit.",
       "Use codex-adversarial-gate for closeout evidence and triage-review-comments for PR feedback.",
       "Use writing-codex-loops for automations; multi-phase-orchestrator for beta work; git-clean-merged-branch after merges."
     ],
