@@ -67,18 +67,17 @@ Security boundary, authorization, permission, data loss, privacy, and cross-work
 
 8. If asked to fix review comments, implement only after triage.
    - Treat "go ahead", "fix them", "do it", or equivalent approval after a triage report as permission to execute the approved-fix workflow.
-   - For PR review feedback execution, use `$ce-resolve-pr-feedback` after this triage has proven which items are real.
-   - Do not route this approved PR feedback workflow to `$binder-review-fix`; that skill is not the default executor for triaged PR review comments.
+   - Execute the approved-fix workflow in this skill. Do not depend on another review-feedback skill being installed.
    - Do not write code just to satisfy a review comment that is not proven true in the current code.
    - Do not resolve a `Fix now` or `Fix if cheap` review thread until the fix is implemented and validated.
 
 9. Approved-fix workflow after the user gives the go-ahead.
-   - Hand the verified `Fix now`, `Fix if cheap`, `Defer`, and `Ignore` decisions to `$ce-resolve-pr-feedback` as the PR feedback execution lane.
-   - Give `$ce-resolve-pr-feedback` an explicit closeout requirement: after each fixed inline review thread is implemented, validated, and visible in the current PR state, it must reply to the thread when a reply surface is available, resolve the GitHub review thread, refetch the thread, and report the fetched resolved state.
+   - Use the verified `Fix now`, `Fix if cheap`, `Defer`, and `Ignore` decisions from the triage report as the execution scope.
    - Fix every verified `Fix now` item.
    - Fix every verified `Fix if cheap` item when the patch remains small, low-risk, and inside the reviewed scope; if it stops being cheap, move it to `Defer` and record why.
    - Add the prevention test/check for each fixed item before or alongside the implementation when practical.
    - Validate every touched surface with the repo's own commands; do not claim completion from one unrelated passing lane.
+   - After each fixed inline review thread is implemented, validated, and visible in the current PR state, reply to the thread when a reply surface is available, resolve the GitHub review thread, refetch the thread, and report the fetched resolved state.
    - Do not stop at a local patch, commit, or push when an open inline review thread was fixed. Resolve every high-confidence fixed thread remotely, or list it under `Should resolve but not resolved` with the exact blocker, such as missing GitHub authentication, missing thread ID, ambiguous thread state, no push permission, or a failed mutation.
    - Refetch GitHub review-thread state after every resolve attempt. Count a thread as resolved only when the refetch shows `isResolved: true` or GitHub already showed it resolved before the run.
    - For Binder deferred items, create or update `docs/Deferred bugs.md` in the Binder repo. If `docs/` or the file does not exist, create them.
@@ -227,5 +226,5 @@ See [EXAMPLE.md](references/EXAMPLE.md) for a claim -> code verification -> buck
 - Actually reply to, resolve, refetch, and report high-confidence fixed inline review threads when tooling is available.
 - Create or link Linear issues only for real deferred non-Binder work.
 - For Binder, record real deferred bugs in `docs/Deferred bugs.md` as checklist items after the user approves fixes.
-- Use `$ce-resolve-pr-feedback` for approved PR review feedback execution; do not use `$binder-review-fix` as the automatic follow-on from this skill.
+- Execute approved PR review feedback directly from this skill; do not route to another skill unless the user explicitly asks for that workflow.
 - Do not write patches unless explicitly asked.
