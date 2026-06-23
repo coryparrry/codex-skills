@@ -90,12 +90,12 @@ Ask:
 Use $auditing-repository-health to audit this repository before starting work.
 ```
 
-The skill runs a bundled read-only audit script over live repo state, instructions, existing scripts, validation commands, package surfaces, ignore hygiene, repo size/history risk, and docs link health. It reports a readiness verdict, ranked findings, mapped script responsibilities, commands run, and anything not checked.
+The skill runs a bundled read-only audit script over live repo state, instructions, existing scripts, validation commands, package surfaces, ignore hygiene, repo size/history risk, and docs link health. It reports a readiness verdict, ranked findings, script responsibilities classified as `present`, `documented`, `missing`, or `not_applicable`, commands run, and anything not checked.
 
 For missing standard scripts, ask:
 
 ```text
-Use $auditing-repository-health to check whether this repo has the standard scripts needed for onboarding, testing, validation, and shipping.
+Use $auditing-repository-health to check whether this repo has the setup, testing, validation, and shipping responsibilities it actually needs.
 ```
 
 The skill uses script/bootstrap, setup, update, server, test, cibuild, and console as a reference vocabulary, but it should map to the repo's existing conventions rather than forcing those exact names.

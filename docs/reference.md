@@ -83,7 +83,7 @@ Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `mu
 | `codex-adversarial-gate` | Gate plan and implementation closeout with reviewer-plus-critic evidence | `SKILL.md`, `agents/`, `references/`, `scripts/`, `templates/` |
 | `writing-codex-loops` | Design or create bounded Codex work loops and automations | `SKILL.md`, `agents/openai.yaml`, `references/loop-principles.md` |
 | `multi-phase-orchestrator` | Beta orchestration for related work units across fresh worktree threads | `SKILL.md`, `agents/openai.yaml` |
-| `auditing-repository-health` | Run a read-only repo readiness audit for scripts, validation, hygiene, docs, and packaging surfaces | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
+| `auditing-repository-health` | Run a read-only repo readiness audit for scripts, validation, hygiene, docs, and packaging surfaces | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/clean_merged_branch.sh` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/triage-review-comments.md` |
 

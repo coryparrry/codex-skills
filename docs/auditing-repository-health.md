@@ -46,10 +46,10 @@ For automation, use JSON output:
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/auditing-repository-health/scripts/audit_repository_health.py" --repo "$PWD" --format json
 ```
 
-For missing script checks, ask:
+For script responsibility checks, ask:
 
 ```text
-Use $auditing-repository-health to check whether this repo has the standard scripts needed for onboarding, testing, validation, and shipping.
+Use $auditing-repository-health to check whether this repo has the setup, testing, validation, and shipping responsibilities it actually needs.
 ```
 
 ## Understand The Output
@@ -69,11 +69,11 @@ Expected sections:
 - `Commands Run`
 - `Not Checked`
 
-`Ready to proceed: conditional` is acceptable when no blocker exists but the repo is missing a script, validation lane, docs check, or package-surface guard that should be fixed soon.
+`Ready to proceed: conditional` is acceptable when no blocker exists but the repo is missing an applicable script responsibility, validation lane, docs check, or package-surface guard that should be fixed soon.
 
 ## Script Readiness
 
-The auditor uses the scripts-to-rule-them-all pattern as a reference vocabulary, not a mandatory structure. It maps the repo's actual commands to equivalent responsibilities:
+The auditor uses the scripts-to-rule-them-all pattern as a reference vocabulary, not a mandatory structure. It maps the repo's actual commands to equivalent responsibilities and reports each as `present`, `documented`, `missing`, or `not_applicable`:
 
 | Responsibility | Common script name |
 |---|---|
@@ -85,7 +85,9 @@ The auditor uses the scripts-to-rule-them-all pattern as a reference vocabulary,
 | Run the CI or closeout gate | `script/cibuild` |
 | Open a project console | `script/console` |
 
-If the repo uses `scripts/test_install.sh`, `npm test`, `make validate`, or another local convention, the auditor should respect that convention and report missing equivalents rather than forcing new names.
+If the repo uses `scripts/test_install.sh`, `npm test`, `make validate`, `./tools/doit --all`, or another local convention, the auditor should respect that convention and report only responsibilities that appear applicable but uncovered.
+
+See `references/script-responsibilities.md` inside the skill for the exact status meanings and applicability rules.
 
 ## What The Skill Will Not Do
 
@@ -104,6 +106,8 @@ skills/auditing-repository-health/
   SKILL.md
   agents/
     openai.yaml
+  references/
+    script-responsibilities.md
   scripts/
     audit_repository_health.py
   tests/

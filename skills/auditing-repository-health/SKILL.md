@@ -35,7 +35,7 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/auditing-repository-health/scripts/a
 |---|---|
 | Repository shape | README, instructions, docs, manifests, scripts directories, CI metadata, contribution/security surfaces. |
 | Documentation | Markdown files, broken local Markdown links, duplicate-looking docs, unresolved public markers. |
-| Scripts | `bootstrap`, `setup`, `update`, `server`, `test`, `cibuild`, and `console` responsibilities mapped to existing `script/`, `scripts/`, `package.json`, or `Makefile` equivalents. |
+| Scripts | `bootstrap`, `setup`, `update`, `server`, `test`, `cibuild`, and `console` responsibilities classified as `present`, `documented`, `missing`, or `not_applicable`. |
 | Validation | Focused tests, reusable full-gate candidates, CI workflow presence, shell/Python test inventory. |
 | Packaging | Skill source folders, `agents/openai.yaml`, and `plugins/codex-skills/skills` mirror parity when this is a skill repo. |
 | Hygiene | Branch, dirty/untracked state, tracked generated files, ignored file sample, largest tracked files, Git object summary. |
@@ -67,6 +67,8 @@ After running the script:
 2. Map script gaps to the repo's own conventions before proposing new names.
 3. Keep `Not Checked` in the final audit; do not convert skipped network, install, or mutation checks into implied pass/fail results.
 4. For skill/plugin repos, verify source and plugin mirror changes stay synchronized.
+
+If script status looks ambiguous, read `references/script-responsibilities.md` before recommending fixes.
 
 ## Common Mistakes
 

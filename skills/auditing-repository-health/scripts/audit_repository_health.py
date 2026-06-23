@@ -10,6 +10,7 @@ import os
 import re
 import shlex
 import subprocess
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -113,6 +114,187 @@ PACKAGE_SCRIPT_MAP = {
     "test": {"test", "test:unit", "test:ci"},
     "cibuild": {"ci", "cibuild", "validate", "preflight", "build"},
     "console": {"console", "repl"},
+}
+
+PACKAGE_MANAGER_DIRECT_SCRIPTS = {"build", "cibuild", "dev", "lint", "preflight", "start", "test", "validate"}
+
+PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES = {
+    "npm": {"start", "test"},
+    "pnpm": PACKAGE_MANAGER_DIRECT_SCRIPTS,
+    "yarn": PACKAGE_MANAGER_DIRECT_SCRIPTS,
+    "bun": PACKAGE_MANAGER_DIRECT_SCRIPTS,
+}
+
+UNSUPPORTED_DIRECT_SCRIPT = "__unsupported_direct_package_script__"
+
+PACKAGE_MANAGER_BUILTIN_COMMANDS = {
+    "npm": {"audit", "ci", "dedupe", "exec", "fund", "init", "install", "outdated", "pack", "publish", "update"},
+    "pnpm": {
+        "add", "audit", "dedupe", "deploy", "dlx", "exec", "fetch", "import", "install", "outdated",
+        "pack", "publish", "update",
+    },
+    "yarn": {
+        "add", "audit", "dedupe", "dlx", "exec", "import", "info", "init", "install", "outdated",
+        "pack", "publish", "remove", "set", "up", "upgrade",
+    },
+    "bun": {"add", "audit", "create", "install", "outdated", "pm", "publish", "remove", "update", "upgrade"},
+}
+
+PACKAGE_MANAGER_DIRECTORY_OPTIONS = {
+    "npm": {"--prefix"},
+    "pnpm": {"-C", "--dir"},
+    "yarn": {"--cwd"},
+    "bun": {"--cwd"},
+}
+
+PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
+    "--frozen-lockfile",
+    "--if-present",
+    "--ignore-scripts",
+    "--immutable",
+    "--offline",
+    "--prefer-offline",
+    "--silent",
+}
+
+CUSTOM_COMMAND_WORDS = {
+    "bootstrap": {"bootstrap", "install"},
+    "setup": {"setup", "doctor"},
+    "update": {"update", "upgrade", "sync"},
+    "server": {"server", "serve", "start", "dev"},
+    "test": {"test", "tests", "spec", "check", "checks", "verify", "prove"},
+    "cibuild": {"ci", "cibuild", "validate", "validation", "preflight", "release", "gate", "all"},
+    "console": {"console", "repl", "shell"},
+}
+
+EXPLICIT_TEST_WORDS = {"test", "tests", "spec"}
+
+COMMAND_FILE_EXTENSIONS = {
+    ".bash",
+    ".cjs",
+    ".command",
+    ".fish",
+    ".js",
+    ".mjs",
+    ".php",
+    ".pl",
+    ".ps1",
+    ".py",
+    ".rb",
+    ".sh",
+    ".swift",
+    ".ts",
+    ".zsh",
+}
+
+NON_COMMAND_FILE_SUFFIXES = {
+    ".cfg",
+    ".conf",
+    ".disabled",
+    ".example",
+    ".ini",
+    ".json",
+    ".jsonl",
+    ".lock",
+    ".markdown",
+    ".md",
+    ".rst",
+    ".sample",
+    ".template",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+
+DOC_RESPONSIBILITY_KEYWORDS = {
+    "bootstrap": ("bootstrap", "install", "dependencies", "dependency"),
+    "setup": ("setup", "set up", "fresh clone", "working state", "doctor"),
+    "update": ("update", "upgrade", "sync", "after pulling"),
+    "server": ("server", "serve", "start", "dev", "run locally", "local app"),
+    "test": ("test", "tests", "check", "checks", "verify", "prove", "spec"),
+    "cibuild": ("ci", "validate", "validation", "preflight", "release gate", "full gate", "closeout"),
+    "console": ("console", "repl", "shell"),
+}
+
+COMMAND_PREFIXES = (
+    "./",
+    "bash ",
+    "sh ",
+    "python ",
+    "python3 ",
+    "npm ",
+    "pnpm ",
+    "yarn ",
+    "bun ",
+    "npx ",
+    "make ",
+    "just ",
+    "go ",
+    "cargo ",
+    "swift ",
+    "bundle ",
+    "rails ",
+    "rake ",
+    "docker ",
+    "uv ",
+    "pytest",
+    "tox ",
+    "script/",
+    "scripts/",
+    "bin/",
+    "tools/",
+)
+
+INTERPRETER_COMMANDS = {
+    "bash",
+    "sh",
+    "python",
+    "python3",
+    "ruby",
+    "node",
+    "bun",
+}
+
+DEPENDENCY_MANIFESTS = {
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "Cargo.toml",
+    "go.mod",
+    "Gemfile",
+    "Package.swift",
+    "pom.xml",
+    "build.gradle",
+}
+
+CODE_EXTENSIONS = {
+    ".bash",
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".go",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".m",
+    ".php",
+    ".py",
+    ".rb",
+    ".rs",
+    ".sh",
+    ".swift",
+    ".ts",
+    ".tsx",
+}
+
+SERVER_MARKERS = {
+    "Dockerfile",
+    "docker-compose.yml",
+    "compose.yml",
+    "Procfile",
 }
 
 
@@ -322,27 +504,60 @@ class Audit:
 
     def check_scripts(self, root: Path) -> Dict[str, Any]:
         package_scripts = read_package_scripts(root / "package.json")
-        make_targets = read_make_targets(root / "Makefile")
+        package_script_sources = read_package_script_sources(root)
+        make_targets_by_file = read_root_make_targets(root)
+        make_targets = flatten_target_sources(make_targets_by_file)
+        just_targets = read_just_targets(root)
+        documented_commands, stale_documented_commands = discover_documented_commands(
+            root,
+            package_scripts,
+            make_targets,
+            just_targets,
+        )
+        custom_commands = discover_custom_command_files(root)
+        needs = infer_responsibility_needs(root, package_scripts, make_targets, just_targets)
         responsibilities: Dict[str, Dict[str, Any]] = {}
+
+        if stale_documented_commands:
+            self.add_finding(
+                "P2",
+                "documented command target missing",
+                stale_documented_commands[:10],
+                "Docs name repo-local commands that do not exist, so the audit cannot treat them as coverage.",
+                "Fix the documented command path or add the missing repo-local command.",
+            )
 
         for responsibility, candidates in RESPONSIBILITY_PATHS.items():
             found = [path for path in candidates if (root / path).exists()]
+            found.extend(custom_commands[responsibility])
             found.extend(
-                f"package.json:{script}"
-                for script in sorted(package_scripts)
+                source
+                for script in sorted(package_script_sources)
                 if script in PACKAGE_SCRIPT_MAP[responsibility]
+                for source in package_script_sources[script]
             )
             found.extend(
-                f"Makefile:{target}"
-                for target in sorted(make_targets)
+                source
+                for target in sorted(make_targets_by_file)
+                if target in PACKAGE_SCRIPT_MAP[responsibility] or target == responsibility
+                for source in make_targets_by_file[target]
+            )
+            found.extend(
+                f"Justfile:{target}"
+                for target in sorted(just_targets)
                 if target in PACKAGE_SCRIPT_MAP[responsibility] or target == responsibility
             )
+            documented = documented_commands[responsibility]
+            status = classify_responsibility_status(found, documented, needs[responsibility])
             responsibilities[responsibility] = {
-                "status": "present" if found else "missing",
-                "candidates": sorted(found),
+                "status": status,
+                "candidates": sorted(set(found + documented)),
+                "reason": not_applicable_reason(responsibility) if status == "not_applicable" else "",
             }
 
-        if responsibilities["setup"]["status"] == "missing" and responsibilities["bootstrap"]["status"] == "missing":
+        setup_missing = responsibilities["setup"]["status"] == "missing"
+        bootstrap_missing = responsibilities["bootstrap"]["status"] == "missing"
+        if setup_missing and bootstrap_missing:
             self.add_finding(
                 "P2",
                 "no setup or bootstrap script",
@@ -371,7 +586,10 @@ class Audit:
         return {
             "responsibilities": responsibilities,
             "package_json_scripts": sorted(package_scripts),
+            "package_script_sources": dict(sorted(package_script_sources.items())),
             "make_targets": sorted(make_targets),
+            "just_targets": sorted(just_targets),
+            "documented_commands": dict(documented_commands),
         }
 
     def check_validation(self, root: Path, scripts_check: Dict[str, Any]) -> Dict[str, Any]:
@@ -383,9 +601,10 @@ class Audit:
         workflows = []
         if workflows_dir.is_dir():
             workflows = sorted(str(path.relative_to(root)) for path in workflows_dir.glob("*") if path.is_file())
-        validation_candidates = scripts_check["responsibilities"]["cibuild"]["candidates"]
+        cibuild = scripts_check["responsibilities"]["cibuild"]
+        validation_candidates = cibuild["candidates"]
 
-        if not validation_candidates and not workflows:
+        if cibuild["status"] == "missing" and not workflows:
             self.add_finding(
                 "P2",
                 "no reusable closeout gate",
@@ -400,7 +619,7 @@ class Audit:
             "ci_workflows": workflows,
             "validation_candidates": validation_candidates,
             "has_focused_tests": bool(python_tests or scripts_check["responsibilities"]["test"]["candidates"]),
-            "has_full_gate": bool(validation_candidates or workflows),
+            "has_full_gate": cibuild["status"] in {"present", "documented"} or bool(workflows),
         }
 
     def check_packaging(self, root: Path) -> Dict[str, Any]:
@@ -571,6 +790,31 @@ def read_package_scripts(path: Path) -> Dict[str, str]:
     return scripts if isinstance(scripts, dict) else {}
 
 
+def read_package_script_sources(root: Path) -> Dict[str, List[str]]:
+    sources: Dict[str, List[str]] = defaultdict(list)
+    for path in iter_files(root, "package.json"):
+        scripts = read_package_scripts(path)
+        if not scripts:
+            continue
+        rel = str(path.relative_to(root))
+        for script in sorted(scripts):
+            sources[script].append(f"{rel}:{script}")
+    return sources
+
+
+def read_root_make_targets(root: Path) -> Dict[str, List[str]]:
+    sources: Dict[str, List[str]] = defaultdict(list)
+    for name in ("Makefile", "makefile", "GNUmakefile"):
+        path = root / name
+        for target in read_make_targets(path):
+            sources[target].append(f"{name}:{target}")
+    return sources
+
+
+def flatten_target_sources(target_sources: Dict[str, List[str]]) -> List[str]:
+    return sorted(target_sources)
+
+
 def read_make_targets(path: Path) -> List[str]:
     if not path.is_file():
         return []
@@ -581,6 +825,540 @@ def read_make_targets(path: Path) -> List[str]:
         if match and not match.group(1).startswith("."):
             targets.append(match.group(1))
     return targets
+
+
+def read_just_targets(root: Path) -> List[str]:
+    for name in ("justfile", "Justfile", ".justfile"):
+        path = root / name
+        if path.is_file():
+            return read_colon_targets(path)
+    return []
+
+
+def read_colon_targets(path: Path) -> List[str]:
+    targets: List[str] = []
+    for line in safe_read_text(path).splitlines():
+        stripped = line.strip()
+        if not stripped or line[:1].isspace() or stripped.startswith("#") or ":=" in stripped:
+            continue
+        prefix = stripped.split(":", 1)[0].strip()
+        name = prefix.split()[0] if prefix else ""
+        if re.match(r"^[A-Za-z0-9_.-]+$", name) and not name.startswith("."):
+            targets.append(name)
+    return targets
+
+
+def discover_custom_command_files(root: Path) -> Dict[str, List[str]]:
+    commands: Dict[str, List[str]] = defaultdict(list)
+    for directory in ("script", "scripts", "bin", "tools"):
+        base = root / directory
+        if not base.is_dir():
+            continue
+        for path in iter_files(base):
+            if not path.is_file() or not is_command_file(path):
+                continue
+            rel = str(path.relative_to(root))
+            for responsibility in classify_command_name(path.name):
+                commands[responsibility].append(rel)
+    return commands
+
+
+def classify_command_name(name: str) -> List[str]:
+    words = set(re.split(r"[^a-z0-9]+", name.lower()))
+    words.discard("")
+    matches = []
+    for responsibility, markers in CUSTOM_COMMAND_WORDS.items():
+        if words & markers:
+            matches.append(responsibility)
+    if words & EXPLICIT_TEST_WORDS:
+        return [responsibility for responsibility in matches if responsibility == "test"]
+    return matches
+
+
+def is_command_file(path: Path) -> bool:
+    suffixes = [suffix.lower() for suffix in path.suffixes]
+    if not suffixes:
+        return True
+    if suffixes[-1] in NON_COMMAND_FILE_SUFFIXES:
+        return False
+    return suffixes[-1] in COMMAND_FILE_EXTENSIONS
+
+
+def discover_documented_commands(
+    root: Path,
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+) -> Tuple[Dict[str, List[str]], List[str]]:
+    documented: Dict[str, List[str]] = defaultdict(list)
+    stale: List[str] = []
+    for path in documented_command_files(root):
+        rel = str(path.relative_to(root))
+        in_fence = False
+        fence_context = ""
+        previous_text = ""
+        for line in safe_read_text(path, limit=300_000).splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("```", "~~~")):
+                in_fence = not in_fence
+                fence_context = previous_text if in_fence else ""
+                continue
+            if in_fence:
+                command = stripped.lstrip("$ ").strip()
+                if looks_like_command(command):
+                    record_documented_command(
+                        root,
+                        documented,
+                        stale,
+                        rel,
+                        fence_context,
+                        command,
+                        package_scripts,
+                        make_targets,
+                        just_targets,
+                    )
+                continue
+            if is_reference_command_line(line):
+                continue
+            commands = [command for command in extract_inline_commands(line) if looks_like_command(command)]
+            if not commands:
+                if stripped:
+                    previous_text = stripped
+                continue
+            for command in commands:
+                record_documented_command(
+                    root,
+                    documented,
+                    stale,
+                    rel,
+                    line,
+                    command,
+                    package_scripts,
+                    make_targets,
+                    just_targets,
+                )
+            if stripped:
+                previous_text = stripped
+    return documented, stale
+
+
+def documented_command_files(root: Path) -> Iterable[Path]:
+    root_prefixes = ("README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL")
+    nested_prefixes = ("README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL", "INSTALLATION", "USAGE")
+    for path in iter_files(root, "*.md"):
+        rel = path.relative_to(root)
+        upper_name = path.name.upper()
+        if len(rel.parts) == 1 and upper_name.startswith(root_prefixes):
+            yield path
+            continue
+        if rel.parts[0] == "docs" and upper_name.startswith(nested_prefixes):
+            yield path
+
+
+def public_markdown_files(root: Path) -> Iterable[Path]:
+    for path in iter_files(root, "*.md"):
+        if is_public_doc_path(str(path.relative_to(root))):
+            yield path
+
+
+def extract_inline_commands(line: str) -> List[str]:
+    return [match.strip().lstrip("$ ").strip() for match in re.findall(r"`([^`\n]+)`", line)]
+
+
+def record_documented_command(
+    root: Path,
+    documented: Dict[str, List[str]],
+    stale: List[str],
+    rel: str,
+    context: str,
+    command: str,
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+) -> None:
+    if documented_command_target_missing(root, command, package_scripts, make_targets, just_targets):
+        stale.append(f"{rel}:{command}")
+        return
+    for responsibility in classify_documented_command(context, command):
+        documented[responsibility].append(f"{rel}:{command}")
+
+
+def is_reference_command_line(line: str) -> bool:
+    stripped = line.lstrip()
+    if stripped.startswith("|"):
+        return True
+    lower = stripped.lower()
+    reference_phrases = (
+        "if the repo uses",
+        "if a repo uses",
+        "for example",
+        "such as",
+        "common script",
+        "common name",
+        "install this reusable skill",
+        "install the skill",
+        "marketplace install",
+        "npx skills add",
+    )
+    return any(phrase in lower for phrase in reference_phrases)
+
+
+def looks_like_command(command: str) -> bool:
+    command = command.strip()
+    lower = command.lower()
+    if "codex_home" in lower or "$home/.codex" in lower:
+        return False
+    if not command or " " not in command and "/" not in command and lower not in {"pytest", "tox"}:
+        return False
+    return lower.startswith(COMMAND_PREFIXES)
+
+
+def documented_command_target_missing(
+    root: Path,
+    command: str,
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+) -> bool:
+    if documented_package_target_missing(root, command, package_scripts, make_targets, just_targets):
+        return True
+    target = local_command_target(command)
+    if target is None:
+        return False
+    if target.startswith("./"):
+        path = root / target[2:]
+        return not path.exists() or not is_command_file(path)
+    if target.startswith(("script/", "scripts/", "bin/", "tools/")):
+        path = root / target
+        return not path.exists() or not is_command_file(path)
+    return False
+
+
+def documented_package_target_missing(
+    root: Path,
+    command: str,
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+) -> bool:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return False
+    tool = tokens[0]
+    if tool in {"npm", "pnpm", "yarn", "bun"}:
+        return package_manager_target_missing(root, tokens, package_scripts)
+    if tool == "make":
+        return make_command_target_missing(root, tokens[1:], make_targets)
+    if tool == "just":
+        target = first_non_option(tokens[1:])
+        if target is None:
+            return not any((root / name).is_file() for name in ("justfile", "Justfile", ".justfile"))
+        return target not in just_targets
+    return False
+
+
+def package_manager_target_missing(root: Path, tokens: List[str], root_package_scripts: Dict[str, str]) -> bool:
+    parsed = parse_package_manager_command(root, tokens)
+    if parsed is None:
+        return False
+    package_dir, script = parsed
+    if script is None:
+        return False
+    scripts = root_package_scripts if package_dir == root else read_package_scripts(package_dir / "package.json")
+    return script not in scripts
+
+
+def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Tuple[Path, Optional[str]]]:
+    if not tokens:
+        return None
+    tool = tokens[0]
+    directory = root
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        directory_option = package_manager_directory_option_value(tool, args, index)
+        if directory_option is not None:
+            value, next_index = directory_option
+            resolved = resolve_repo_path(root, root, value)
+            if resolved is None:
+                return None
+            directory = resolved
+            index = next_index
+            continue
+        arg = args[index]
+        if arg in PACKAGE_MANAGER_NO_VALUE_OPTIONS or (
+            arg.startswith("--") and "=" in arg and package_manager_option_name(arg) in PACKAGE_MANAGER_NO_VALUE_OPTIONS
+        ):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            return None
+        return directory, package_manager_script_from_args(tool, args[index:])
+    return directory, None
+
+
+def package_manager_directory_option_value(
+    tool: str,
+    args: List[str],
+    index: int,
+) -> Optional[Tuple[str, int]]:
+    arg = args[index]
+    options = PACKAGE_MANAGER_DIRECTORY_OPTIONS.get(tool, set())
+    if arg in options:
+        if index + 1 >= len(args):
+            return None
+        return args[index + 1], index + 2
+    for option in options:
+        if arg.startswith(f"{option}="):
+            return arg.split("=", 1)[1], index + 1
+    if tool == "pnpm" and arg.startswith("-C") and arg != "-C":
+        return arg[2:], index + 1
+    return None
+
+
+def package_manager_option_name(arg: str) -> str:
+    return arg.split("=", 1)[0]
+
+
+def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str]:
+    if not args:
+        return None
+    command = args[0]
+    if command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
+        return None
+    if command in {"run", "run-script"}:
+        return first_non_option(args[1:])
+    if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
+        return command
+    if command in PACKAGE_MANAGER_DIRECT_SCRIPTS:
+        return UNSUPPORTED_DIRECT_SCRIPT
+    return None
+
+
+def first_non_option(tokens: List[str]) -> Optional[str]:
+    for token in tokens:
+        if not token.startswith("-"):
+            return token
+    return None
+
+
+def make_command_target_missing(root: Path, args: List[str], root_make_targets: List[str]) -> bool:
+    parsed = parse_make_command(root, args)
+    if parsed is None:
+        return False
+    makefile, target = parsed
+    if target is None:
+        return not makefile.is_file()
+    if makefile == root / "Makefile":
+        return target not in root_make_targets
+    return not makefile.is_file() or target not in read_make_targets(makefile)
+
+
+def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, Optional[str]]]:
+    directory = root
+    makefile_arg: Optional[str] = None
+    targets: List[str] = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            targets.extend(token for token in args[index + 1 :] if "=" not in token)
+            break
+        if "=" in arg and not arg.startswith("-"):
+            index += 1
+            continue
+        if arg in {"-C", "--directory"}:
+            if index + 1 >= len(args):
+                return None
+            resolved = resolve_repo_path(root, root, args[index + 1])
+            if resolved is None:
+                return None
+            directory = resolved
+            index += 2
+            continue
+        if arg.startswith("-C") and arg != "-C":
+            resolved = resolve_repo_path(root, root, arg[2:])
+            if resolved is None:
+                return None
+            directory = resolved
+            index += 1
+            continue
+        if arg.startswith("--directory="):
+            resolved = resolve_repo_path(root, root, arg.split("=", 1)[1])
+            if resolved is None:
+                return None
+            directory = resolved
+            index += 1
+            continue
+        if arg in {"-f", "--file", "--makefile"}:
+            if index + 1 >= len(args):
+                return None
+            makefile_arg = args[index + 1]
+            index += 2
+            continue
+        if arg.startswith("-f") and arg != "-f":
+            makefile_arg = arg[2:]
+            index += 1
+            continue
+        if arg.startswith(("--file=", "--makefile=")):
+            makefile_arg = arg.split("=", 1)[1]
+            index += 1
+            continue
+        if arg.startswith("-"):
+            return None
+        targets.append(arg)
+        index += 1
+
+    if makefile_arg is None:
+        makefile = directory / "Makefile"
+    else:
+        makefile = resolve_repo_path(root, directory, makefile_arg)
+        if makefile is None:
+            return None
+    return makefile, targets[0] if targets else None
+
+
+def resolve_repo_path(root: Path, base: Path, value: str) -> Optional[Path]:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return None
+    resolved = (base / candidate).resolve()
+    try:
+        resolved.relative_to(root.resolve())
+    except ValueError:
+        return None
+    return resolved
+
+
+def local_command_target(command: str) -> Optional[str]:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return None
+    if is_repo_local_token(tokens[0]):
+        return tokens[0]
+    if tokens[0] not in INTERPRETER_COMMANDS:
+        return None
+    skip_next = False
+    for token in tokens[1:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if token in {"-m", "-c", "-e"}:
+            skip_next = True
+            continue
+        if token.startswith("-"):
+            continue
+        if is_repo_local_token(token):
+            return token
+        return None
+    return None
+
+
+def is_repo_local_token(token: str) -> bool:
+    return token.startswith(("./", "script/", "scripts/", "bin/", "tools/"))
+
+
+def classify_documented_command(line: str, command: str) -> List[str]:
+    text = line.replace(f"`{command}`", " ").lower()
+    matches = []
+    for responsibility, keywords in DOC_RESPONSIBILITY_KEYWORDS.items():
+        if any(keyword_matches_text(keyword, text) for keyword in keywords):
+            matches.append(responsibility)
+    return matches
+
+
+def keyword_matches_text(keyword: str, text: str) -> bool:
+    if " " in keyword:
+        return keyword in text
+    return re.search(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])", text) is not None
+
+
+def classify_responsibility_status(found: List[str], documented: List[str], needed: bool) -> str:
+    if found:
+        return "present"
+    if documented:
+        return "documented"
+    if not needed:
+        return "not_applicable"
+    return "missing"
+
+
+def infer_responsibility_needs(
+    root: Path,
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+) -> Dict[str, bool]:
+    has_dependencies = has_dependency_surface(root)
+    has_code = has_code_surface(root)
+    has_tests = has_test_surface(root)
+    has_packaging = (root / "skills").is_dir() or (root / "plugins" / "codex-skills").is_dir()
+    has_server = has_server_surface(root, package_scripts, make_targets, just_targets)
+    has_console = has_named_surface(package_scripts, make_targets, just_targets, {"console", "repl", "shell"})
+
+    return {
+        "bootstrap": has_dependencies,
+        "setup": has_dependencies,
+        "update": has_dependencies,
+        "server": has_server,
+        "test": has_code or has_tests or has_packaging,
+        "cibuild": has_code or has_tests or has_packaging,
+        "console": has_console,
+    }
+
+
+def has_dependency_surface(root: Path) -> bool:
+    return any(path.name in DEPENDENCY_MANIFESTS for path in iter_files(root))
+
+
+def has_code_surface(root: Path) -> bool:
+    return any(path.suffix in CODE_EXTENSIONS for path in iter_files(root))
+
+
+def has_test_surface(root: Path) -> bool:
+    return any(iter_files(root, "test_*.py")) or any(iter_files(root, "*_test.py"))
+
+
+def has_server_surface(
+    root: Path,
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+) -> bool:
+    if any((root / marker).exists() for marker in SERVER_MARKERS):
+        return True
+    return has_named_surface(package_scripts, make_targets, just_targets, {"server", "serve", "start", "dev"})
+
+
+def has_named_surface(
+    package_scripts: Dict[str, str],
+    make_targets: List[str],
+    just_targets: List[str],
+    names: set[str],
+) -> bool:
+    package_names = set(package_scripts)
+    make_names = set(make_targets)
+    just_names = set(just_targets)
+    return bool((package_names | make_names | just_names) & names)
+
+
+def not_applicable_reason(responsibility: str) -> str:
+    reasons = {
+        "bootstrap": "no dependency setup surface detected",
+        "setup": "no dependency setup surface detected",
+        "update": "no dependency update surface detected",
+        "server": "no app or service runtime surface detected",
+        "test": "no executable or packaged surface detected",
+        "cibuild": "no executable, packaged, or validation surface detected",
+        "console": "no console or REPL surface detected",
+    }
+    return reasons[responsibility]
 
 
 def normalize_doc_name(name: str) -> str:
@@ -746,7 +1524,12 @@ def render_documentation(documentation: Dict[str, Any]) -> List[str]:
 def render_scripts(scripts: Dict[str, Any]) -> List[str]:
     lines = ["## Scripts"]
     for name, item in scripts["responsibilities"].items():
-        candidates = ", ".join(item["candidates"]) if item["candidates"] else "missing"
+        if item["candidates"]:
+            candidates = ", ".join(item["candidates"])
+        elif item["status"] == "not_applicable":
+            candidates = item["reason"]
+        else:
+            candidates = "missing"
         lines.append(f"- {name}: {item['status']} - {candidates}")
     lines.append("")
     return lines
