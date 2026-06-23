@@ -63,9 +63,12 @@ The skill should produce or use a contract with these fields:
 
 | Field | Meaning |
 |---|---|
+| Problem | The repeated failure or workflow gap the loop prevents |
 | Goal | Observable final state |
 | Trigger | Manual request, schedule, CI failure, review comment, stale state, or event |
 | State | Phase, source of truth, artifacts, attempt count, last observation, and owner |
+| Key interfaces | Stable repos, PRs, dashboards, files, APIs, commands, skills, or automations the loop touches |
+| Acceptance criteria | Checkable conditions that prove the loop can stop successfully while preserving invariants |
 | Cycle | Observe, decide, act, verify, update state, and report |
 | Feedback | Tests, logs, review threads, screenshots, command output, user decisions, or API results |
 | Progress | What must change or decrease each pass |
@@ -74,6 +77,7 @@ The skill should produce or use a contract with these fields:
 | Retry | Retryable errors, max attempts, backoff, idempotency, and non-retryable failures |
 | Stop | Exact success, max attempts, no-progress threshold, blocked state, or user redirect |
 | Escalation | Concrete user question with evidence and choices |
+| Out of scope | Adjacent work the loop must not absorb |
 | Audit | What each pass reports so the loop can be inspected or resumed |
 
 ## Loop Kinds

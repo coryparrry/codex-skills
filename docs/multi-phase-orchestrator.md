@@ -154,12 +154,13 @@ Do not resurrect old worktrees unless the user explicitly asks. Old branches and
 
 ### 4. Send Complete Child Packets
 
-Each child thread packet should include enough context for the child to work independently and narrowly.
+Each child thread packet should start with a durable work-unit brief, then include enough operational context for the child to work independently and narrowly.
 
 Include:
 
 | Packet Field | Purpose |
 |---|---|
+| Work unit brief | States category, summary, source, current state, desired state, key interfaces, acceptance criteria, required skills, validation boundary, and out-of-scope work |
 | Unit name and source ref | Ties the child to the approved source |
 | Required skills | Preserves user-selected workflows inside the child thread |
 | Skill propagation mode | Says whether the child runs a whole skill, one role, or no skill |

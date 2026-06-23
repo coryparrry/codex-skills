@@ -25,9 +25,11 @@ If the request depends on unfamiliar loop theory, read [references/loop-principl
 
 | Field | Required content |
 | --- | --- |
+| Problem | Why this loop exists and what repeated failure it prevents. |
 | Goal | Final state the loop is trying to reach. |
 | Trigger | Manual request, schedule, CI failure, review comment, stale state, or event. |
 | State | Current phase, source of truth, artifacts, attempt count, last observation, and owner. |
+| Key interfaces | Stable repos, PRs, dashboards, files, APIs, commands, skills, or automations the loop will touch. |
 | Cycle | Plan/act/observe/decide steps, including named skills/tools. |
 | Feedback | Tests, logs, review threads, screenshots, command output, user decision, or external API result. |
 | Progress | What must change or decrease each pass: failing tests, unresolved comments, unknowns, blockers. |
@@ -36,6 +38,7 @@ If the request depends on unfamiliar loop theory, read [references/loop-principl
 | Retry | Retryable errors, max attempts, backoff/jitter, idempotency, and non-retryable failures. |
 | Stop | Exact success, max attempts, no-progress threshold, blocked state, or user redirect. |
 | Escalation | Concrete user question with evidence and 2-3 choices, not vague "what now?" |
+| Out of scope | Adjacent work the loop must not absorb. |
 | Audit | What each pass reports: actions, changed files, checks, decisions, next step. |
 
 3. Write the loop as a contract, not prose.
@@ -44,10 +47,17 @@ If the request depends on unfamiliar loop theory, read [references/loop-principl
 ```markdown
 # Loop Contract: <name>
 
+Problem: <current workflow gap or repeated failure this loop prevents>
 Goal: <observable done state>
 Loop kind: <heartbeat | project automation | standalone automation | in-thread | multi-agent>
 Cadence: <interval or event>
 State source: <thread context, file path, PR, issue, dashboard, logs, etc.>
+Key interfaces:
+- <stable repo, PR, dashboard, file, API, command, skill, or automation touched by the loop>
+
+Acceptance criteria:
+- [ ] <specific condition that proves the loop can stop successfully>
+- [ ] <specific condition that proves the loop preserved required invariants>
 
 Each pass:
 1. Observe: <live state to read>
@@ -68,6 +78,9 @@ Stop blocked and ask when:
 
 Do not:
 - <task-specific invariant>
+
+Out of scope:
+- <adjacent work the loop must not absorb>
 ```
 
 4. For actual loop requests, create or update the automation.
@@ -99,10 +112,20 @@ Do not:
 ```markdown
 # Loop Contract: PR Review And CI Heartbeat
 
+Problem: PR closeout can stall or drift when CI, review threads, and local branch hygiene are checked manually.
 Goal: The current PR has no failing or pending required checks, no unresolved actionable review threads, and the local branch contains only scoped intentional changes.
 Loop kind: heartbeat
 Cadence: every 5 minutes while CI/review is active
 State source: current thread context, local repo, current branch, GitHub PR
+Key interfaces:
+- GitHub PR checks and review threads
+- Local Git branch and changed files
+- Required repo validation commands
+
+Acceptance criteria:
+- [ ] Required checks are passing.
+- [ ] Actionable review threads are resolved or addressed with evidence.
+- [ ] Local changes are scoped and relevant validation passes.
 
 Each pass:
 1. Observe: run `git status --short`, confirm current branch, resolve the open PR with `gh pr view`, fetch check status and unresolved review threads.
@@ -129,6 +152,9 @@ Do not:
 - Push to the default branch.
 - Post review replies or resolve threads unless the user allowed it.
 - Touch unrelated files.
+
+Out of scope:
+- Product changes unrelated to the PR's failing checks or actionable review findings.
 ```
 
 If the user asked to make this loop run, create a heartbeat automation with this prompt. Do not merely paste the contract back to the user.

@@ -73,6 +73,7 @@ The response should include:
 
 - inventory counts
 - each bucket with short reasons
+- review fix briefs for every `Fix now` item
 - resolved review threads
 - threads that should resolve but were not resolved remotely
 - prevention tests or checks

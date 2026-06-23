@@ -105,6 +105,47 @@ For each unit, record:
 
 Do not dispatch child threads until each initial unit has enough scope, routing, and validation detail to work independently.
 
+## Work Unit Brief
+
+Before dispatching a child thread, write a durable work-unit brief. The brief is the contract the child works from; the surrounding packet is operational detail.
+
+Use this structure:
+
+```markdown
+## Work Unit Brief: <unit name>
+
+**Category:** <implementation | review | bug investigation | docs | validation | integration>
+**Summary:** <one-line outcome>
+
+**Source:**
+<plan phase, issue, review finding, PR comment, bug report, or owner request that created this unit>
+
+**Current behavior or state:**
+<what is true now, including the gap or failure when relevant>
+
+**Desired behavior or state:**
+<what should be true when the unit is complete>
+
+**Key interfaces and surfaces:**
+- <stable type, command, API, UI state, doc, skill, workflow, or repo contract>
+
+**Acceptance criteria:**
+- [ ] <independently verifiable criterion>
+- [ ] <independently verifiable criterion>
+
+**Required skills/workflows:**
+- <skill name and path, or "none">
+
+**Validation boundary:**
+- Worker-allowed: <cheap checks the child may run>
+- Coordinator-only: <expensive or forbidden checks the child must report back>
+
+**Out of scope:**
+- <adjacent work the child must not absorb>
+```
+
+Avoid line-number instructions in the brief. Use file paths only when they are stable source documents, required evidence locations, or an explicit write scope.
+
 ## Step 3: Create Fresh Worktree Threads
 
 Create one fresh Codex worktree thread per runnable unit when edits may conflict, units can run concurrently, or unit commits should stay separate.
@@ -132,6 +173,7 @@ If the target checkout is dirty in a way that blocks safe orchestration, create 
 
 Each child thread prompt must include:
 
+- work-unit brief in the structure above
 - unit name and source reference
 - required skills/workflows to load and use, including skill names and paths when available
 - skill propagation mode: whole-skill, role-slice, or no-skill

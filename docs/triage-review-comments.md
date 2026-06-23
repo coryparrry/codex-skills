@@ -45,6 +45,7 @@ The skill reports:
 
 - inventory counts for review comments and threads;
 - comments grouped into `Fix now`, `Fix if cheap`, `Defer`, and `Ignore`;
+- review fix briefs for every `Fix now` item, with current behavior, desired behavior, key interfaces, acceptance criteria, validation, and out-of-scope boundaries;
 - inline threads resolved on GitHub;
 - threads that look fixed but could not be resolved remotely;
 - prevention checks for real issues;
