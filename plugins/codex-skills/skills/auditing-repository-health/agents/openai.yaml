@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Repository Health"
+  short_description: "Audit repo readiness before work"
+  default_prompt: "Use $auditing-repository-health to audit this repository before starting work."
