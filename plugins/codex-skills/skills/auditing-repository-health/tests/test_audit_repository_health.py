@@ -202,6 +202,53 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("README.md:./tools/doit --fast", responsibilities["test"]["candidates"])
             self.assertIn("README.md:./tools/doit --all", responsibilities["cibuild"]["candidates"])
 
+    def test_fenced_reference_examples_do_not_create_stale_documented_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "For example, a repo might use:\n\n"
+                "```sh\n"
+                "./tools/doit --all\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
+
+    def test_fenced_real_commands_with_example_wording_still_document_responsibilities(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "For example, to run tests:\n\n"
+                "```sh\n"
+                "pytest\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertIn("README.md:pytest", responsibilities["test"]["candidates"])
+
     def test_install_test_helpers_do_not_satisfy_bootstrap_responsibility(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -612,6 +659,66 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("not_applicable", responsibilities["setup"]["status"])
             self.assertEqual("not_applicable", responsibilities["test"]["status"])
             self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
+
+    def test_detects_tracked_generated_files_in_nested_package_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated = root / "frontend" / "dist"
+            self.init_repo(root)
+            generated.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "frontend" / "package.json").write_text('{"scripts": {"build": "vite build"}}\n')
+            (generated / "bundle.js").write_text("console.log('built')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("generated files are tracked", titles)
+            self.assertIn("frontend/dist/bundle.js", report["checks"]["hygiene"]["tracked_generated"])
+
+    def test_detects_tracked_next_output_at_repository_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated = root / ".next" / "server"
+            self.init_repo(root)
+            generated.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"build": "next build"}}\n')
+            (generated / "app.js").write_text("console.log('built')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("generated files are tracked", titles)
+            self.assertIn(".next/server/app.js", report["checks"]["hygiene"]["tracked_generated"])
+
+    def test_source_directories_named_build_or_coverage_are_not_generated_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tool_build = root / "tools" / "build"
+            docs_coverage = root / "docs" / "coverage"
+            self.init_repo(root)
+            tool_build.mkdir(parents=True)
+            docs_coverage.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (tool_build / "release.sh").write_text("#!/usr/bin/env bash\n")
+            (docs_coverage / "guide.md").write_text("# Coverage guide\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("generated files are tracked", titles)
+            self.assertEqual([], report["checks"]["hygiene"]["tracked_generated"])
 
     def test_reference_tables_do_not_document_repo_commands(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -39,6 +39,7 @@ GENERATED_PATTERNS = [
     "*.pyc",
     ".DS_Store",
     "node_modules/*",
+    ".next/*",
     "dist/*",
     "build/*",
     "coverage/*",
@@ -50,6 +51,8 @@ GENERATED_PATTERNS = [
     "*.tgz",
     "*.log",
 ]
+
+NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
 
 RESPONSIBILITY_PATHS = {
     "bootstrap": [
@@ -690,7 +693,7 @@ class Audit:
         tracked_paths = tracked_result.stdout.split("\0") if tracked_result.returncode == 0 else []
         tracked_paths = [path for path in tracked_paths if path]
         dirty_lines = [line for line in status_lines if not line.startswith("##")]
-        tracked_generated = sorted(path for path in tracked_paths if is_generated_path(path))
+        tracked_generated = sorted(path for path in tracked_paths if is_generated_path(path, root))
         largest_files = largest_tracked_files(root, tracked_paths, limit=10)
         ignored_lines = ignored_result.stdout.splitlines() if ignored_result.returncode == 0 else []
 
@@ -904,6 +907,8 @@ def discover_documented_commands(
                 fence_context = previous_text if in_fence else ""
                 continue
             if in_fence:
+                if is_fenced_reference_context(fence_context):
+                    continue
                 command = stripped.lstrip("$ ").strip()
                 if looks_like_command(command):
                     record_documented_command(
@@ -919,6 +924,8 @@ def discover_documented_commands(
                     )
                 continue
             if is_reference_command_line(line):
+                if stripped:
+                    previous_text = stripped
                 continue
             commands = [command for command in extract_inline_commands(line) if looks_like_command(command)]
             if not commands:
@@ -992,6 +999,27 @@ def is_reference_command_line(line: str) -> bool:
         "if the repo uses",
         "if a repo uses",
         "for example",
+        "such as",
+        "common script",
+        "common name",
+        "install this reusable skill",
+        "install the skill",
+        "marketplace install",
+        "npx skills add",
+    )
+    return any(phrase in lower for phrase in reference_phrases)
+
+
+def is_fenced_reference_context(line: str) -> bool:
+    stripped = line.lstrip()
+    if stripped.startswith("|"):
+        return True
+    lower = stripped.lower()
+    reference_phrases = (
+        "if the repo uses",
+        "if a repo uses",
+        "a repo might use",
+        "repo might use",
         "such as",
         "common script",
         "common name",
@@ -1425,8 +1453,28 @@ def directory_fingerprint(path: Path) -> Dict[str, str]:
     return fingerprint
 
 
-def is_generated_path(path: str) -> bool:
-    return any(fnmatch.fnmatch(path, pattern) for pattern in GENERATED_PATTERNS)
+def is_generated_path(path: str, root: Optional[Path] = None) -> bool:
+    normalized = path.replace(os.sep, "/")
+    if any(fnmatch.fnmatch(normalized, pattern) for pattern in GENERATED_PATTERNS):
+        return True
+    if root is None:
+        return False
+    return is_nested_generated_path(normalized, root)
+
+
+def is_nested_generated_path(path: str, root: Path) -> bool:
+    parts = path.split("/")
+    for index, part in enumerate(parts[:-1]):
+        if part not in NESTED_GENERATED_DIRS or index == 0:
+            continue
+        package_root = root.joinpath(*parts[:index])
+        if has_direct_dependency_manifest(package_root):
+            return True
+    return False
+
+
+def has_direct_dependency_manifest(path: Path) -> bool:
+    return any((path / name).is_file() for name in DEPENDENCY_MANIFESTS)
 
 
 def largest_tracked_files(root: Path, tracked_paths: List[str], limit: int) -> List[Dict[str, Any]]:
