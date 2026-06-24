@@ -119,7 +119,7 @@ PACKAGE_SCRIPT_MAP = {
     "console": {"console", "repl"},
 }
 
-PACKAGE_MANAGER_DIRECT_SCRIPTS = {"build", "cibuild", "dev", "lint", "preflight", "start", "test", "validate"}
+PACKAGE_MANAGER_DIRECT_SCRIPTS = {"build", "cibuild", "dev", "e2e", "lint", "preflight", "start", "test", "validate"}
 
 PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES = {
     "npm": {"start", "test"},
@@ -128,10 +128,30 @@ PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES = {
     "bun": PACKAGE_MANAGER_DIRECT_SCRIPTS,
 }
 
+PACKAGE_MANAGER_COMMAND_ALIASES = {
+    "npm": {
+        "i": "install",
+        "it": "install-test",
+        "rum": "run",
+        "t": "test",
+        "tst": "test",
+        "urn": "run",
+    },
+}
+
 UNSUPPORTED_DIRECT_SCRIPT = "__unsupported_direct_package_script__"
 
 PACKAGE_MANAGER_BUILTIN_COMMANDS = {
-    "npm": {"audit", "ci", "dedupe", "exec", "fund", "init", "install", "outdated", "pack", "publish", "update"},
+    "npm": {
+        "access", "adduser", "audit", "bugs", "cache", "ci", "completion", "config", "dedupe",
+        "deprecate", "diff", "dist-tag", "docs", "doctor", "edit", "exec", "explain", "explore",
+        "find-dupes", "fund", "get", "help", "help-search", "init", "install", "install-ci-test",
+        "install-test", "link", "ll", "login", "logout", "ls", "org", "outdated", "owner", "pack",
+        "ping", "pkg", "prefix", "profile", "prune", "publish", "query", "rebuild", "repo",
+        "restart", "root", "run", "sbom", "search", "set", "shrinkwrap", "star", "stars",
+        "start", "stop", "team", "test", "token", "trust", "undeprecate", "uninstall",
+        "unpublish", "unstar", "update", "version", "view", "whoami",
+    },
     "pnpm": {
         "add", "audit", "dedupe", "deploy", "dlx", "exec", "fetch", "import", "install", "outdated",
         "pack", "publish", "update",
@@ -848,10 +868,22 @@ def read_root_make_targets(root: Path) -> Dict[str, List[str]]:
 
 def default_makefile(directory: Path) -> Path:
     for name in ("GNUmakefile", "makefile", "Makefile"):
-        path = directory / name
-        if path.is_file():
+        path = exact_child_file(directory, name)
+        if path is not None:
             return path
     return directory / "Makefile"
+
+
+def exact_child_file(directory: Path, name: str) -> Optional[Path]:
+    if not directory.is_dir():
+        return None
+    try:
+        for child in directory.iterdir():
+            if child.name == name and child.is_file():
+                return child
+    except OSError:
+        return None
+    return None
 
 
 def flatten_target_sources(target_sources: Dict[str, List[str]]) -> List[str]:
@@ -862,12 +894,24 @@ def read_make_targets(path: Path) -> List[str]:
     if not path.is_file():
         return []
     targets: List[str] = []
-    pattern = re.compile(r"^([A-Za-z0-9_.-]+):")
     for line in safe_read_text(path).splitlines():
-        match = pattern.match(line)
-        if match and not match.group(1).startswith("."):
-            targets.append(match.group(1))
+        if not line or line[:1].isspace() or line.lstrip().startswith("#"):
+            continue
+        target_list, separator, remainder = line.partition(":")
+        if not separator or make_assignment_before_colon(line) or remainder.lstrip().startswith("="):
+            continue
+        for target in target_list.split():
+            if re.match(r"^[A-Za-z0-9_.-]+$", target) and not target.startswith("."):
+                targets.append(target)
     return targets
+
+
+def make_assignment_before_colon(line: str) -> bool:
+    colon_index = line.find(":")
+    if colon_index == -1:
+        return False
+    assignment_indexes = [line.find(operator) for operator in ("+=", "?=", "!=", "=")]
+    return any(0 <= index < colon_index for index in assignment_indexes)
 
 
 def read_just_targets(root: Path) -> List[str]:
@@ -1219,7 +1263,13 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Pac
             return None
         command_args = args[index:]
         workspace_selection.extend(package_manager_workspace_selection(tool, command_args))
+        command_directory = package_manager_command_directory(root, directory, tool, command_args)
+        if command_directory is None:
+            return None
+        directory = command_directory
         script = package_manager_script_from_args(tool, command_args)
+        if script == UNSUPPORTED_DIRECT_SCRIPT and tool == "npm":
+            return PackageManagerCommand(None, script)
         if workspace_selection.enabled():
             package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
             return PackageManagerCommand(package_dirs, script)
@@ -1233,11 +1283,12 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Pac
 def package_manager_workspace_selection(tool: str, args: List[str]) -> WorkspaceSelection:
     if not args:
         return WorkspaceSelection([])
-    if args[0] in {"run", "run-script"}:
+    command = normalize_package_manager_command(tool, args[0])
+    if command in {"run", "run-script"}:
         return package_manager_run_workspace_selection(tool, args[1:])
-    if args[0] in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
+    if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
         return package_manager_post_command_workspace_selection(tool, args[1:])
-    if args[0] in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
+    if command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
         return package_manager_post_command_workspace_selection(tool, args[1:])
     return WorkspaceSelection([])
 
@@ -1250,6 +1301,10 @@ def package_manager_run_workspace_selection(tool: str, tokens: List[str]) -> Wor
         token = tokens[index]
         if token == "--":
             break
+        directory_option = package_manager_directory_option_value(tool, tokens, index)
+        if directory_option is not None:
+            _, index = directory_option
+            continue
         workspace_option = package_manager_workspace_option_value(tool, tokens, index)
         if workspace_option is not None:
             value, index = workspace_option
@@ -1282,6 +1337,10 @@ def package_manager_post_command_workspace_selection(tool: str, tokens: List[str
         token = tokens[index]
         if token == "--":
             break
+        directory_option = package_manager_directory_option_value(tool, tokens, index)
+        if directory_option is not None:
+            _, index = directory_option
+            continue
         workspace_option = package_manager_workspace_option_value(tool, tokens, index)
         if workspace_option is not None:
             value, index = workspace_option
@@ -1304,12 +1363,96 @@ def package_manager_post_command_workspace_selection(tool: str, tokens: List[str
     return selection
 
 
+def package_manager_command_directory(root: Path, directory: Path, tool: str, args: List[str]) -> Optional[Path]:
+    if not args:
+        return directory
+    command = normalize_package_manager_command(tool, args[0])
+    if command in {"run", "run-script"}:
+        return package_manager_run_command_directory(root, directory, tool, args[1:])
+    if (
+        command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set())
+        or command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set())
+    ):
+        return package_manager_post_command_directory(root, directory, tool, args[1:])
+    if command in PACKAGE_MANAGER_DIRECT_SCRIPTS:
+        return directory
+    return directory
+
+
+def package_manager_run_command_directory(root: Path, directory: Path, tool: str, tokens: List[str]) -> Optional[Path]:
+    index = 0
+    saw_script = False
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            break
+        directory_option = package_manager_directory_option_value(tool, tokens, index)
+        if directory_option is not None:
+            value, index = directory_option
+            resolved = resolve_repo_path(root, directory, value)
+            if resolved is None:
+                return None
+            directory = resolved
+            continue
+        if package_manager_workspace_option_value(tool, tokens, index) is not None:
+            _, index = package_manager_workspace_option_value(tool, tokens, index)
+            continue
+        if package_manager_all_workspaces_option_value(tool, tokens, index) is not None:
+            _, index = package_manager_all_workspaces_option_value(tool, tokens, index)
+            continue
+        if package_manager_include_workspace_root_option(tool, tokens, index) is not None:
+            _, index = package_manager_include_workspace_root_option(tool, tokens, index)
+            continue
+        if is_package_manager_no_value_option(token):
+            index += 1
+            continue
+        if token.startswith("-") or saw_script:
+            break
+        saw_script = True
+        index += 1
+    return directory
+
+
+def package_manager_post_command_directory(root: Path, directory: Path, tool: str, tokens: List[str]) -> Optional[Path]:
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            break
+        directory_option = package_manager_directory_option_value(tool, tokens, index)
+        if directory_option is not None:
+            value, index = directory_option
+            resolved = resolve_repo_path(root, directory, value)
+            if resolved is None:
+                return None
+            directory = resolved
+            continue
+        if package_manager_workspace_option_value(tool, tokens, index) is not None:
+            _, index = package_manager_workspace_option_value(tool, tokens, index)
+            continue
+        if package_manager_all_workspaces_option_value(tool, tokens, index) is not None:
+            _, index = package_manager_all_workspaces_option_value(tool, tokens, index)
+            continue
+        if package_manager_include_workspace_root_option(tool, tokens, index) is not None:
+            _, index = package_manager_include_workspace_root_option(tool, tokens, index)
+            continue
+        if is_package_manager_no_value_option(token):
+            index += 1
+            continue
+        break
+    return directory
+
+
 def first_package_manager_run_arg(tool: str, tokens: List[str]) -> Optional[str]:
     index = 0
     while index < len(tokens):
         token = tokens[index]
         if token == "--":
             return None
+        directory_option = package_manager_directory_option_value(tool, tokens, index)
+        if directory_option is not None:
+            _, index = directory_option
+            continue
         workspace_option = package_manager_workspace_option_value(tool, tokens, index)
         if workspace_option is not None:
             _, index = workspace_option
@@ -1364,7 +1507,8 @@ def package_manager_run_without_script(command: str) -> bool:
             continue
         if token.startswith("-"):
             return False
-        return token in {"run", "run-script"} and first_package_manager_run_arg(tool, args[index + 1:]) is None
+        command = normalize_package_manager_command(tool, token)
+        return command in {"run", "run-script"} and first_package_manager_run_arg(tool, args[index + 1:]) is None
     return False
 
 
@@ -1535,16 +1679,20 @@ def package_manager_option_name(arg: str) -> str:
 def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str]:
     if not args:
         return None
-    command = args[0]
-    if command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
-        return None
+    command = normalize_package_manager_command(tool, args[0])
     if command in {"run", "run-script"}:
         return first_package_manager_run_arg(tool, args[1:])
     if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
         return command
+    if command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
+        return None
     if command in PACKAGE_MANAGER_DIRECT_SCRIPTS:
         return UNSUPPORTED_DIRECT_SCRIPT
     return None
+
+
+def normalize_package_manager_command(tool: str, command: str) -> str:
+    return PACKAGE_MANAGER_COMMAND_ALIASES.get(tool, {}).get(command, command)
 
 
 def is_package_manager_no_value_option(arg: str) -> bool:

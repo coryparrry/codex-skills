@@ -584,6 +584,68 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", responsibilities["test"]["status"])
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
 
+    def test_post_subcommand_npm_prefix_options_select_package_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `npm run test --prefix=frontend`.\n"
+                "Run direct tests with `npm test --prefix=frontend`.\n"
+                "Run the full validation gate with `npm run validate --prefix frontend`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (frontend / "package.json").write_text('{"scripts": {"test": "vitest", "validate": "vitest --run"}}\n')
+            (frontend / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertEqual("present", responsibilities["cibuild"]["status"])
+            self.assertIn("frontend/package.json:test", responsibilities["test"]["candidates"])
+            self.assertIn("frontend/package.json:validate", responsibilities["cibuild"]["candidates"])
+
+    def test_post_subcommand_npm_prefix_options_still_allow_workspace_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "frontend" / "packages" / "app"
+            self.init_repo(root)
+            app.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `npm test --prefix frontend --workspaces`.\n"
+                "Run validation with `npm run --prefix frontend validate --workspaces`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (root / "frontend" / "package.json").write_text('{"workspaces": ["packages/*"]}\n')
+            (app / "package.json").write_text(
+                '{"name": "app", "scripts": {"test": "vitest", "validate": "vitest --run"}}\n'
+            )
+            (app / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertEqual("present", responsibilities["cibuild"]["status"])
+            self.assertIn("frontend/packages/app/package.json:test", responsibilities["test"]["candidates"])
+            self.assertIn("frontend/packages/app/package.json:validate", responsibilities["cibuild"]["candidates"])
+
     def test_builtin_package_manager_commands_can_document_setup_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -711,6 +773,25 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("missing", responsibilities["test"]["status"])
 
+    def test_npm_run_alias_without_script_does_not_document_test_responsibility(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `npm rum`.\n",
+                '{"scripts": {"test": "vitest"}}\n',
+                {},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertEqual(["package.json:test"], responsibilities["test"]["candidates"])
+
     def test_npm_multi_workspace_commands_report_stale_when_any_workspace_lacks_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -792,6 +873,69 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("present", responsibilities["cibuild"]["status"])
             self.assertIn("package.json:validate", responsibilities["cibuild"]["candidates"])
 
+    def test_unknown_npm_subcommand_is_reported_as_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `npm e2e`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (root / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_standard_npm_test_aliases_are_not_reported_as_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `npm t` or `npm tst`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"test": "vitest"}}\n')
+            (root / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("package.json:test", responsibilities["test"]["candidates"])
+
+    def test_standard_npm_run_aliases_are_not_reported_as_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `npm rum test`.\n"
+                "Run the full validation gate with `npm urn validate`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"test": "vitest", "validate": "vitest --run"}}\n')
+            (root / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertEqual("present", responsibilities["cibuild"]["status"])
+            self.assertIn("package.json:test", responsibilities["test"]["candidates"])
+            self.assertIn("package.json:validate", responsibilities["cibuild"]["candidates"])
+
     def test_documented_custom_make_target_can_satisfy_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -866,6 +1010,49 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
             self.assertEqual(["GNUmakefile:test"], responsibilities["test"]["candidates"])
             self.assertEqual([], responsibilities["cibuild"]["candidates"])
+
+    def test_make_targets_with_spaces_before_colon_and_multiple_targets_are_parsed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "Makefile").write_text("test validate :\n\t@echo ok\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no CI or full validation entry point", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertEqual("present", responsibilities["cibuild"]["status"])
+            self.assertIn("Makefile:test", responsibilities["test"]["candidates"])
+            self.assertIn("Makefile:validate", responsibilities["cibuild"]["candidates"])
+
+    def test_make_variable_assignments_with_colon_values_are_not_targets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "Makefile").write_text(
+                "test += http://localhost:3000\n"
+                "validate = foo:bar\n"
+            )
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("no test command or script", titles)
+            self.assertIn("no CI or full validation entry point", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+            self.assertEqual("missing", responsibilities["cibuild"]["status"])
 
     def test_gnumakefile_targets_satisfy_test_and_validation_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
