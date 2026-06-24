@@ -911,6 +911,254 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 responsibilities["test"]["candidates"],
             )
 
+    def test_pnpm_recursive_commands_report_stale_when_workspaces_lack_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\n"
+                "Run tests with `pnpm --recursive run test`.\n"
+                "Run tests with `pnpm -r test`.\n"
+                "Run tests with `pnpm -r --include-workspace-root test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {
+                    "packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n',
+                    "packages/api": '{"name": "api", "scripts": {"lint": "eslint ."}}\n',
+                },
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_pnpm_recursive_include_workspace_root_command_is_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `pnpm -r --include-workspace-root test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {
+                    "packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n',
+                    "packages/api": '{"name": "api", "scripts": {"lint": "eslint ."}}\n',
+                },
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_pnpm_recursive_commands_use_pnpm_workspace_yaml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `pnpm --recursive run test`.\n"
+                "Run tests with `pnpm -r test`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text("packages:\n  - 'packages/*'\n")
+            for package_name in ("app", "api"):
+                package_dir = root / "packages" / package_name
+                package_dir.mkdir(parents=True)
+                (package_dir / "package.json").write_text(
+                    f'{{"name": "{package_name}", "scripts": {{"test": "vitest"}}}}\n'
+                )
+                (package_dir / "index.js").write_text(f"console.log('{package_name}')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm --recursive run test", responsibilities["test"]["candidates"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_recursive_commands_without_workspace_yaml_discover_package_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `pnpm -r test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"test": "vitest"}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_recursive_commands_skip_workspaces_without_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `pnpm -r test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text("packages:\n  - 'packages/*'\n")
+            app = root / "packages" / "app"
+            app.mkdir(parents=True)
+            (app / "package.json").write_text('{"name": "app", "scripts": {"test": "vitest"}}\n')
+            (app / "index.js").write_text("console.log('app')\n")
+            api = root / "packages" / "api"
+            api.mkdir(parents=True)
+            (api / "package.json").write_text('{"name": "api", "scripts": {"lint": "eslint ."}}\n')
+            (api / "index.js").write_text("console.log('api')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_workspace_yaml_negated_patterns_exclude_packages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `pnpm -r test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text(
+                "packages:\n"
+                "  - 'packages/*'\n"
+                "  - '!packages/legacy'\n"
+            )
+            app = root / "packages" / "app"
+            app.mkdir(parents=True)
+            (app / "package.json").write_text('{"name": "app", "scripts": {"test": "vitest"}}\n')
+            (app / "index.js").write_text("console.log('app')\n")
+            legacy = root / "packages" / "legacy"
+            legacy.mkdir(parents=True)
+            (legacy / "package.json").write_text('{"name": "legacy", "scripts": {"lint": "eslint ."}}\n')
+            (legacy / "index.js").write_text("console.log('legacy')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_workspace_yaml_inline_packages_list_is_supported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `pnpm -r test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text("packages: ['packages/*']\n")
+            app = root / "packages" / "app"
+            app.mkdir(parents=True)
+            (app / "package.json").write_text('{"name": "app", "scripts": {"test": "vitest"}}\n')
+            (app / "index.js").write_text("console.log('app')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_workspace_yaml_packages_key_allows_inline_comment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `pnpm -r test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text("packages: # workspace packages\n  - 'packages/*'\n")
+            app = root / "packages" / "app"
+            app.mkdir(parents=True)
+            (app / "package.json").write_text('{"name": "app", "scripts": {"test": "vitest"}}\n')
+            (app / "index.js").write_text("console.log('app')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_workspace_yaml_inline_plain_scalars_are_supported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `pnpm -r test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text("packages: [packages/*]\n")
+            app = root / "packages" / "app"
+            app.mkdir(parents=True)
+            (app / "package.json").write_text('{"name": "app", "scripts": {"test": "vitest"}}\n')
+            (app / "index.js").write_text("console.log('app')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
+    def test_pnpm_workspace_yaml_brace_globs_are_supported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `pnpm -r test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text("packages:\n  - '{apps,packages}/*'\n")
+            for base, name in (("apps", "web"), ("packages", "api")):
+                package_dir = root / base / name
+                package_dir.mkdir(parents=True)
+                (package_dir / "package.json").write_text(
+                    f'{{"name": "{name}", "scripts": {{"test": "vitest"}}}}\n'
+                )
+                (package_dir / "index.js").write_text(f"console.log('{name}')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:pnpm -r test", responsibilities["test"]["candidates"])
+
     def test_npm_all_workspaces_with_all_scripts_is_not_stale(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

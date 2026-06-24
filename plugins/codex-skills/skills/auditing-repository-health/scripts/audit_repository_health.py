@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import fnmatch
 import json
 import os
@@ -177,10 +178,12 @@ PACKAGE_MANAGER_WORKSPACE_OPTIONS = {
 
 PACKAGE_MANAGER_ALL_WORKSPACES_OPTIONS = {
     "npm": {"--workspaces"},
+    "pnpm": {"-r", "--recursive"},
 }
 
 PACKAGE_MANAGER_INCLUDE_WORKSPACE_ROOT_OPTIONS = {
     "npm": {"--include-workspace-root"},
+    "pnpm": {"--include-workspace-root"},
 }
 
 PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
@@ -224,6 +227,7 @@ class PackageManagerCommand:
     package_dirs: Optional[List[Path]]
     script: Optional[str]
     if_present: bool = False
+    allow_missing_scripts: bool = False
 
 EXPLICIT_TEST_WORDS = {"test", "tests", "spec"}
 
@@ -1241,7 +1245,7 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
         scripts = root_package_scripts if package_dir == root else read_package_scripts(package_dir / "package.json")
         if parsed.script in scripts:
             found_script = True
-        elif not parsed.if_present:
+        elif not parsed.if_present and not parsed.allow_missing_scripts:
             return True
     return not found_script
 
@@ -1298,14 +1302,15 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Pac
             return None
         directory = command_directory
         script = package_manager_script_from_args(tool, command_args)
+        allow_missing_scripts = tool == "pnpm" and workspace_selection.all_workspaces
         if script == UNSUPPORTED_DIRECT_SCRIPT and tool == "npm":
             return PackageManagerCommand(None, script)
         if workspace_selection.enabled():
-            package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
-            return PackageManagerCommand(package_dirs, script, if_present)
-        return PackageManagerCommand([directory], script, if_present)
+            package_dirs = resolve_package_workspaces(root, directory, tool, workspace_selection)
+            return PackageManagerCommand(package_dirs, script, if_present, allow_missing_scripts)
+        return PackageManagerCommand([directory], script, if_present, allow_missing_scripts)
     if workspace_selection.enabled():
-        package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
+        package_dirs = resolve_package_workspaces(root, directory, tool, workspace_selection)
         return PackageManagerCommand(package_dirs, None, if_present)
     return PackageManagerCommand([directory], None, if_present)
 
@@ -1609,9 +1614,10 @@ def package_manager_args_if_present(args: List[str]) -> bool:
 def resolve_package_workspaces(
     root: Path,
     package_root: Path,
+    tool: str,
     selection: WorkspaceSelection,
 ) -> Optional[List[Path]]:
-    declared = declared_package_workspaces(root, package_root)
+    declared = declared_package_workspaces(root, package_root, tool)
     selected: List[Path] = []
     if selection.all_workspaces:
         selected.extend(declared)
@@ -1626,21 +1632,67 @@ def resolve_package_workspaces(
     return selected or None
 
 
-def declared_package_workspaces(root: Path, package_root: Path) -> List[Path]:
-    patterns = read_package_workspace_patterns(package_root / "package.json")
+def declared_package_workspaces(root: Path, package_root: Path, tool: str) -> List[Path]:
+    if tool == "pnpm":
+        workspace_file = package_root / "pnpm-workspace.yaml"
+        patterns = read_pnpm_workspace_patterns(workspace_file)
+        if not patterns and not workspace_file.is_file():
+            return discover_pnpm_recursive_packages(root, package_root)
+    else:
+        patterns = read_package_workspace_patterns(package_root / "package.json")
     workspaces: List[Path] = []
     for pattern in patterns:
-        if pattern.startswith("!"):
+        exclude = pattern.startswith("!")
+        if exclude:
+            pattern = pattern[1:]
+        pattern = pattern.strip()
+        if not pattern:
             continue
-        for candidate in sorted(package_root.glob(pattern)):
+        candidates = matching_workspace_dirs(root, package_root, pattern)
+        if exclude:
+            excluded = {candidate.resolve() for candidate in candidates}
+            workspaces = [workspace for workspace in workspaces if workspace.resolve() not in excluded]
+            continue
+        workspaces.extend(candidates)
+    return unique_paths(workspaces)
+
+
+def discover_pnpm_recursive_packages(root: Path, package_root: Path) -> List[Path]:
+    package_dirs: List[Path] = []
+    for package_json in iter_files(package_root, "package.json"):
+        package_dir = package_json.parent
+        try:
+            package_dir.resolve().relative_to(root.resolve())
+        except ValueError:
+            continue
+        package_dirs.append(package_dir)
+    return unique_paths(package_dirs)
+
+
+def matching_workspace_dirs(root: Path, package_root: Path, pattern: str) -> List[Path]:
+    matches: List[Path] = []
+    for expanded_pattern in expand_brace_glob(pattern):
+        for candidate in sorted(package_root.glob(expanded_pattern)):
             if not candidate.is_dir() or not (candidate / "package.json").is_file():
                 continue
             try:
                 candidate.resolve().relative_to(root.resolve())
             except ValueError:
                 continue
-            workspaces.append(candidate)
-    return unique_paths(workspaces)
+            matches.append(candidate)
+    return matches
+
+
+def expand_brace_glob(pattern: str) -> List[str]:
+    match = re.search(r"\{([^{}]+)\}", pattern)
+    if not match:
+        return [pattern]
+    expanded: List[str] = []
+    before = pattern[: match.start()]
+    after = pattern[match.end() :]
+    for option in match.group(1).split(","):
+        expanded.extend(expand_brace_glob(f"{before}{option}{after}"))
+    return expanded
 
 
 def read_package_workspace_patterns(path: Path) -> List[str]:
@@ -1658,6 +1710,73 @@ def read_package_workspace_patterns(path: Path) -> List[str]:
         if isinstance(packages, list):
             return [item for item in packages if isinstance(item, str)]
     return []
+
+
+def read_pnpm_workspace_patterns(path: Path) -> List[str]:
+    if not path.is_file():
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    patterns: List[str] = []
+    in_packages = False
+    packages_indent = 0
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if not in_packages:
+            if stripped.startswith("packages:"):
+                package_value = strip_yaml_inline_comment(stripped.split(":", 1)[1].strip())
+                inline_patterns = parse_yaml_inline_string_list(package_value)
+                if inline_patterns:
+                    patterns.extend(inline_patterns)
+                    continue
+                if package_value:
+                    continue
+                in_packages = True
+                packages_indent = indent
+            continue
+        if indent <= packages_indent and not stripped.startswith("-"):
+            break
+        if not stripped.startswith("-"):
+            continue
+        pattern = stripped[1:].strip()
+        pattern = strip_yaml_inline_comment(pattern)
+        pattern = pattern.strip("\"'")
+        if pattern:
+            patterns.append(pattern)
+    return patterns
+
+
+def strip_yaml_inline_comment(value: str) -> str:
+    if value.startswith("#"):
+        return ""
+    if " #" in value:
+        return value.split(" #", 1)[0].strip()
+    return value
+
+
+def parse_yaml_inline_string_list(value: str) -> List[str]:
+    if not value.startswith("[") or not value.endswith("]"):
+        return []
+    try:
+        parsed = ast.literal_eval(value)
+    except (SyntaxError, ValueError):
+        parsed = None
+    if isinstance(parsed, list):
+        return [item for item in parsed if isinstance(item, str)]
+    inner = value[1:-1].strip()
+    if not inner:
+        return []
+    items = []
+    for item in inner.split(","):
+        item = strip_yaml_inline_comment(item.strip()).strip("\"'")
+        if item:
+            items.append(item)
+    return items
 
 
 def resolve_declared_package_workspace(package_root: Path, declared: List[Path], workspace: str) -> Optional[Path]:
