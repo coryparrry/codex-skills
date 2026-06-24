@@ -185,6 +185,34 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("docs/DEVELOPMENT.md:./tools/doit --fast", responsibilities["test"]["candidates"])
             self.assertIn("docs/DEVELOPMENT.md:./tools/doit --all", responsibilities["cibuild"]["candidates"])
 
+    def test_testing_and_validation_docs_can_document_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            docs = root / "docs"
+            docs.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (root / "package.json").write_text('{"scripts": {"release-gate": "echo ok"}}\n')
+            (docs / "testing.md").write_text("# Testing\n\nRun tests with `pytest`.\n")
+            (docs / "validation.md").write_text(
+                "# Validation\n\nRun the full validation gate with `npm run release-gate`.\n"
+            )
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertEqual("documented", responsibilities["cibuild"]["status"])
+            self.assertIn("docs/testing.md:pytest", responsibilities["test"]["candidates"])
+            self.assertIn("docs/validation.md:npm run release-gate", responsibilities["cibuild"]["candidates"])
+
     def test_fenced_command_blocks_can_document_custom_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -890,6 +918,42 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("no test command or script", titles)
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_unknown_npm_check_subcommand_is_reported_as_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun checks with `npm check`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (root / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_yarn_check_is_not_treated_as_missing_package_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun checks with `yarn check`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (root / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
 
     def test_standard_npm_test_aliases_are_not_reported_as_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:

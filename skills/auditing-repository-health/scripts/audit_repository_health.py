@@ -120,6 +120,7 @@ PACKAGE_SCRIPT_MAP = {
 }
 
 PACKAGE_MANAGER_DIRECT_SCRIPTS = {"build", "cibuild", "dev", "e2e", "lint", "preflight", "start", "test", "validate"}
+NPM_UNSUPPORTED_DIRECT_SCRIPTS = {"check"}
 
 PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES = {
     "npm": {"start", "test"},
@@ -1039,7 +1040,10 @@ def discover_documented_commands(
 
 def documented_command_files(root: Path) -> Iterable[Path]:
     root_prefixes = ("README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL")
-    nested_prefixes = ("README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL", "INSTALLATION", "USAGE")
+    nested_prefixes = (
+        "README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL", "INSTALLATION", "TEST", "USAGE",
+        "VALIDATION",
+    )
     for path in iter_files(root, "*.md"):
         rel = path.relative_to(root)
         upper_name = path.name.upper()
@@ -1686,6 +1690,8 @@ def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str
         return command
     if command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
         return None
+    if tool == "npm" and command in NPM_UNSUPPORTED_DIRECT_SCRIPTS:
+        return UNSUPPORTED_DIRECT_SCRIPT
     if command in PACKAGE_MANAGER_DIRECT_SCRIPTS:
         return UNSUPPORTED_DIRECT_SCRIPT
     return None
