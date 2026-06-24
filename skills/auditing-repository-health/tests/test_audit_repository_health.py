@@ -305,6 +305,31 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("documented", responsibilities["test"]["status"])
             self.assertIn("README.md:pytest", responsibilities["test"]["candidates"])
 
+    def test_inline_commands_are_classified_from_nearby_command_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `pytest`; run the full validation gate with `./tools/ci`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            self.assertIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertEqual("missing", responsibilities["cibuild"]["status"])
+            self.assertIn("README.md:pytest", responsibilities["test"]["candidates"])
+            self.assertEqual([], responsibilities["cibuild"]["candidates"])
+
     def test_inline_reference_examples_do_not_create_stale_documented_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -819,6 +844,29 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("README.md:make -C docs html", responsibilities["cibuild"]["candidates"])
             self.assertIn("README.md:make -f ci.mk validate", responsibilities["cibuild"]["candidates"])
 
+    def test_make_default_makefile_precedence_ignores_lower_priority_targets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun the full validation gate with `make validate`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "GNUmakefile").write_text("test:\n\t@echo test\n")
+            (root / "Makefile").write_text("validate:\n\t@echo validate\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no CI or full validation entry point", titles)
+            self.assertIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["cibuild"]["status"])
+            self.assertEqual(["GNUmakefile:test"], responsibilities["test"]["candidates"])
+            self.assertEqual([], responsibilities["cibuild"]["candidates"])
+
     def test_gnumakefile_targets_satisfy_test_and_validation_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1048,6 +1096,29 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("skill plugin mirror drift", titles)
             packaging = report["checks"]["packaging"]
             self.assertEqual(["stale-skill"], packaging["extra_skill_mirrors"])
+
+    def test_domain_skills_directory_without_codex_skill_evidence_skips_packaging_findings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            domain_skill = root / "skills" / "fireball"
+            domain_skill.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (domain_skill / "data.json").write_text('{"damage": 10}\n')
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("skill metadata missing", titles)
+            self.assertNotIn("skill plugin mirror drift", titles)
+            packaging = report["checks"]["packaging"]
+            self.assertEqual([], packaging["skills"])
+            self.assertEqual([], packaging["missing_agents_openai_yaml"])
+            self.assertEqual([], packaging["missing_skill_mirrors"])
 
     def test_iter_files_prunes_skipped_directories(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -673,10 +673,10 @@ class Audit:
         if not skills_dir.is_dir():
             return result
 
-        source_skills = sorted(path.name for path in skills_dir.iterdir() if path.is_dir())
+        source_skills = sorted(path.name for path in skills_dir.iterdir() if is_codex_skill_dir(path))
         mirror_skills = []
         if mirror_dir.is_dir():
-            mirror_skills = sorted(path.name for path in mirror_dir.iterdir() if path.is_dir())
+            mirror_skills = sorted(path.name for path in mirror_dir.iterdir() if is_codex_skill_dir(path))
         result["skills"] = source_skills
         result["missing_agents_openai_yaml"] = [
             name for name in source_skills if not (skills_dir / name / "agents" / "openai.yaml").is_file()
@@ -840,11 +840,18 @@ def read_package_script_sources(root: Path) -> Dict[str, List[str]]:
 
 def read_root_make_targets(root: Path) -> Dict[str, List[str]]:
     sources: Dict[str, List[str]] = defaultdict(list)
-    for name in ("Makefile", "makefile", "GNUmakefile"):
-        path = root / name
-        for target in read_make_targets(path):
-            sources[target].append(f"{name}:{target}")
+    path = default_makefile(root)
+    for target in read_make_targets(path):
+        sources[target].append(f"{path.name}:{target}")
     return sources
+
+
+def default_makefile(directory: Path) -> Path:
+    for name in ("GNUmakefile", "makefile", "Makefile"):
+        path = directory / name
+        if path.is_file():
+            return path
+    return directory / "Makefile"
 
 
 def flatten_target_sources(target_sources: Dict[str, List[str]]) -> List[str]:
@@ -960,18 +967,22 @@ def discover_documented_commands(
                 if stripped:
                     previous_text = stripped
                 continue
-            commands = [command for command in extract_inline_commands(line) if looks_like_command(command)]
+            commands = [
+                (command, context)
+                for command, context in extract_inline_command_contexts(line)
+                if looks_like_command(command)
+            ]
             if not commands:
                 if stripped:
                     previous_text = stripped
                 continue
-            for command in commands:
+            for command, context in commands:
                 record_documented_command(
                     root,
                     documented,
                     stale,
                     rel,
-                    line,
+                    context,
                     command,
                     package_scripts,
                     make_targets,
@@ -1003,6 +1014,22 @@ def public_markdown_files(root: Path) -> Iterable[Path]:
 
 def extract_inline_commands(line: str) -> List[str]:
     return [match.strip().lstrip("$ ").strip() for match in re.findall(r"`([^`\n]+)`", line)]
+
+
+def extract_inline_command_contexts(line: str) -> List[Tuple[str, str]]:
+    matches = list(re.finditer(r"`([^`\n]+)`", line))
+    contexts: List[Tuple[str, str]] = []
+    for match in matches:
+        command = match.group(1).strip().lstrip("$ ").strip()
+        context_start = max(line.rfind(separator, 0, match.start()) for separator in (";", ".", "!", "?")) + 1
+        next_separators = [
+            position
+            for separator in (";", ".", "!", "?")
+            if (position := line.find(separator, match.end())) != -1
+        ]
+        context_end = min(next_separators) + 1 if next_separators else len(line)
+        contexts.append((command, line[context_start:context_end].strip()))
+    return contexts
 
 
 def record_documented_command(
@@ -1540,7 +1567,7 @@ def make_command_target_missing(root: Path, args: List[str], root_make_targets: 
     makefile, target = parsed
     if target is None:
         return not makefile.is_file()
-    if makefile == root / "Makefile":
+    if makefile == default_makefile(root):
         return target not in root_make_targets
     return not makefile.is_file() or target not in read_make_targets(makefile)
 
@@ -1601,12 +1628,16 @@ def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, Opti
         index += 1
 
     if makefile_arg is None:
-        makefile = directory / "Makefile"
+        makefile = default_makefile(directory)
     else:
         makefile = resolve_repo_path(root, directory, makefile_arg)
         if makefile is None:
             return None
     return makefile, targets[0] if targets else None
+
+
+def is_codex_skill_dir(path: Path) -> bool:
+    return path.is_dir() and (path / "SKILL.md").is_file()
 
 
 def resolve_repo_path(root: Path, base: Path, value: str) -> Optional[Path]:
