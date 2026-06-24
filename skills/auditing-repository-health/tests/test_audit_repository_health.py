@@ -508,6 +508,42 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", responsibilities["bootstrap"]["status"])
             self.assertEqual("missing", responsibilities["setup"]["status"])
 
+    def test_pip_install_documentation_satisfies_setup_responsibility(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `pip install -r requirements.txt`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "requirements.txt").write_text("requests\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("no setup or bootstrap script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["setup"]["status"])
+            self.assertIn("README.md:pip install -r requirements.txt", responsibilities["setup"]["candidates"])
+
+    def test_pip_install_missing_requirements_file_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nInstall dependencies with `pip install -r missing.txt`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "requirements.txt").write_text("requests\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
     def test_nested_package_scripts_satisfy_test_and_validation_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1217,6 +1253,22 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("present", responsibilities["cibuild"]["status"])
             self.assertIn("package.json:validate", responsibilities["cibuild"]["candidates"])
+
+    def test_make_no_value_options_still_validate_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `make -j test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "Makefile").write_text("lint:\n\t@echo lint\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
 
     def test_unknown_npm_subcommand_is_reported_as_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:

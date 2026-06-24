@@ -287,6 +287,8 @@ COMMAND_PREFIXES = (
     "sh ",
     "python ",
     "python3 ",
+    "pip ",
+    "pip3 ",
     "npm ",
     "pnpm ",
     "yarn ",
@@ -1222,6 +1224,8 @@ def documented_package_target_missing(
     tool = tokens[0]
     if tool in {"npm", "pnpm", "yarn", "bun"}:
         return package_manager_target_missing(root, tokens, package_scripts)
+    if tool in {"pip", "pip3"}:
+        return pip_install_target_missing(root, tokens)
     if tool == "make":
         return make_command_target_missing(root, tokens[1:], make_targets)
     if tool == "just":
@@ -1229,6 +1233,32 @@ def documented_package_target_missing(
         if target is None:
             return not any((root / name).is_file() for name in ("justfile", "Justfile", ".justfile"))
         return target not in just_targets
+    return False
+
+
+def pip_install_target_missing(root: Path, tokens: List[str]) -> bool:
+    if len(tokens) < 2 or tokens[1] != "install":
+        return False
+    args = tokens[2:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        requirement: Optional[str] = None
+        if arg in {"-r", "--requirement"}:
+            if index + 1 >= len(args):
+                return True
+            requirement = args[index + 1]
+            index += 2
+        elif arg.startswith("--requirement="):
+            requirement = arg.split("=", 1)[1]
+            index += 1
+        else:
+            index += 1
+        if requirement is None:
+            continue
+        path = resolve_repo_path(root, root, requirement)
+        if path is None or not path.is_file():
+            return True
     return False
 
 
@@ -1934,6 +1964,21 @@ def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, Opti
             makefile_arg = arg.split("=", 1)[1]
             index += 1
             continue
+        if arg in {"-s", "--silent", "--quiet", "-k", "--keep-going", "-n", "--just-print", "--dry-run", "--recon"}:
+            index += 1
+            continue
+        if arg in {"-j", "--jobs"}:
+            if index + 1 < len(args) and args[index + 1].isdigit():
+                index += 2
+            else:
+                index += 1
+            continue
+        if arg.startswith("-j") and arg[2:].isdigit():
+            index += 1
+            continue
+        if arg.startswith("--jobs="):
+            index += 1
+            continue
         if arg.startswith("-"):
             return None
         targets.append(arg)
@@ -2002,7 +2047,17 @@ def classify_documented_command(line: str, command: str) -> List[str]:
     for responsibility, keywords in DOC_RESPONSIBILITY_KEYWORDS.items():
         if any(keyword_matches_text(keyword, text) for keyword in keywords):
             matches.append(responsibility)
+    if documented_pip_install_command(command) and "setup" not in matches:
+        matches.append("setup")
     return matches
+
+
+def documented_pip_install_command(command: str) -> bool:
+    try:
+        tokens = shlex.split(command_without_leading_env_assignments(command))
+    except ValueError:
+        tokens = command.split()
+    return len(tokens) >= 2 and tokens[0] in {"pip", "pip3"} and tokens[1] == "install"
 
 
 def keyword_matches_text(keyword: str, text: str) -> bool:
