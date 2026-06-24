@@ -36,6 +36,9 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             capture_output=True,
         )
 
+    def audit_report(self, root):
+        return json.loads(self.run_audit(root, "--format", "json").stdout)
+
     def init_repo(self, root):
         self.run_git("init", cwd=root)
         self.run_git("config", "user.email", "test@example.com", cwd=root)
@@ -45,6 +48,18 @@ class AuditRepositoryHealthTests(unittest.TestCase):
     def commit_all(self, root, message="fixture"):
         self.run_git("add", ".", cwd=root)
         self.run_git("commit", "-m", message, cwd=root)
+
+    def write_npm_fixture(self, root, readme, root_package_json, packages):
+        self.init_repo(root)
+        (root / "README.md").write_text(readme)
+        (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+        (root / "package.json").write_text(root_package_json)
+        for rel_path, package_json in packages.items():
+            package_dir = root / rel_path
+            package_dir.mkdir(parents=True)
+            (package_dir / "package.json").write_text(package_json)
+            (package_dir / "index.js").write_text(f"console.log('{package_dir.name}')\n")
+        self.commit_all(root)
 
     def test_json_report_flags_missing_operating_scripts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -224,6 +239,28 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
 
+    def test_fenced_generic_example_without_responsibility_does_not_create_stale_documented_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "For example:\n\n"
+                "```sh\n"
+                "./tools/doit --all\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
+
     def test_fenced_real_commands_with_example_wording_still_document_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -248,6 +285,60 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("documented", responsibilities["test"]["status"])
             self.assertIn("README.md:pytest", responsibilities["test"]["candidates"])
+
+    def test_inline_real_commands_with_example_wording_still_document_responsibilities(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nFor example, to run tests, use `pytest`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertIn("README.md:pytest", responsibilities["test"]["candidates"])
+
+    def test_inline_reference_examples_do_not_create_stale_documented_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "For example, a repo might use `./tools/doit --all`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
+
+    def test_inline_generic_example_without_responsibility_does_not_create_stale_documented_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nFor example: `./tools/doit --all`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
 
     def test_install_test_helpers_do_not_satisfy_bootstrap_responsibility(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -494,6 +585,168 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("documented", responsibilities["bootstrap"]["status"])
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
             self.assertIn("README.md:npm ci", responsibilities["bootstrap"]["candidates"])
+
+    def test_npm_workspace_commands_document_workspace_scripts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\n"
+                "Run tests with `npm run --workspace app test`.\n"
+                "Run tests with `npm --workspace app test`.\n"
+                "Run tests with `npm -w app run test`.\n"
+                "Run tests with `npm --workspace=app run test`.\n"
+                "Run tests with `npm run test --workspace app`.\n"
+                "Run tests with `npm test --workspace app`.\n"
+                "Install dependencies with `npm install --workspace app`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {
+                    "packages/app": (
+                        '{"name": "app", "scripts": {"test": "vitest"}, '
+                        '"dependencies": {"left-pad": "1.3.0"}}\n'
+                    ),
+                },
+            )
+
+            report = self.audit_report(root)
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertEqual("documented", responsibilities["bootstrap"]["status"])
+            expected = [
+                "npm run --workspace app test",
+                "npm --workspace app test",
+                "npm -w app run test",
+                "npm --workspace=app run test",
+                "npm run test --workspace app",
+                "npm test --workspace app",
+            ]
+            for command in expected:
+                self.assertIn(f"README.md:{command}", responsibilities["test"]["candidates"])
+            self.assertIn("README.md:npm install --workspace app", responsibilities["bootstrap"]["candidates"])
+
+    def test_npm_script_arguments_after_separator_do_not_select_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\n"
+                "Run tests with `npm run test -- --workspace app`.\n",
+                '{"workspaces": ["packages/*"], "scripts": {"test": "vitest --run"}}\n',
+                {"packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn(
+                "README.md:npm run test -- --workspace app",
+                responsibilities["test"]["candidates"],
+            )
+
+    def test_unresolved_npm_workspace_options_report_stale_documented_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\n"
+                "Run tests with `npm run --workspace missing test`.\n"
+                "Install dependencies with `npm install --workspace missing`.\n",
+                '{"scripts": {"test": "vitest"}}\n',
+                {},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+
+    def test_npm_run_without_script_does_not_document_test_responsibility(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `npm run --workspace app`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_npm_multi_workspace_commands_report_stale_when_any_workspace_lacks_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\n"
+                "Run tests with `npm run --workspaces test`.\n"
+                "Run tests with `npm run -w app -w api test`.\n",
+                '{"workspaces": ["packages/*"], "scripts": {"test": "vitest"}}\n',
+                {
+                    "packages/app": '{"name": "app", "scripts": {"test": "vitest"}}\n',
+                    "packages/api": '{"name": "api", "scripts": {"lint": "eslint ."}}\n',
+                },
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+
+    def test_npm_all_workspaces_with_all_scripts_is_not_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `npm run --workspaces test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {
+                    "packages/app": '{"name": "app", "scripts": {"test": "vitest"}}\n',
+                    "packages/api": '{"name": "api", "scripts": {"test": "vitest"}}\n',
+                },
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:npm run --workspaces test", responsibilities["test"]["candidates"])
+
+    def test_npm_workspace_resolution_ignores_packages_outside_declared_workspaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `npm run --workspace app test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {
+                    "packages/web": '{"name": "web", "scripts": {"test": "vitest"}}\n',
+                    "examples/app": '{"name": "app", "scripts": {"test": "vitest"}}\n',
+                },
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
 
     def test_invalid_npm_direct_script_alias_is_reported_as_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:

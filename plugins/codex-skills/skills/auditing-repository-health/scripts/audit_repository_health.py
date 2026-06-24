@@ -150,6 +150,18 @@ PACKAGE_MANAGER_DIRECTORY_OPTIONS = {
     "bun": {"--cwd"},
 }
 
+PACKAGE_MANAGER_WORKSPACE_OPTIONS = {
+    "npm": {"-w", "--workspace"},
+}
+
+PACKAGE_MANAGER_ALL_WORKSPACES_OPTIONS = {
+    "npm": {"--workspaces"},
+}
+
+PACKAGE_MANAGER_INCLUDE_WORKSPACE_ROOT_OPTIONS = {
+    "npm": {"--include-workspace-root"},
+}
+
 PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
     "--frozen-lockfile",
     "--if-present",
@@ -169,6 +181,27 @@ CUSTOM_COMMAND_WORDS = {
     "cibuild": {"ci", "cibuild", "validate", "validation", "preflight", "release", "gate", "all"},
     "console": {"console", "repl", "shell"},
 }
+
+
+@dataclass
+class WorkspaceSelection:
+    names: List[str]
+    all_workspaces: bool = False
+    include_root: bool = False
+
+    def extend(self, other: "WorkspaceSelection") -> None:
+        self.names.extend(other.names)
+        self.all_workspaces = self.all_workspaces or other.all_workspaces
+        self.include_root = self.include_root or other.include_root
+
+    def enabled(self) -> bool:
+        return bool(self.names) or self.all_workspaces
+
+
+@dataclass
+class PackageManagerCommand:
+    package_dirs: Optional[List[Path]]
+    script: Optional[str]
 
 EXPLICIT_TEST_WORDS = {"test", "tests", "spec"}
 
@@ -983,10 +1016,15 @@ def record_documented_command(
     make_targets: List[str],
     just_targets: List[str],
 ) -> None:
+    responsibilities = classify_documented_command(context, command)
+    if not responsibilities and is_generic_reference_context(context):
+        return
+    if package_manager_run_without_script(command):
+        return
     if documented_command_target_missing(root, command, package_scripts, make_targets, just_targets):
         stale.append(f"{rel}:{command}")
         return
-    for responsibility in classify_documented_command(context, command):
+    for responsibility in responsibilities:
         documented[responsibility].append(f"{rel}:{command}")
 
 
@@ -998,7 +1036,8 @@ def is_reference_command_line(line: str) -> bool:
     reference_phrases = (
         "if the repo uses",
         "if a repo uses",
-        "for example",
+        "a repo might use",
+        "repo might use",
         "such as",
         "common script",
         "common name",
@@ -1029,6 +1068,10 @@ def is_fenced_reference_context(line: str) -> bool:
         "npx skills add",
     )
     return any(phrase in lower for phrase in reference_phrases)
+
+
+def is_generic_reference_context(line: str) -> bool:
+    return line.lstrip().lower().startswith("for example")
 
 
 def looks_like_command(command: str) -> bool:
@@ -1092,21 +1135,44 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
     parsed = parse_package_manager_command(root, tokens)
     if parsed is None:
         return False
-    package_dir, script = parsed
-    if script is None:
+    if parsed.package_dirs is None:
+        return True
+    if parsed.script is None:
         return False
-    scripts = root_package_scripts if package_dir == root else read_package_scripts(package_dir / "package.json")
-    return script not in scripts
+    for package_dir in parsed.package_dirs:
+        scripts = root_package_scripts if package_dir == root else read_package_scripts(package_dir / "package.json")
+        if parsed.script not in scripts:
+            return True
+    return False
 
 
-def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Tuple[Path, Optional[str]]]:
+def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[PackageManagerCommand]:
     if not tokens:
         return None
     tool = tokens[0]
     directory = root
+    workspace_selection = WorkspaceSelection([])
     args = tokens[1:]
     index = 0
     while index < len(args):
+        workspace_option = package_manager_workspace_option_value(tool, args, index)
+        if workspace_option is not None:
+            value, next_index = workspace_option
+            workspace_selection.names.append(value)
+            index = next_index
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tool, args, index)
+        if workspace_toggle is not None:
+            enabled, next_index = workspace_toggle
+            workspace_selection.all_workspaces = workspace_selection.all_workspaces or enabled
+            index = next_index
+            continue
+        include_root = package_manager_include_workspace_root_option(tool, args, index)
+        if include_root is not None:
+            enabled, next_index = include_root
+            workspace_selection.include_root = workspace_selection.include_root or enabled
+            index = next_index
+            continue
         directory_option = package_manager_directory_option_value(tool, args, index)
         if directory_option is not None:
             value, next_index = directory_option
@@ -1124,8 +1190,296 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Tup
             continue
         if arg.startswith("-"):
             return None
-        return directory, package_manager_script_from_args(tool, args[index:])
-    return directory, None
+        command_args = args[index:]
+        workspace_selection.extend(package_manager_workspace_selection(tool, command_args))
+        script = package_manager_script_from_args(tool, command_args)
+        if workspace_selection.enabled():
+            package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
+            return PackageManagerCommand(package_dirs, script)
+        return PackageManagerCommand([directory], script)
+    if workspace_selection.enabled():
+        package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
+        return PackageManagerCommand(package_dirs, None)
+    return PackageManagerCommand([directory], None)
+
+
+def package_manager_workspace_selection(tool: str, args: List[str]) -> WorkspaceSelection:
+    if not args:
+        return WorkspaceSelection([])
+    if args[0] in {"run", "run-script"}:
+        return package_manager_run_workspace_selection(tool, args[1:])
+    if args[0] in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
+        return package_manager_post_command_workspace_selection(tool, args[1:])
+    if args[0] in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
+        return package_manager_post_command_workspace_selection(tool, args[1:])
+    return WorkspaceSelection([])
+
+
+def package_manager_run_workspace_selection(tool: str, tokens: List[str]) -> WorkspaceSelection:
+    selection = WorkspaceSelection([])
+    index = 0
+    saw_script = False
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            break
+        workspace_option = package_manager_workspace_option_value(tool, tokens, index)
+        if workspace_option is not None:
+            value, index = workspace_option
+            selection.names.append(value)
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tool, tokens, index)
+        if workspace_toggle is not None:
+            enabled, index = workspace_toggle
+            selection.all_workspaces = selection.all_workspaces or enabled
+            continue
+        include_root = package_manager_include_workspace_root_option(tool, tokens, index)
+        if include_root is not None:
+            enabled, index = include_root
+            selection.include_root = selection.include_root or enabled
+            continue
+        if is_package_manager_no_value_option(token):
+            index += 1
+            continue
+        if token.startswith("-") or saw_script:
+            break
+        saw_script = True
+        index += 1
+    return selection
+
+
+def package_manager_post_command_workspace_selection(tool: str, tokens: List[str]) -> WorkspaceSelection:
+    selection = WorkspaceSelection([])
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            break
+        workspace_option = package_manager_workspace_option_value(tool, tokens, index)
+        if workspace_option is not None:
+            value, index = workspace_option
+            selection.names.append(value)
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tool, tokens, index)
+        if workspace_toggle is not None:
+            enabled, index = workspace_toggle
+            selection.all_workspaces = selection.all_workspaces or enabled
+            continue
+        include_root = package_manager_include_workspace_root_option(tool, tokens, index)
+        if include_root is not None:
+            enabled, index = include_root
+            selection.include_root = selection.include_root or enabled
+            continue
+        if is_package_manager_no_value_option(token):
+            index += 1
+            continue
+        break
+    return selection
+
+
+def first_package_manager_run_arg(tool: str, tokens: List[str]) -> Optional[str]:
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            return None
+        workspace_option = package_manager_workspace_option_value(tool, tokens, index)
+        if workspace_option is not None:
+            _, index = workspace_option
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tool, tokens, index)
+        if workspace_toggle is not None:
+            _, index = workspace_toggle
+            continue
+        include_root = package_manager_include_workspace_root_option(tool, tokens, index)
+        if include_root is not None:
+            _, index = include_root
+            continue
+        if is_package_manager_no_value_option(token):
+            index += 1
+            continue
+        if token.startswith("-"):
+            return None
+        return token
+    return None
+
+
+def package_manager_run_without_script(command: str) -> bool:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens or tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
+        return False
+    tool = tokens[0]
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        workspace_option = package_manager_workspace_option_value(tool, args, index)
+        if workspace_option is not None:
+            _, index = workspace_option
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tool, args, index)
+        if workspace_toggle is not None:
+            _, index = workspace_toggle
+            continue
+        include_root = package_manager_include_workspace_root_option(tool, args, index)
+        if include_root is not None:
+            _, index = include_root
+            continue
+        directory_option = package_manager_directory_option_value(tool, args, index)
+        if directory_option is not None:
+            _, index = directory_option
+            continue
+        token = args[index]
+        if is_package_manager_no_value_option(token):
+            index += 1
+            continue
+        if token.startswith("-"):
+            return False
+        return token in {"run", "run-script"} and first_package_manager_run_arg(tool, args[index + 1:]) is None
+    return False
+
+
+def package_manager_workspace_option_value(
+    tool: str,
+    args: List[str],
+    index: int,
+) -> Optional[Tuple[str, int]]:
+    arg = args[index]
+    options = PACKAGE_MANAGER_WORKSPACE_OPTIONS.get(tool, set())
+    if arg in options:
+        if index + 1 >= len(args):
+            return None
+        return args[index + 1], index + 2
+    for option in options:
+        if arg.startswith(f"{option}="):
+            return arg.split("=", 1)[1], index + 1
+    return None
+
+
+def package_manager_all_workspaces_option_value(
+    tool: str,
+    args: List[str],
+    index: int,
+) -> Optional[Tuple[bool, int]]:
+    arg = args[index]
+    options = PACKAGE_MANAGER_ALL_WORKSPACES_OPTIONS.get(tool, set())
+    if arg in options:
+        return True, index + 1
+    for option in options:
+        if arg.startswith(f"{option}="):
+            return parse_truthy_option_value(arg.split("=", 1)[1]), index + 1
+    return None
+
+
+def package_manager_include_workspace_root_option(
+    tool: str,
+    args: List[str],
+    index: int,
+) -> Optional[Tuple[bool, int]]:
+    arg = args[index]
+    options = PACKAGE_MANAGER_INCLUDE_WORKSPACE_ROOT_OPTIONS.get(tool, set())
+    if arg in options:
+        return True, index + 1
+    for option in options:
+        if arg.startswith(f"{option}="):
+            return parse_truthy_option_value(arg.split("=", 1)[1]), index + 1
+    return None
+
+
+def parse_truthy_option_value(value: str) -> bool:
+    return value.lower() not in {"0", "false", "no", "off"}
+
+
+def resolve_package_workspaces(
+    root: Path,
+    package_root: Path,
+    selection: WorkspaceSelection,
+) -> Optional[List[Path]]:
+    declared = declared_package_workspaces(root, package_root)
+    selected: List[Path] = []
+    if selection.all_workspaces:
+        selected.extend(declared)
+    for workspace in selection.names:
+        resolved = resolve_declared_package_workspace(package_root, declared, workspace)
+        if resolved is None:
+            return None
+        selected.append(resolved)
+    if selection.include_root:
+        selected.append(package_root)
+    selected = unique_paths(selected)
+    return selected or None
+
+
+def declared_package_workspaces(root: Path, package_root: Path) -> List[Path]:
+    patterns = read_package_workspace_patterns(package_root / "package.json")
+    workspaces: List[Path] = []
+    for pattern in patterns:
+        if pattern.startswith("!"):
+            continue
+        for candidate in sorted(package_root.glob(pattern)):
+            if not candidate.is_dir() or not (candidate / "package.json").is_file():
+                continue
+            try:
+                candidate.resolve().relative_to(root.resolve())
+            except ValueError:
+                continue
+            workspaces.append(candidate)
+    return unique_paths(workspaces)
+
+
+def read_package_workspace_patterns(path: Path) -> List[str]:
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    workspaces = data.get("workspaces")
+    if isinstance(workspaces, list):
+        return [item for item in workspaces if isinstance(item, str)]
+    if isinstance(workspaces, dict):
+        packages = workspaces.get("packages", [])
+        if isinstance(packages, list):
+            return [item for item in packages if isinstance(item, str)]
+    return []
+
+
+def resolve_declared_package_workspace(package_root: Path, declared: List[Path], workspace: str) -> Optional[Path]:
+    normalized = workspace.strip().rstrip("/")
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    for workspace_dir in declared:
+        rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
+        if normalized == rel or normalized == f"./{rel}":
+            return workspace_dir
+        if read_package_name(workspace_dir / "package.json") == workspace:
+            return workspace_dir
+    return None
+
+
+def unique_paths(paths: List[Path]) -> List[Path]:
+    seen = set()
+    unique: List[Path] = []
+    for path in paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(path)
+    return unique
+
+
+def read_package_name(path: Path) -> Optional[str]:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    name = data.get("name")
+    return name if isinstance(name, str) else None
 
 
 def package_manager_directory_option_value(
@@ -1158,12 +1512,18 @@ def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str
     if command in PACKAGE_MANAGER_BUILTIN_COMMANDS.get(tool, set()):
         return None
     if command in {"run", "run-script"}:
-        return first_non_option(args[1:])
+        return first_package_manager_run_arg(tool, args[1:])
     if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
         return command
     if command in PACKAGE_MANAGER_DIRECT_SCRIPTS:
         return UNSUPPORTED_DIRECT_SCRIPT
     return None
+
+
+def is_package_manager_no_value_option(arg: str) -> bool:
+    return arg in PACKAGE_MANAGER_NO_VALUE_OPTIONS or (
+        arg.startswith("--") and "=" in arg and package_manager_option_name(arg) in PACKAGE_MANAGER_NO_VALUE_OPTIONS
+    )
 
 
 def first_non_option(tokens: List[str]) -> Optional[str]:
