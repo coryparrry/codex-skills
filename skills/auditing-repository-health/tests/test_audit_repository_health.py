@@ -92,6 +92,24 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertTrue(report["commands_run"])
             self.assertTrue(report["not_checked"])
 
+    def test_non_yaml_workflow_files_do_not_count_as_ci_workflows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (workflows / "README.md").write_text("# Workflows\n")
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("no reusable closeout gate", titles)
+            self.assertEqual([], report["checks"]["validation"]["ci_workflows"])
+
     def test_markdown_report_maps_scripts_and_required_sections(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -212,6 +230,32 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("documented", responsibilities["cibuild"]["status"])
             self.assertIn("docs/testing.md:pytest", responsibilities["test"]["candidates"])
             self.assertIn("docs/validation.md:npm run release-gate", responsibilities["cibuild"]["candidates"])
+
+    def test_env_prefixed_documented_commands_satisfy_responsibilities(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `PYTHONPATH=. pytest`.\n"
+                "Run the full validation gate with `CI=1 npm run release-gate`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"scripts": {"release-gate": "echo ok"}}\n')
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            self.assertNotIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertEqual("documented", responsibilities["cibuild"]["status"])
+            self.assertIn("README.md:PYTHONPATH=. pytest", responsibilities["test"]["candidates"])
+            self.assertIn("README.md:CI=1 npm run release-gate", responsibilities["cibuild"]["candidates"])
 
     def test_fenced_command_blocks_can_document_custom_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -841,6 +885,31 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("documented command target missing", titles)
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("present", responsibilities["test"]["status"])
+
+    def test_npm_all_workspaces_if_present_ignores_missing_workspace_scripts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `npm run test --workspaces --if-present`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {
+                    "packages/app": '{"name": "app", "scripts": {"test": "vitest"}}\n',
+                    "packages/api": '{"name": "api", "scripts": {"lint": "eslint ."}}\n',
+                },
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn(
+                "README.md:npm run test --workspaces --if-present",
+                responsibilities["test"]["candidates"],
+            )
 
     def test_npm_all_workspaces_with_all_scripts_is_not_stale(self):
         with tempfile.TemporaryDirectory() as tmp:

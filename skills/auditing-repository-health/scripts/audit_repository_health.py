@@ -223,8 +223,11 @@ class WorkspaceSelection:
 class PackageManagerCommand:
     package_dirs: Optional[List[Path]]
     script: Optional[str]
+    if_present: bool = False
 
 EXPLICIT_TEST_WORDS = {"test", "tests", "spec"}
+
+CI_WORKFLOW_EXTENSIONS = {".yaml", ".yml"}
 
 COMMAND_FILE_EXTENSIONS = {
     ".bash",
@@ -657,7 +660,11 @@ class Audit:
             shell_scripts = sorted(str(path.relative_to(root)) for path in (root / "scripts").glob("*.sh"))
         workflows = []
         if workflows_dir.is_dir():
-            workflows = sorted(str(path.relative_to(root)) for path in workflows_dir.glob("*") if path.is_file())
+            workflows = sorted(
+                str(path.relative_to(root))
+                for path in workflows_dir.glob("*")
+                if path.is_file() and path.suffix.lower() in CI_WORKFLOW_EXTENSIONS
+            )
         cibuild = scripts_check["responsibilities"]["cibuild"]
         validation_candidates = cibuild["candidates"]
 
@@ -1149,8 +1156,22 @@ def is_generic_reference_context(line: str) -> bool:
     return line.lstrip().lower().startswith("for example")
 
 
+def command_without_leading_env_assignments(command: str) -> str:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    while tokens and is_env_assignment(tokens[0]):
+        tokens = tokens[1:]
+    return shlex.join(tokens) if tokens else ""
+
+
+def is_env_assignment(token: str) -> bool:
+    return re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", token) is not None
+
+
 def looks_like_command(command: str) -> bool:
-    command = command.strip()
+    command = command_without_leading_env_assignments(command).strip()
     lower = command.lower()
     if "codex_home" in lower or "$home/.codex" in lower:
         return False
@@ -1187,6 +1208,7 @@ def documented_package_target_missing(
     make_targets: List[str],
     just_targets: List[str],
 ) -> bool:
+    command = command_without_leading_env_assignments(command)
     try:
         tokens = shlex.split(command)
     except ValueError:
@@ -1214,11 +1236,14 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
         return True
     if parsed.script is None:
         return False
+    found_script = False
     for package_dir in parsed.package_dirs:
         scripts = root_package_scripts if package_dir == root else read_package_scripts(package_dir / "package.json")
-        if parsed.script not in scripts:
+        if parsed.script in scripts:
+            found_script = True
+        elif not parsed.if_present:
             return True
-    return False
+    return not found_script
 
 
 def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[PackageManagerCommand]:
@@ -1228,6 +1253,7 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Pac
     directory = root
     workspace_selection = WorkspaceSelection([])
     args = tokens[1:]
+    if_present = package_manager_args_if_present(args)
     index = 0
     while index < len(args):
         workspace_option = package_manager_workspace_option_value(tool, args, index)
@@ -1276,12 +1302,12 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Pac
             return PackageManagerCommand(None, script)
         if workspace_selection.enabled():
             package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
-            return PackageManagerCommand(package_dirs, script)
-        return PackageManagerCommand([directory], script)
+            return PackageManagerCommand(package_dirs, script, if_present)
+        return PackageManagerCommand([directory], script, if_present)
     if workspace_selection.enabled():
         package_dirs = resolve_package_workspaces(root, directory, workspace_selection)
-        return PackageManagerCommand(package_dirs, None)
-    return PackageManagerCommand([directory], None)
+        return PackageManagerCommand(package_dirs, None, if_present)
+    return PackageManagerCommand([directory], None, if_present)
 
 
 def package_manager_workspace_selection(tool: str, args: List[str]) -> WorkspaceSelection:
@@ -1479,6 +1505,7 @@ def first_package_manager_run_arg(tool: str, tokens: List[str]) -> Optional[str]
 
 
 def package_manager_run_without_script(command: str) -> bool:
+    command = command_without_leading_env_assignments(command)
     try:
         tokens = shlex.split(command)
     except ValueError:
@@ -1565,6 +1592,18 @@ def package_manager_include_workspace_root_option(
 
 def parse_truthy_option_value(value: str) -> bool:
     return value.lower() not in {"0", "false", "no", "off"}
+
+
+def package_manager_args_if_present(args: List[str]) -> bool:
+    enabled = False
+    for arg in args:
+        if arg == "--":
+            break
+        if arg == "--if-present":
+            enabled = True
+        elif arg.startswith("--if-present="):
+            enabled = parse_truthy_option_value(arg.split("=", 1)[1])
+    return enabled
 
 
 def resolve_package_workspaces(
@@ -1807,6 +1846,7 @@ def resolve_repo_path(root: Path, base: Path, value: str) -> Optional[Path]:
 
 
 def local_command_target(command: str) -> Optional[str]:
+    command = command_without_leading_env_assignments(command)
     try:
         tokens = shlex.split(command)
     except ValueError:
