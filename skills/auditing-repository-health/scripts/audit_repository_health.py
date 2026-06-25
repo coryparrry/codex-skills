@@ -1906,15 +1906,19 @@ def make_command_target_missing(root: Path, args: List[str], root_make_targets: 
     parsed = parse_make_command(root, args)
     if parsed is None:
         return False
-    makefile, target = parsed
-    if target is None:
+    makefile, targets = parsed
+    if not targets:
         return not makefile.is_file()
+    if not makefile.is_file():
+        return True
     if makefile == default_makefile(root):
-        return target not in root_make_targets
-    return not makefile.is_file() or target not in read_make_targets(makefile)
+        make_targets = root_make_targets
+    else:
+        make_targets = read_make_targets(makefile)
+    return any(target not in make_targets for target in targets)
 
 
-def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, Optional[str]]]:
+def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, List[str]]]:
     directory = root
     makefile_arg: Optional[str] = None
     targets: List[str] = []
@@ -1990,7 +1994,7 @@ def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, Opti
         makefile = resolve_repo_path(root, directory, makefile_arg)
         if makefile is None:
             return None
-    return makefile, targets[0] if targets else None
+    return makefile, targets
 
 
 def is_codex_skill_dir(path: Path) -> bool:

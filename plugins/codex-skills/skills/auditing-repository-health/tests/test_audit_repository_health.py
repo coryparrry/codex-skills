@@ -1270,6 +1270,22 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("documented command target missing", titles)
             self.assertIn("no test command or script", titles)
 
+    def test_make_multiple_goals_all_validate_before_accepting_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun validation with `make test validate`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "Makefile").write_text("test:\n\t@echo test\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no CI or full validation entry point", titles)
+
     def test_unknown_npm_subcommand_is_reported_as_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
