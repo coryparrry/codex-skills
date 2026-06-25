@@ -231,6 +231,32 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("docs/testing.md:pytest", responsibilities["test"]["candidates"])
             self.assertIn("docs/validation.md:npm run release-gate", responsibilities["cibuild"]["candidates"])
 
+    def test_agent_instruction_docs_can_document_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "AGENTS.md").write_text(
+                "# Agent Instructions\n\n"
+                "Run tests with `pytest`.\n"
+                "Run the full validation gate with `pytest`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no CI or full validation entry point", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertEqual("documented", responsibilities["cibuild"]["status"])
+            self.assertIn("AGENTS.md:pytest", responsibilities["test"]["candidates"])
+            self.assertIn("AGENTS.md:pytest", responsibilities["cibuild"]["candidates"])
+
     def test_env_prefixed_documented_commands_satisfy_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1855,6 +1881,34 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("GNUmakefile:test", responsibilities["test"]["candidates"])
             self.assertIn("GNUmakefile:validate", responsibilities["cibuild"]["candidates"])
 
+    def test_bare_make_command_can_satisfy_documented_responsibilities(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests with `make`.\n"
+                "Run the full validation gate with `make`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "Makefile").write_text("all:\n\t@echo ok\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no CI or full validation entry point", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertEqual("documented", responsibilities["cibuild"]["status"])
+            self.assertIn("README.md:make", responsibilities["test"]["candidates"])
+            self.assertIn("README.md:make", responsibilities["cibuild"]["candidates"])
+
     def test_justfile_targets_satisfy_test_and_validation_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2081,6 +2135,28 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertIn("skill plugin mirror drift", titles)
             packaging = report["checks"]["packaging"]
+            self.assertEqual(["stale-skill"], packaging["extra_skill_mirrors"])
+
+    def test_detects_stale_plugin_only_skill_mirror_without_source_skills_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            stale_mirror = root / "plugins" / "codex-skills" / "skills" / "stale-skill"
+            stale_mirror.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (stale_mirror / "SKILL.md").write_text("---\nname: stale-skill\ndescription: Use when stale\n---\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("skill plugin mirror drift", titles)
+            packaging = report["checks"]["packaging"]
+            self.assertFalse(packaging["has_skills_dir"])
+            self.assertTrue(packaging["has_plugin_skill_mirror"])
             self.assertEqual(["stale-skill"], packaging["extra_skill_mirrors"])
 
     def test_domain_skills_directory_without_codex_skill_evidence_skips_packaging_findings(self):

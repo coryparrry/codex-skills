@@ -364,6 +364,8 @@ COMMAND_PREFIXES = (
     "tools/",
 )
 
+SINGLE_WORD_COMMANDS = {"make", "pytest", "tox"}
+
 INTERPRETER_COMMANDS = {
     "bash",
     "sh",
@@ -756,10 +758,9 @@ class Audit:
             "extra_skill_mirrors": [],
             "drifted_skill_mirrors": [],
         }
-        if not skills_dir.is_dir():
-            return result
-
-        source_skills = sorted(path.name for path in skills_dir.iterdir() if is_codex_skill_dir(path))
+        source_skills = []
+        if skills_dir.is_dir():
+            source_skills = sorted(path.name for path in skills_dir.iterdir() if is_codex_skill_dir(path))
         mirror_skills = []
         if mirror_dir.is_dir():
             mirror_skills = sorted(path.name for path in mirror_dir.iterdir() if is_codex_skill_dir(path))
@@ -1105,6 +1106,7 @@ def discover_documented_commands(
 
 def documented_command_files(root: Path) -> Iterable[Path]:
     root_prefixes = ("README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL")
+    root_instruction_docs = {"AGENTS.MD", "CLAUDE.MD", "GEMINI.MD"}
     nested_prefixes = (
         "README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL", "INSTALLATION", "TEST", "USAGE",
         "VALIDATION",
@@ -1112,7 +1114,7 @@ def documented_command_files(root: Path) -> Iterable[Path]:
     for path in iter_files(root, "*.md"):
         rel = path.relative_to(root)
         upper_name = path.name.upper()
-        if len(rel.parts) == 1 and upper_name.startswith(root_prefixes):
+        if len(rel.parts) == 1 and (upper_name.startswith(root_prefixes) or upper_name in root_instruction_docs):
             yield path
             continue
         if rel.parts[0] == "docs" and upper_name.startswith(nested_prefixes):
@@ -1233,9 +1235,9 @@ def looks_like_command(command: str) -> bool:
     lower = command.lower()
     if "codex_home" in lower or "$home/.codex" in lower:
         return False
-    if not command or " " not in command and "/" not in command and lower not in {"pytest", "tox"}:
+    if not command or " " not in command and "/" not in command and lower not in SINGLE_WORD_COMMANDS:
         return False
-    return lower.startswith(COMMAND_PREFIXES)
+    return lower in SINGLE_WORD_COMMANDS or lower.startswith(COMMAND_PREFIXES)
 
 
 def documented_command_target_missing(
