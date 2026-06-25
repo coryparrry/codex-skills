@@ -196,6 +196,58 @@ PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
     "--silent",
 }
 
+PACKAGE_MANAGER_INSTALL_VALUE_OPTIONS = {
+    "--allow-git",
+    "--before",
+    "--cache",
+    "--cpu",
+    "--install-strategy",
+    "--include",
+    "--libc",
+    "--min-release-age",
+    "--omit",
+    "--only",
+    "--os",
+    "--registry",
+    "--save-prefix",
+    "--tag",
+    "--userconfig",
+}
+
+PACKAGE_MANAGER_INSTALL_NO_VALUE_OPTIONS = {
+    "--audit",
+    "-B",
+    "-D",
+    "-E",
+    "--fund",
+    "-O",
+    "-P",
+    "--bin-links",
+    "--dry-run",
+    "--force",
+    "--foreground-scripts",
+    "-g",
+    "--global",
+    "--global-style",
+    "--ignore-scripts",
+    "--install-links",
+    "--legacy-bundling",
+    "--legacy-peer-deps",
+    "--no-save",
+    "--package-lock",
+    "--package-lock-only",
+    "--prefer-dedupe",
+    "--production",
+    "--save",
+    "--save-bundle",
+    "--save-dev",
+    "--save-exact",
+    "--save-optional",
+    "--save-peer",
+    "--save-prod",
+    "--strict-peer-deps",
+}
+
 CUSTOM_COMMAND_WORDS = {
     "bootstrap": {"bootstrap", "install"},
     "setup": {"setup", "doctor"},
@@ -1221,7 +1273,7 @@ def documented_package_target_missing(
         tokens = command.split()
     if not tokens:
         return False
-    tokens = normalize_python_module_pip_tokens(tokens)
+    tokens = normalize_pip_command_tokens(tokens)
     tool = tokens[0]
     if tool in {"npm", "pnpm", "yarn", "bun"}:
         return package_manager_target_missing(root, tokens, package_scripts)
@@ -1271,6 +1323,8 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
         return True
     if package_manager_builtin_target_missing(root, tokens):
         return True
+    if package_manager_install_manifest_missing(tokens, parsed):
+        return True
     if parsed.script is None:
         return False
     found_script = False
@@ -1288,6 +1342,107 @@ def package_manager_builtin_target_missing(root: Path, tokens: List[str]) -> boo
         return False
     lockfile_root = npm_ci_lockfile_root(root, tokens)
     return lockfile_root is not None and not npm_lockfile_exists(lockfile_root)
+
+
+def package_manager_install_manifest_missing(tokens: List[str], parsed: PackageManagerCommand) -> bool:
+    command = package_manager_builtin_command(tokens)
+    if command != "install":
+        return False
+    if tokens[0] == "npm" and package_manager_install_has_package_spec(tokens):
+        return False
+    return any(not (package_dir / "package.json").is_file() for package_dir in parsed.package_dirs or [])
+
+
+def package_manager_install_has_package_spec(tokens: List[str]) -> bool:
+    command_args = package_manager_builtin_command_args(tokens)
+    if not command_args or normalize_package_manager_command(tokens[0], command_args[0]) != "install":
+        return False
+    args = command_args[1:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            return False
+        if is_package_manager_no_value_option(arg):
+            index += 1
+            continue
+        directory_option = package_manager_directory_option_value(tokens[0], args, index)
+        if directory_option is not None:
+            _, index = directory_option
+            continue
+        workspace_option = package_manager_workspace_option_value(tokens[0], args, index)
+        if workspace_option is not None:
+            _, index = workspace_option
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tokens[0], args, index)
+        if workspace_toggle is not None:
+            _, index = workspace_toggle
+            continue
+        include_root = package_manager_include_workspace_root_option(tokens[0], args, index)
+        if include_root is not None:
+            _, index = include_root
+            continue
+        install_option = package_manager_install_option_value(args, index)
+        if install_option is not None:
+            index = install_option
+            continue
+        if arg.startswith("-"):
+            return False
+        return True
+    return False
+
+
+def package_manager_install_option_value(args: List[str], index: int) -> Optional[int]:
+    arg = args[index]
+    if arg in PACKAGE_MANAGER_INSTALL_NO_VALUE_OPTIONS or arg.startswith("--no-"):
+        return index + 1
+    if any(arg.startswith(f"{option}=") for option in PACKAGE_MANAGER_INSTALL_NO_VALUE_OPTIONS):
+        return index + 1
+    if arg in PACKAGE_MANAGER_INSTALL_VALUE_OPTIONS:
+        return index + 2 if index + 1 < len(args) else len(args)
+    if any(arg.startswith(f"{option}=") for option in PACKAGE_MANAGER_INSTALL_VALUE_OPTIONS):
+        return index + 1
+    return None
+
+
+def package_manager_builtin_command(tokens: List[str]) -> Optional[str]:
+    command_args = package_manager_builtin_command_args(tokens)
+    if not command_args:
+        return None
+    return normalize_package_manager_command(tokens[0], command_args[0])
+
+
+def package_manager_builtin_command_args(tokens: List[str]) -> List[str]:
+    if not tokens:
+        return []
+    tool = tokens[0]
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        directory_option = package_manager_directory_option_value(tool, args, index)
+        if directory_option is not None:
+            _, index = directory_option
+            continue
+        workspace_option = package_manager_workspace_option_value(tool, args, index)
+        if workspace_option is not None:
+            _, index = workspace_option
+            continue
+        workspace_toggle = package_manager_all_workspaces_option_value(tool, args, index)
+        if workspace_toggle is not None:
+            _, index = workspace_toggle
+            continue
+        include_root = package_manager_include_workspace_root_option(tool, args, index)
+        if include_root is not None:
+            _, index = include_root
+            continue
+        arg = args[index]
+        if is_package_manager_no_value_option(arg):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            return []
+        return args[index:]
+    return []
 
 
 def npm_lockfile_exists(package_dir: Path) -> bool:
@@ -2109,13 +2264,15 @@ def documented_pip_install_command(command: str) -> bool:
         tokens = shlex.split(command_without_leading_env_assignments(command))
     except ValueError:
         tokens = command.split()
-    tokens = normalize_python_module_pip_tokens(tokens)
+    tokens = normalize_pip_command_tokens(tokens)
     return len(tokens) >= 2 and tokens[0] in {"pip", "pip3"} and tokens[1] == "install"
 
 
-def normalize_python_module_pip_tokens(tokens: List[str]) -> List[str]:
+def normalize_pip_command_tokens(tokens: List[str]) -> List[str]:
     if len(tokens) >= 4 and tokens[0] in {"python", "python3"} and tokens[1] == "-m" and tokens[2] == "pip":
         return [tokens[2], *tokens[3:]]
+    if len(tokens) >= 3 and tokens[0] == "uv" and tokens[1] == "pip":
+        return [tokens[1], *tokens[2:]]
     return tokens
 
 

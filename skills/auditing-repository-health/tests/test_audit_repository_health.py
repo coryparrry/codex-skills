@@ -562,6 +562,24 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("documented command target missing", titles)
             self.assertIn("no setup or bootstrap script", titles)
 
+    def test_uv_pip_missing_requirements_file_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `uv pip install -r missing.txt`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "requirements.txt").write_text("requests\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
     def test_nested_package_scripts_satisfy_test_and_validation_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -853,6 +871,245 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertIn("documented command target missing", titles)
             self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_without_package_manifest_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text("# Example\n\nInstall dependencies with `npm --prefix frontend install`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_explicit_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_pnpm_install_argument_without_manifest_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `pnpm -C frontend install left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_value_option_without_manifest_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --cache .npm-cache`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_unknown_value_option_without_manifest_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --only prod`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_release_filter_without_manifest_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --before 2024-01-01`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_unknown_option_without_manifest_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --fetch-retry-maxtimeout 60000`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_boolean_option_with_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --legacy-peer-deps left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_shorthand_boolean_option_with_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install -D left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_no_prefixed_boolean_option_with_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --no-package-lock left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_common_boolean_option_with_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --production left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_boolean_assignment_with_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --save=false left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_npm_install_save_bundle_with_package_without_manifest_documents_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `npm --prefix frontend install --save-bundle left-pad`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
 
     def test_npm_workspace_commands_document_workspace_scripts(self):
         with tempfile.TemporaryDirectory() as tmp:
