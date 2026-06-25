@@ -544,6 +544,24 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("documented command target missing", titles)
             self.assertIn("no setup or bootstrap script", titles)
 
+    def test_python_module_pip_missing_requirements_file_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nInstall dependencies with `python -m pip install -r missing.txt`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "requirements.txt").write_text("requests\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
     def test_nested_package_scripts_satisfy_test_and_validation_responsibilities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -765,6 +783,7 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
             (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
             (root / "index.js").write_text("console.log('hello')\n")
             self.commit_all(root)
 
@@ -780,6 +799,60 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("documented", responsibilities["bootstrap"]["status"])
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
             self.assertIn("README.md:npm ci", responsibilities["bootstrap"]["candidates"])
+
+    def test_npm_ci_without_lockfile_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nInstall dependencies with `npm ci`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            (root / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
+
+    def test_npm_workspace_ci_uses_root_lockfile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "packages" / "app"
+            self.init_repo(root)
+            app.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n\nInstall dependencies with `npm ci --workspace app`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"workspaces": ["packages/*"]}\n')
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
+            (app / "package.json").write_text('{"name": "app", "scripts": {"test": "vitest"}}\n')
+            (app / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no setup or bootstrap script", titles)
+
+    def test_npm_ci_with_prefix_without_lockfile_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text("# Example\n\nInstall dependencies with `npm --prefix frontend ci`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (frontend / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            (frontend / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no setup or bootstrap script", titles)
 
     def test_npm_workspace_commands_document_workspace_scripts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1594,6 +1667,26 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertNotIn("no reusable closeout gate", titles)
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("not_applicable", responsibilities["setup"]["status"])
+            self.assertEqual("not_applicable", responsibilities["test"]["status"])
+            self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
+
+    def test_domain_skills_directory_without_codex_skills_does_not_require_gates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            domain_skill = root / "skills" / "fireball"
+            domain_skill.mkdir(parents=True)
+            (root / "README.md").write_text("# Example Docs\n\nStatic documentation only.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (domain_skill / "data.json").write_text('{"damage": 8}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no CI or full validation entry point", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("not_applicable", responsibilities["test"]["status"])
             self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
 

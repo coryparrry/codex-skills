@@ -1221,6 +1221,7 @@ def documented_package_target_missing(
         tokens = command.split()
     if not tokens:
         return False
+    tokens = normalize_python_module_pip_tokens(tokens)
     tool = tokens[0]
     if tool in {"npm", "pnpm", "yarn", "bun"}:
         return package_manager_target_missing(root, tokens, package_scripts)
@@ -1268,6 +1269,8 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
         return False
     if parsed.package_dirs is None:
         return True
+    if package_manager_builtin_target_missing(root, tokens):
+        return True
     if parsed.script is None:
         return False
     found_script = False
@@ -1278,6 +1281,51 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
         elif not parsed.if_present and not parsed.allow_missing_scripts:
             return True
     return not found_script
+
+
+def package_manager_builtin_target_missing(root: Path, tokens: List[str]) -> bool:
+    if tokens[0] != "npm":
+        return False
+    lockfile_root = npm_ci_lockfile_root(root, tokens)
+    return lockfile_root is not None and not npm_lockfile_exists(lockfile_root)
+
+
+def npm_lockfile_exists(package_dir: Path) -> bool:
+    return (package_dir / "package-lock.json").is_file() or (package_dir / "npm-shrinkwrap.json").is_file()
+
+
+def npm_ci_lockfile_root(root: Path, tokens: List[str]) -> Optional[Path]:
+    directory = root
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        directory_option = package_manager_directory_option_value("npm", args, index)
+        if directory_option is not None:
+            value, index = directory_option
+            resolved = resolve_repo_path(root, root, value)
+            if resolved is None:
+                return None
+            directory = resolved
+            continue
+        if package_manager_workspace_option_value("npm", args, index) is not None:
+            _, index = package_manager_workspace_option_value("npm", args, index)
+            continue
+        if package_manager_all_workspaces_option_value("npm", args, index) is not None:
+            _, index = package_manager_all_workspaces_option_value("npm", args, index)
+            continue
+        if package_manager_include_workspace_root_option("npm", args, index) is not None:
+            _, index = package_manager_include_workspace_root_option("npm", args, index)
+            continue
+        arg = args[index]
+        if is_package_manager_no_value_option(arg):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            return None
+        if normalize_package_manager_command("npm", arg) != "ci":
+            return None
+        return package_manager_command_directory(root, directory, "npm", args[index:])
+    return None
 
 
 def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[PackageManagerCommand]:
@@ -2061,7 +2109,14 @@ def documented_pip_install_command(command: str) -> bool:
         tokens = shlex.split(command_without_leading_env_assignments(command))
     except ValueError:
         tokens = command.split()
+    tokens = normalize_python_module_pip_tokens(tokens)
     return len(tokens) >= 2 and tokens[0] in {"pip", "pip3"} and tokens[1] == "install"
+
+
+def normalize_python_module_pip_tokens(tokens: List[str]) -> List[str]:
+    if len(tokens) >= 4 and tokens[0] in {"python", "python3"} and tokens[1] == "-m" and tokens[2] == "pip":
+        return [tokens[2], *tokens[3:]]
+    return tokens
 
 
 def keyword_matches_text(keyword: str, text: str) -> bool:
@@ -2089,7 +2144,7 @@ def infer_responsibility_needs(
     has_dependencies = has_dependency_surface(root)
     has_code = has_code_surface(root)
     has_tests = has_test_surface(root)
-    has_packaging = (root / "skills").is_dir() or (root / "plugins" / "codex-skills").is_dir()
+    has_packaging = has_codex_packaging_surface(root)
     has_server = has_server_surface(root, package_scripts, make_targets, just_targets)
     has_console = has_named_surface(package_scripts, make_targets, just_targets, {"console", "repl", "shell"})
 
@@ -2114,6 +2169,15 @@ def has_code_surface(root: Path) -> bool:
 
 def has_test_surface(root: Path) -> bool:
     return any(iter_files(root, "test_*.py")) or any(iter_files(root, "*_test.py"))
+
+
+def has_codex_packaging_surface(root: Path) -> bool:
+    skills_dir = root / "skills"
+    mirror_dir = root / "plugins" / "codex-skills" / "skills"
+    return any(
+        directory.is_dir() and any(is_codex_skill_dir(path) for path in directory.iterdir())
+        for directory in (skills_dir, mirror_dir)
+    )
 
 
 def has_server_surface(
