@@ -315,6 +315,38 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("README.md:./tools/doit --fast", responsibilities["test"]["candidates"])
             self.assertIn("README.md:./tools/doit --all", responsibilities["cibuild"]["candidates"])
 
+    def test_fenced_commands_after_cd_validate_from_changed_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frontend = root / "frontend"
+            self.init_repo(root)
+            frontend.mkdir()
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run tests:\n\n"
+                "```sh\n"
+                "cd frontend\n"
+                "npm test\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (frontend / "package.json").write_text('{"scripts": {"test": "node --test"}}\n')
+            (frontend / "index.js").write_text("console.log('hello')\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("frontend/package.json:test", responsibilities["test"]["candidates"])
+            documented_commands = report["checks"]["scripts"]["documented_commands"]
+            self.assertIn("README.md:npm test", documented_commands["test"])
+
     def test_fenced_reference_examples_do_not_create_stale_documented_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

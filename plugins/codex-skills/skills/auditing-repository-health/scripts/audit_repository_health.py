@@ -1050,20 +1050,27 @@ def discover_documented_commands(
         rel = str(path.relative_to(root))
         in_fence = False
         fence_context = ""
+        fence_command_base = root
         previous_text = ""
         for line in safe_read_text(path, limit=300_000).splitlines():
             stripped = line.strip()
             if stripped.startswith(("```", "~~~")):
                 in_fence = not in_fence
                 fence_context = previous_text if in_fence else ""
+                fence_command_base = root
                 continue
             if in_fence:
                 if is_fenced_reference_context(fence_context):
                     continue
                 command = stripped.lstrip("$ ").strip()
+                changed_directory = command_changed_directory(root, fence_command_base, command)
+                if changed_directory is not None:
+                    fence_command_base = changed_directory
+                    continue
                 if looks_like_command(command):
                     record_documented_command(
                         root,
+                        fence_command_base,
                         documented,
                         stale,
                         rel,
@@ -1089,6 +1096,7 @@ def discover_documented_commands(
                 continue
             for command, context in commands:
                 record_documented_command(
+                    root,
                     root,
                     documented,
                     stale,
@@ -1149,6 +1157,7 @@ def extract_inline_command_contexts(line: str) -> List[Tuple[str, str]]:
 
 def record_documented_command(
     root: Path,
+    command_base: Path,
     documented: Dict[str, List[str]],
     stale: List[str],
     rel: str,
@@ -1163,7 +1172,7 @@ def record_documented_command(
         return
     if package_manager_run_without_script(command):
         return
-    if documented_command_target_missing(root, command, package_scripts, make_targets, just_targets):
+    if documented_command_target_missing(root, command_base, command, package_scripts, make_targets, just_targets):
         stale.append(f"{rel}:{command}")
         return
     for responsibility in responsibilities:
@@ -1240,29 +1249,48 @@ def looks_like_command(command: str) -> bool:
     return lower in SINGLE_WORD_COMMANDS or lower.startswith(COMMAND_PREFIXES)
 
 
+def command_changed_directory(root: Path, command_base: Path, command: str) -> Optional[Path]:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if len(tokens) != 2 or tokens[0] != "cd":
+        return None
+    directory = resolve_repo_path(root, command_base, tokens[1])
+    if directory is None or not directory.is_dir():
+        return None
+    return directory
+
+
 def documented_command_target_missing(
     root: Path,
+    command_base: Path,
     command: str,
     package_scripts: Dict[str, str],
     make_targets: List[str],
     just_targets: List[str],
 ) -> bool:
-    if documented_package_target_missing(root, command, package_scripts, make_targets, just_targets):
+    if documented_package_target_missing(root, command_base, command, package_scripts, make_targets, just_targets):
         return True
     target = local_command_target(command)
     if target is None:
         return False
     if target.startswith("./"):
-        path = root / target[2:]
+        path = resolve_repo_path(root, command_base, target[2:])
+        if path is None:
+            return True
         return not path.exists() or not is_command_file(path)
     if target.startswith(("script/", "scripts/", "bin/", "tools/")):
-        path = root / target
+        path = resolve_repo_path(root, command_base, target)
+        if path is None:
+            return True
         return not path.exists() or not is_command_file(path)
     return False
 
 
 def documented_package_target_missing(
     root: Path,
+    command_base: Path,
     command: str,
     package_scripts: Dict[str, str],
     make_targets: List[str],
@@ -1278,20 +1306,21 @@ def documented_package_target_missing(
     tokens = normalize_pip_command_tokens(tokens)
     tool = tokens[0]
     if tool in {"npm", "pnpm", "yarn", "bun"}:
-        return package_manager_target_missing(root, tokens, package_scripts)
+        return package_manager_target_missing(root, command_base, tokens, package_scripts)
     if tool in {"pip", "pip3"}:
-        return pip_install_target_missing(root, tokens)
+        return pip_install_target_missing(root, command_base, tokens)
     if tool == "make":
-        return make_command_target_missing(root, tokens[1:], make_targets)
+        return make_command_target_missing(root, command_base, tokens[1:], make_targets)
     if tool == "just":
         target = first_non_option(tokens[1:])
         if target is None:
-            return not any((root / name).is_file() for name in ("justfile", "Justfile", ".justfile"))
-        return target not in just_targets
+            return not any((command_base / name).is_file() for name in ("justfile", "Justfile", ".justfile"))
+        available_targets = just_targets if command_base == root else read_just_targets(command_base)
+        return target not in available_targets
     return False
 
 
-def pip_install_target_missing(root: Path, tokens: List[str]) -> bool:
+def pip_install_target_missing(root: Path, command_base: Path, tokens: List[str]) -> bool:
     if len(tokens) < 2 or tokens[1] != "install":
         return False
     args = tokens[2:]
@@ -1311,19 +1340,24 @@ def pip_install_target_missing(root: Path, tokens: List[str]) -> bool:
             index += 1
         if requirement is None:
             continue
-        path = resolve_repo_path(root, root, requirement)
+        path = resolve_repo_path(root, command_base, requirement)
         if path is None or not path.is_file():
             return True
     return False
 
 
-def package_manager_target_missing(root: Path, tokens: List[str], root_package_scripts: Dict[str, str]) -> bool:
-    parsed = parse_package_manager_command(root, tokens)
+def package_manager_target_missing(
+    root: Path,
+    command_base: Path,
+    tokens: List[str],
+    root_package_scripts: Dict[str, str],
+) -> bool:
+    parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None:
         return False
     if parsed.package_dirs is None:
         return True
-    if package_manager_builtin_target_missing(root, tokens):
+    if package_manager_builtin_target_missing(root, command_base, tokens):
         return True
     if package_manager_install_manifest_missing(tokens, parsed):
         return True
@@ -1339,10 +1373,10 @@ def package_manager_target_missing(root: Path, tokens: List[str], root_package_s
     return not found_script
 
 
-def package_manager_builtin_target_missing(root: Path, tokens: List[str]) -> bool:
+def package_manager_builtin_target_missing(root: Path, command_base: Path, tokens: List[str]) -> bool:
     if tokens[0] != "npm":
         return False
-    lockfile_root = npm_ci_lockfile_root(root, tokens)
+    lockfile_root = npm_ci_lockfile_root(root, command_base, tokens)
     return lockfile_root is not None and not npm_lockfile_exists(lockfile_root)
 
 
@@ -1451,15 +1485,15 @@ def npm_lockfile_exists(package_dir: Path) -> bool:
     return (package_dir / "package-lock.json").is_file() or (package_dir / "npm-shrinkwrap.json").is_file()
 
 
-def npm_ci_lockfile_root(root: Path, tokens: List[str]) -> Optional[Path]:
-    directory = root
+def npm_ci_lockfile_root(root: Path, command_base: Path, tokens: List[str]) -> Optional[Path]:
+    directory = command_base
     args = tokens[1:]
     index = 0
     while index < len(args):
         directory_option = package_manager_directory_option_value("npm", args, index)
         if directory_option is not None:
             value, index = directory_option
-            resolved = resolve_repo_path(root, root, value)
+            resolved = resolve_repo_path(root, command_base, value)
             if resolved is None:
                 return None
             directory = resolved
@@ -1485,11 +1519,15 @@ def npm_ci_lockfile_root(root: Path, tokens: List[str]) -> Optional[Path]:
     return None
 
 
-def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[PackageManagerCommand]:
+def parse_package_manager_command(
+    root: Path,
+    command_base: Path,
+    tokens: List[str],
+) -> Optional[PackageManagerCommand]:
     if not tokens:
         return None
     tool = tokens[0]
-    directory = root
+    directory = command_base
     workspace_selection = WorkspaceSelection([])
     args = tokens[1:]
     if_present = package_manager_args_if_present(args)
@@ -1516,7 +1554,7 @@ def parse_package_manager_command(root: Path, tokens: List[str]) -> Optional[Pac
         directory_option = package_manager_directory_option_value(tool, args, index)
         if directory_option is not None:
             value, next_index = directory_option
-            resolved = resolve_repo_path(root, root, value)
+            resolved = resolve_repo_path(root, command_base, value)
             if resolved is None:
                 return None
             directory = resolved
@@ -2107,8 +2145,13 @@ def first_non_option(tokens: List[str]) -> Optional[str]:
     return None
 
 
-def make_command_target_missing(root: Path, args: List[str], root_make_targets: List[str]) -> bool:
-    parsed = parse_make_command(root, args)
+def make_command_target_missing(
+    root: Path,
+    command_base: Path,
+    args: List[str],
+    root_make_targets: List[str],
+) -> bool:
+    parsed = parse_make_command(root, command_base, args)
     if parsed is None:
         return False
     makefile, targets = parsed
@@ -2123,8 +2166,8 @@ def make_command_target_missing(root: Path, args: List[str], root_make_targets: 
     return any(target not in make_targets for target in targets)
 
 
-def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, List[str]]]:
-    directory = root
+def parse_make_command(root: Path, command_base: Path, args: List[str]) -> Optional[Tuple[Path, List[str]]]:
+    directory = command_base
     makefile_arg: Optional[str] = None
     targets: List[str] = []
     index = 0
@@ -2139,21 +2182,21 @@ def parse_make_command(root: Path, args: List[str]) -> Optional[Tuple[Path, List
         if arg in {"-C", "--directory"}:
             if index + 1 >= len(args):
                 return None
-            resolved = resolve_repo_path(root, root, args[index + 1])
+            resolved = resolve_repo_path(root, directory, args[index + 1])
             if resolved is None:
                 return None
             directory = resolved
             index += 2
             continue
         if arg.startswith("-C") and arg != "-C":
-            resolved = resolve_repo_path(root, root, arg[2:])
+            resolved = resolve_repo_path(root, directory, arg[2:])
             if resolved is None:
                 return None
             directory = resolved
             index += 1
             continue
         if arg.startswith("--directory="):
-            resolved = resolve_repo_path(root, root, arg.split("=", 1)[1])
+            resolved = resolve_repo_path(root, directory, arg.split("=", 1)[1])
             if resolved is None:
                 return None
             directory = resolved
