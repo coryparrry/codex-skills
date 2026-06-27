@@ -155,7 +155,9 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 "Run the full release gate with `./tools/doit --all`.\n"
             )
             (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
-            (tools / "doit").write_text("#!/usr/bin/env bash\n")
+            doit = tools / "doit"
+            doit.write_text("#!/usr/bin/env bash\n")
+            doit.chmod(0o755)
             (root / "app.py").write_text("print('hello')\n")
             self.commit_all(root)
 
@@ -183,7 +185,9 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             (root / "README.md").write_text("# Example\n")
             (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
             (root / "app.py").write_text("print('hello')\n")
-            (tools / "doit").write_text("#!/usr/bin/env bash\n")
+            doit = tools / "doit"
+            doit.write_text("#!/usr/bin/env bash\n")
+            doit.chmod(0o755)
             (docs / "DEVELOPMENT.md").write_text(
                 "# Development\n\n"
                 "Run project checks with `./tools/doit --fast`.\n"
@@ -302,7 +306,9 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
             (root / "app.py").write_text("print('hello')\n")
-            (tools / "doit").write_text("#!/usr/bin/env bash\n")
+            doit = tools / "doit"
+            doit.write_text("#!/usr/bin/env bash\n")
+            doit.chmod(0o755)
             self.commit_all(root)
 
             result = self.run_audit(root, "--format", "json")
@@ -1727,6 +1733,84 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertNotIn("no test command or script", titles)
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("documented", responsibilities["test"]["status"])
+
+    def test_bun_test_uses_builtin_runner_without_package_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nRun tests with `bun test`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"devDependencies": {"bun-types": "latest"}}\n')
+            (root / "app.test.ts").write_text("import { test } from 'bun:test';\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("documented", responsibilities["test"]["status"])
+            self.assertIn("README.md:bun test", responsibilities["test"]["candidates"])
+
+    def test_yarn_workspace_command_requires_selected_workspace_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `yarn workspace app test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_yarn_workspace_command_documents_selected_workspace_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `yarn workspace app test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"test": "vitest"}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("documented command target missing", titles)
+            self.assertNotIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("present", responsibilities["test"]["status"])
+            self.assertIn("README.md:yarn workspace app test", responsibilities["test"]["candidates"])
+            self.assertIn("packages/app/package.json:test", responsibilities["test"]["candidates"])
+
+    def test_direct_local_documented_command_requires_executable_bit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            (root / "README.md").write_text("# Example\n\nRun tests with `./scripts/test.sh`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            test_script = scripts / "test.sh"
+            test_script.write_text("#!/usr/bin/env bash\n")
+            test_script.chmod(0o644)
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertNotIn("README.md:./scripts/test.sh", responsibilities["test"]["candidates"])
 
     def test_standard_npm_test_aliases_are_not_reported_as_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:

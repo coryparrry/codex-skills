@@ -127,7 +127,7 @@ PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES = {
     "npm": {"start", "test"},
     "pnpm": PACKAGE_MANAGER_DIRECT_SCRIPTS,
     "yarn": PACKAGE_MANAGER_DIRECT_SCRIPTS,
-    "bun": PACKAGE_MANAGER_DIRECT_SCRIPTS,
+    "bun": PACKAGE_MANAGER_DIRECT_SCRIPTS - {"test"},
 }
 
 PACKAGE_MANAGER_COMMAND_ALIASES = {
@@ -162,7 +162,7 @@ PACKAGE_MANAGER_BUILTIN_COMMANDS = {
         "add", "audit", "dedupe", "dlx", "exec", "import", "info", "init", "install", "outdated",
         "pack", "publish", "remove", "set", "up", "upgrade",
     },
-    "bun": {"add", "audit", "create", "install", "outdated", "pm", "publish", "remove", "update", "upgrade"},
+    "bun": {"add", "audit", "create", "install", "outdated", "pm", "publish", "remove", "test", "update", "upgrade"},
 }
 
 PACKAGE_MANAGER_DIRECTORY_OPTIONS = {
@@ -1275,17 +1275,26 @@ def documented_command_target_missing(
     target = local_command_target(command)
     if target is None:
         return False
+    direct_target = direct_local_command_target(command)
     if target.startswith("./"):
         path = resolve_repo_path(root, command_base, target[2:])
         if path is None:
             return True
-        return not path.exists() or not is_command_file(path)
+        return not documented_local_command_target_exists(path, direct_target == target)
     if target.startswith(("script/", "scripts/", "bin/", "tools/")):
         path = resolve_repo_path(root, command_base, target)
         if path is None:
             return True
-        return not path.exists() or not is_command_file(path)
+        return not documented_local_command_target_exists(path, direct_target == target)
     return False
+
+
+def documented_local_command_target_exists(path: Path, requires_executable: bool) -> bool:
+    if not path.exists() or not is_command_file(path):
+        return False
+    if requires_executable and not os.access(path, os.X_OK):
+        return False
+    return True
 
 
 def documented_package_target_missing(
@@ -1592,6 +1601,8 @@ def package_manager_workspace_selection(tool: str, args: List[str]) -> Workspace
     if not args:
         return WorkspaceSelection([])
     command = normalize_package_manager_command(tool, args[0])
+    if tool == "yarn" and command == "workspace":
+        return yarn_workspace_command_selection(args)
     if command in {"run", "run-script"}:
         return package_manager_run_workspace_selection(tool, args[1:])
     if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
@@ -1675,6 +1686,8 @@ def package_manager_command_directory(root: Path, directory: Path, tool: str, ar
     if not args:
         return directory
     command = normalize_package_manager_command(tool, args[0])
+    if tool == "yarn" and command == "workspace":
+        return directory
     if command in {"run", "run-script"}:
         return package_manager_run_command_directory(root, directory, tool, args[1:])
     if (
@@ -2115,6 +2128,10 @@ def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str
     if not args:
         return None
     command = normalize_package_manager_command(tool, args[0])
+    if tool == "yarn" and command == "workspace":
+        if len(args) < 3:
+            return None
+        return package_manager_script_from_args(tool, args[2:])
     if command in {"run", "run-script"}:
         return first_package_manager_run_arg(tool, args[1:])
     if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
@@ -2126,6 +2143,12 @@ def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str
     if command in PACKAGE_MANAGER_DIRECT_SCRIPTS:
         return UNSUPPORTED_DIRECT_SCRIPT
     return None
+
+
+def yarn_workspace_command_selection(args: List[str]) -> WorkspaceSelection:
+    if len(args) < 2:
+        return WorkspaceSelection([])
+    return WorkspaceSelection([args[1]])
 
 
 def normalize_package_manager_command(tool: str, command: str) -> str:
@@ -2287,6 +2310,17 @@ def local_command_target(command: str) -> Optional[str]:
             return token
         return None
     return None
+
+
+def direct_local_command_target(command: str) -> Optional[str]:
+    command = command_without_leading_env_assignments(command)
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens or not is_repo_local_token(tokens[0]):
+        return None
+    return tokens[0]
 
 
 def is_repo_local_token(token: str) -> bool:
