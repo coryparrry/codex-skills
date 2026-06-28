@@ -2917,6 +2917,59 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertNotIn("duplicate-looking documentation", titles)
 
+    def test_skill_reference_docs_define_report_contract_and_overlays(self):
+        root = Path(__file__).resolve().parents[1]
+        report_contract = (root / "references" / "report-contract.md").read_text()
+        foundation = (root / "references" / "repo-foundation-rubric.md").read_text()
+        ecosystem_index = (root / "references" / "ecosystem-index.md").read_text()
+
+        for heading in [
+            "## Repository Classification",
+            "## Topology Inventory",
+            "## Lifecycle Gate Matrix",
+            "## Ecosystem Assessment",
+            "## Recommended Foundation",
+        ]:
+            self.assertIn(heading, report_contract)
+
+        for phrase in [
+            "Root health does not prove package health",
+            "Responsibilities, Not Filenames",
+            "Evidence Before Prescription",
+            "Missing Best-Practice Files Are Usually Not Blockers",
+        ]:
+            self.assertIn(phrase, foundation)
+
+        for mapping in [
+            "package.json -> references/ecosystems/node-typescript.md",
+            "pyproject.toml -> references/ecosystems/python.md",
+            "go.mod -> references/ecosystems/go.md",
+            "Cargo.toml -> references/ecosystems/rust.md",
+            "Package.swift -> references/ecosystems/swift-apple.md",
+            "SKILL.md -> references/ecosystems/codex-skill-plugin.md",
+        ]:
+            self.assertIn(mapping, ecosystem_index)
+
+    def test_ecosystem_overlays_include_required_sections(self):
+        root = Path(__file__).resolve().parents[1]
+        overlays = sorted((root / "references" / "ecosystems").glob("*.md"))
+        self.assertGreaterEqual(len(overlays), 10)
+        required = [
+            "## Detection Artifacts",
+            "## Common Repo Shapes",
+            "## Required Lifecycle Gates",
+            "## Native Commands",
+            "## CI Expectations",
+            "## Common False Positives",
+            "## Severity Guidance",
+            "## Good Finding Examples",
+            "## Bad Finding Examples",
+        ]
+        for path in overlays:
+            text = path.read_text()
+            for heading in required:
+                self.assertIn(heading, text, path.name)
+
 
 if __name__ == "__main__":
     unittest.main()
