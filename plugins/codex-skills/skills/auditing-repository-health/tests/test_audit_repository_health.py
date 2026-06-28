@@ -2985,6 +2985,22 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             for heading in required:
                 self.assertIn(heading, text, path.name)
 
+    def test_source_and_plugin_mirror_are_identical(self):
+        repo = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "scripts" / "check_skill_mirror.py").exists()
+        )
+        result = subprocess.run(
+            ["python3", "scripts/check_skill_mirror.py", "auditing-repository-health"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual("", result.stderr)
+        self.assertEqual(0, result.returncode, result.stdout)
+        self.assertIn("mirror ok: auditing-repository-health", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
