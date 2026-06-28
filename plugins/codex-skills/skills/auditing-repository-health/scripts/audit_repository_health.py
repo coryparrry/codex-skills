@@ -175,6 +175,7 @@ PACKAGE_MANAGER_DIRECTORY_OPTIONS = {
 
 PACKAGE_MANAGER_WORKSPACE_OPTIONS = {
     "npm": {"-w", "--workspace"},
+    "pnpm": {"-F", "--filter"},
 }
 
 PACKAGE_MANAGER_ALL_WORKSPACES_OPTIONS = {
@@ -469,6 +470,9 @@ DOCS_SITE_FILES = {
 class Finding:
     severity: str
     title: str
+    path: str
+    scope_type: str
+    evidence_state: str
     evidence: List[str]
     impact: str
     fix_shape: str
@@ -527,13 +531,32 @@ class Audit:
         evidence: Iterable[str],
         impact: str,
         fix_shape: str,
+        *,
+        path: str = ".",
+        scope_type: str = "root/shared",
+        evidence_state: str = "proven",
     ) -> None:
         evidence_list = [item for item in evidence if item]
         for finding in self.findings:
-            if finding.title == title:
+            if (
+                finding.title == title
+                and finding.path == path
+                and finding.scope_type == scope_type
+            ):
                 finding.evidence.extend(item for item in evidence_list if item not in finding.evidence)
                 return
-        self.findings.append(Finding(severity, title, evidence_list, impact, fix_shape))
+        self.findings.append(
+            Finding(
+                severity,
+                title,
+                path,
+                scope_type,
+                evidence_state,
+                evidence_list,
+                impact,
+                fix_shape,
+            )
+        )
 
     def add_not_checked(self, area: str, reason: str) -> None:
         item = {"area": area, "reason": reason}
@@ -639,6 +662,7 @@ class Audit:
                 "path": boundary_rel,
                 "kind": kind,
                 "ecosystem": ecosystem,
+                "scope_type": scope_type_for_path(boundary_rel),
                 "evidence": [rel],
             }
             boundaries.append(boundary)
@@ -646,6 +670,7 @@ class Audit:
 
         boundaries = merge_boundaries(boundaries)
         classification = classify_repository_inventory(boundaries)
+        purpose = classify_repository_purpose(boundaries)
         overlays = sorted(
             ECOSYSTEM_OVERLAYS[ecosystem]
             for ecosystem in ecosystems
@@ -654,6 +679,7 @@ class Audit:
 
         return {
             "classification": classification,
+            "purpose": purpose,
             "ecosystems": sorted(ecosystems),
             "boundaries": boundaries,
             "suggested_overlays": overlays,
@@ -855,22 +881,33 @@ class Audit:
         for boundary in inventory["boundaries"]:
             path = boundary["path"]
             scope_path = lifecycle_scope_path(boundary)
-            rows.append(
-                {
-                    "path": path,
-                    "kind": boundary["kind"],
-                    "ecosystem": boundary["ecosystem"],
-                    "setup": lifecycle_cell(scope_path, "setup", scripts_check, workflow_commands),
-                    "focused_test": lifecycle_cell(scope_path, "test", scripts_check, workflow_commands),
-                    "full_validation": lifecycle_cell(scope_path, "cibuild", scripts_check, workflow_commands),
-                    "lint_format": lifecycle_cell(scope_path, "lint", scripts_check, workflow_commands),
-                    "typecheck_static": lifecycle_cell(scope_path, "typecheck", scripts_check, workflow_commands),
-                    "build_package": lifecycle_cell(scope_path, "build", scripts_check, workflow_commands),
-                    "server": lifecycle_server_cell(boundary, scripts_check, workflow_commands),
-                    "docs_release": lifecycle_cell(scope_path, "docs", scripts_check, workflow_commands),
-                    "ci_coverage": ci_coverage_cell(scope_path, workflow_commands),
-                }
-            )
+            row = {
+                "path": path,
+                "kind": boundary["kind"],
+                "ecosystem": boundary["ecosystem"],
+                "scope_type": boundary["scope_type"],
+                "setup": lifecycle_cell(scope_path, "setup", scripts_check, workflow_commands, boundary),
+                "focused_test": lifecycle_cell(scope_path, "test", scripts_check, workflow_commands, boundary),
+                "full_validation": lifecycle_cell(scope_path, "cibuild", scripts_check, workflow_commands, boundary),
+                "lint_format": lifecycle_cell(scope_path, "lint", scripts_check, workflow_commands, boundary),
+                "typecheck_static": lifecycle_cell(scope_path, "typecheck", scripts_check, workflow_commands, boundary),
+                "build_package": lifecycle_cell(scope_path, "build", scripts_check, workflow_commands, boundary),
+                "server": lifecycle_server_cell(boundary, scripts_check, workflow_commands),
+                "docs_release": lifecycle_cell(scope_path, "docs", scripts_check, workflow_commands, boundary),
+                "ci_coverage": ci_coverage_cell(scope_path, workflow_commands, boundary),
+            }
+            rows.append(row)
+            if expects_package_focused_tests(boundary) and row["focused_test"]["status"] == "missing":
+                self.add_finding(
+                    "P2",
+                    "missing focused test coverage",
+                    [path],
+                    "Package-specific changes have no dedicated focused validation path.",
+                    "Add or document a package-native focused test command or CI step for this package.",
+                    path=path,
+                    scope_type=boundary["scope_type"],
+                    evidence_state="proven",
+                )
         return {"rows": rows}
 
     def check_packaging(self, root: Path) -> Dict[str, Any]:
@@ -1078,6 +1115,7 @@ def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "path": boundary["path"],
                 "kind": boundary["kind"],
                 "ecosystem": boundary["ecosystem"],
+                "scope_type": boundary["scope_type"],
                 "evidence": [],
             },
         )
@@ -1090,6 +1128,8 @@ def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
+    if has_source_plugin_mirror(boundaries):
+        return "source-plugin-mirror"
     package_boundaries = [
         boundary
         for boundary in boundaries
@@ -1098,9 +1138,58 @@ def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
     ecosystems = {boundary["ecosystem"] for boundary in boundaries}
     if len(package_boundaries) >= 2 or len(ecosystems) >= 3:
         return "monorepo"
-    if any(boundary["kind"] == "codex-skill" for boundary in boundaries):
-        return "skill-repository"
     return "single-repository"
+
+
+def has_source_plugin_mirror(boundaries: List[Dict[str, Any]]) -> bool:
+    source_skills = {
+        posixpath.basename(boundary["path"])
+        for boundary in boundaries
+        if boundary["kind"] == "codex-skill" and boundary["path"].startswith("skills/")
+    }
+    mirror_skills = {
+        posixpath.basename(boundary["path"])
+        for boundary in boundaries
+        if boundary["kind"] == "codex-skill"
+        and boundary["path"].startswith("plugins/codex-skills/skills/")
+    }
+    return bool(source_skills & mirror_skills)
+
+
+def scope_type_for_path(path: str) -> str:
+    return "root/shared" if path == "." else "package-specific"
+
+
+def classify_repository_purpose(boundaries: List[Dict[str, Any]]) -> str:
+    kinds = {boundary["kind"] for boundary in boundaries}
+    if "codex-skill" in kinds:
+        return "skill/plugin"
+    if kinds and kinds <= {"docs-site"}:
+        return "docs"
+    if "docker-service" in kinds:
+        return "service"
+    package_kinds = {
+        "go-package",
+        "jvm-build",
+        "node-workspace-root",
+        "python-package",
+        "ruby-package",
+        "rust-crate",
+        "swift-package",
+    }
+    if kinds & package_kinds:
+        return "mixed" if len(kinds) > 1 else "library"
+    if "infra-iac" in kinds:
+        return "infra"
+    return "mixed"
+
+
+def expects_package_focused_tests(boundary: Dict[str, Any]) -> bool:
+    return boundary["path"] != "." and boundary["kind"] not in {
+        "docker-service",
+        "docs-site",
+        "infra-iac",
+    }
 
 
 def safe_read_text(path: Path, limit: int = 100_000) -> str:
@@ -2117,10 +2206,10 @@ def resolve_package_workspaces(
     if selection.all_workspaces:
         selected.extend(declared)
     for workspace in selection.names:
-        resolved = resolve_declared_package_workspace(package_root, declared, workspace)
+        resolved = resolve_declared_package_workspaces(package_root, declared, workspace)
         if resolved is None:
             return None
-        selected.append(resolved)
+        selected.extend(resolved)
     if selection.include_root:
         selected.append(package_root)
     selected = unique_paths(selected)
@@ -2274,17 +2363,56 @@ def parse_yaml_inline_string_list(value: str) -> List[str]:
     return items
 
 
-def resolve_declared_package_workspace(package_root: Path, declared: List[Path], workspace: str) -> Optional[Path]:
+def resolve_declared_package_workspaces(
+    package_root: Path,
+    declared: List[Path],
+    workspace: str,
+) -> Optional[List[Path]]:
     normalized = workspace.strip().rstrip("/")
-    if normalized.startswith("./"):
-        normalized = normalized[2:]
+    normalized_without_dot = normalized[2:] if normalized.startswith("./") else normalized
     for workspace_dir in declared:
         rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
-        if normalized == rel or normalized == f"./{rel}":
-            return workspace_dir
-        if read_package_name(workspace_dir / "package.json") == workspace:
-            return workspace_dir
-    return None
+        if normalized_without_dot == rel or normalized == f"./{rel}":
+            return [workspace_dir]
+        if read_package_name(workspace_dir / "package.json") == workspace.strip():
+            return [workspace_dir]
+    filter_selector = normalize_pnpm_filter_selector(normalized)
+    if filter_selector is None:
+        return None
+    matches = []
+    for workspace_dir in declared:
+        rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
+        if pnpm_filter_selector_matches_workspace(filter_selector, rel):
+            matches.append(workspace_dir)
+    return unique_paths(matches) or None
+
+
+def normalize_pnpm_filter_selector(selector: str) -> Optional[str]:
+    stripped = selector.strip().rstrip("/")
+    if not stripped:
+        return None
+    for prefix in ("...^", "...", "^"):
+        if stripped.startswith(prefix) and len(stripped) > len(prefix):
+            stripped = stripped[len(prefix):]
+            break
+    for suffix in ("^...", "...", "^"):
+        if stripped.endswith(suffix) and len(stripped) > len(suffix):
+            stripped = stripped[: -len(suffix)]
+            break
+    stripped = stripped.rstrip("/")
+    if stripped.startswith("./"):
+        stripped = stripped[2:]
+    if not stripped or not is_pnpm_path_or_glob_selector(stripped):
+        return None
+    return stripped
+
+
+def is_pnpm_path_or_glob_selector(selector: str) -> bool:
+    return selector.startswith(".") or "/" in selector or any(char in selector for char in "*?[")
+
+
+def pnpm_filter_selector_matches_workspace(selector: str, rel: str) -> bool:
+    return fnmatch.fnmatch(rel, selector) or fnmatch.fnmatch(f"./{rel}", selector)
 
 
 def unique_paths(paths: List[Path]) -> List[Path]:
@@ -2783,8 +2911,39 @@ def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
             continue
         for directory, commands in workflow_step_run_commands(text):
             for command in commands:
-                evidence[directory or "."].append(f"{rel_workflow}:{command}")
+                for scope_path in workflow_command_scope_paths(root, directory or ".", command):
+                    evidence[scope_path].append(f"{rel_workflow}:{command}")
     return dict(evidence)
+
+
+def workflow_command_scope_paths(root: Path, directory: str, command: str) -> List[str]:
+    command = command_without_leading_env_assignments(command)
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return [directory or "."]
+    if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
+        return [directory or "."]
+    command_base = root if directory in {"", "."} else (root / directory).resolve()
+    parsed = parse_package_manager_command(root, command_base, tokens)
+    if parsed is None or parsed.package_dirs is None:
+        return [directory or "."]
+    scope_paths = package_dirs_to_scope_paths(root, parsed.package_dirs)
+    return scope_paths or [directory or "."]
+
+
+def package_dirs_to_scope_paths(root: Path, package_dirs: List[Path]) -> List[str]:
+    scope_paths: List[str] = []
+    for package_dir in package_dirs:
+        try:
+            rel = relative_path(root, package_dir)
+        except ValueError:
+            continue
+        if rel not in scope_paths:
+            scope_paths.append(rel)
+    return scope_paths
 
 
 def workflow_step_run_commands(text: str) -> List[Tuple[str, List[str]]]:
@@ -2908,7 +3067,8 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
             continue
         if stripped.startswith("run:"):
             value = line.split(":", 1)[1].lstrip()
-            if workflow_block_scalar_header(value):
+            block_style = workflow_block_scalar_style(value)
+            if block_style is not None:
                 block_lines: List[str] = []
                 index += 1
                 while index < len(lines):
@@ -2917,7 +3077,7 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
                         break
                     block_lines.append(block_line)
                     index += 1
-                commands.extend(workflow_block_commands(block_lines))
+                commands.extend(workflow_block_commands(block_lines, block_style))
                 continue
             command = workflow_scalar_value(value)
             if command:
@@ -2926,16 +3086,37 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
     return normalize_workflow_directory(directory), commands
 
 
-def workflow_block_scalar_header(value: str) -> bool:
+def workflow_block_scalar_style(value: str) -> Optional[str]:
     header = value.strip()
-    return header in {"|", ">", "|-", ">-", "|+", ">+"}
+    if header in {"|", "|-", "|+"}:
+        return "literal"
+    if header in {">", ">-", ">+"}:
+        return "folded"
+    return None
 
 
-def workflow_block_commands(lines: List[str]) -> List[str]:
+def workflow_block_commands(lines: List[str], block_style: str) -> List[str]:
     non_empty = [line for line in lines if line.strip()]
     if not non_empty:
         return []
     base_indent = min(leading_spaces(line) for line in non_empty)
+    if block_style == "folded":
+        commands: List[str] = []
+        paragraph: List[Tuple[int, str]] = []
+        for line in lines:
+            if not line.strip():
+                if paragraph:
+                    commands.extend(folded_workflow_paragraph_commands(paragraph, base_indent))
+                    paragraph = []
+                continue
+            indent = leading_spaces(line)
+            command = line[base_indent:].strip()
+            if not command or command.startswith("#"):
+                continue
+            paragraph.append((indent, command))
+        if paragraph:
+            commands.extend(folded_workflow_paragraph_commands(paragraph, base_indent))
+        return commands
     commands = []
     for line in lines:
         if not line.strip():
@@ -2944,6 +3125,15 @@ def workflow_block_commands(lines: List[str]) -> List[str]:
         if command and not command.startswith("#"):
             commands.append(command)
     return commands
+
+
+def folded_workflow_paragraph_commands(
+    paragraph: List[Tuple[int, str]],
+    base_indent: int,
+) -> List[str]:
+    if any(indent > base_indent for indent, _ in paragraph):
+        return [command for _, command in paragraph]
+    return [" ".join(command for _, command in paragraph)]
 
 
 def workflow_scalar_value(value: str) -> str:
@@ -2995,9 +3185,13 @@ def workflow_command_responsibilities(command: str) -> List[str]:
     tokens = normalize_pip_command_tokens(tokens)
     tool = tokens[0]
     if tool in {"npm", "pnpm", "yarn", "bun"}:
-        script = package_manager_script_from_args(tool, tokens[1:])
+        command_args = package_manager_builtin_command_args(tokens)
+        script = package_manager_script_from_args(tool, command_args)
         if script:
             return classify_workflow_name(script)
+        builtin_command = package_manager_builtin_command(tokens)
+        if builtin_command:
+            return classify_workflow_name(builtin_command)
     if tool in {"make", "just"}:
         target = first_non_option(tokens[1:])
         if target is not None:
@@ -3011,14 +3205,55 @@ def workflow_command_responsibilities(command: str) -> List[str]:
     return classify_workflow_name(tool)
 
 
+def workflow_command_matches_boundary(command: str, boundary: Optional[Dict[str, Any]]) -> bool:
+    if boundary is None or boundary["kind"] != "docker-service":
+        return True
+    return is_docker_service_command(command, boundary["path"])
+
+
+def is_docker_service_command(command: str, boundary_path: str) -> bool:
+    command = command_without_leading_env_assignments(command)
+    search_text = command.lower()
+    docker_markers = ("docker", "dockerfile", "compose", "podman", "buildah", "container")
+    if any(marker in search_text for marker in docker_markers):
+        return True
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return False
+    tool = tokens[0].lower()
+    docker_tools = {"buildah", "docker", "docker-compose", "nerdctl", "podman"}
+    if tool in docker_tools:
+        return True
+    boundary_tokens = {boundary_path.lower(), posixpath.basename(boundary_path).lower(), "dockerfile"}
+    return any(token.lower() in boundary_tokens for token in tokens[1:])
+
+
+def repo_owned_candidate_matches_boundary(
+    candidate: str,
+    boundary: Optional[Dict[str, Any]],
+    script_name: str = "",
+) -> bool:
+    if boundary is None or boundary["kind"] != "docker-service":
+        return True
+    search_text = " ".join(part for part in (candidate, script_name) if part).lower()
+    docker_markers = ("docker", "dockerfile", "compose", "podman", "buildah", "container")
+    return any(marker in search_text for marker in docker_markers)
+
+
 def workflow_evidence_for_responsibility(
     path: str,
     responsibility: str,
     workflow_commands: Dict[str, List[str]],
+    boundary: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     evidence = []
     for item in workflow_commands.get(path, []):
         _, _, command = item.partition(":")
+        if not workflow_command_matches_boundary(command, boundary):
+            continue
         if responsibility in workflow_command_responsibilities(command):
             evidence.append(item)
     return evidence
@@ -3028,6 +3263,7 @@ def lifecycle_repo_owned_evidence(
     path: str,
     responsibility: str,
     scripts_check: Dict[str, Any],
+    boundary: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     evidence: List[str] = []
     responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
@@ -3036,11 +3272,17 @@ def lifecycle_repo_owned_evidence(
             candidate
             for candidate in responsibility_info.get("candidates", [])
             if lifecycle_candidate_scope_path(candidate) == path
+            and repo_owned_candidate_matches_boundary(candidate, boundary)
         )
     for script, sources in scripts_check.get("package_script_sources", {}).items():
         if responsibility not in classify_workflow_name(script):
             continue
-        evidence.extend(source for source in sources if lifecycle_candidate_scope_path(source) == path)
+        evidence.extend(
+            source
+            for source in sources
+            if lifecycle_candidate_scope_path(source) == path
+            and repo_owned_candidate_matches_boundary(source, boundary, script)
+        )
     return sorted(set(evidence))
 
 
@@ -3066,8 +3308,9 @@ def lifecycle_cell(
     responsibility: str,
     scripts_check: Dict[str, Any],
     workflow_commands: Dict[str, List[str]],
+    boundary: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    evidence = lifecycle_repo_owned_evidence(path, responsibility, scripts_check)
+    evidence = lifecycle_repo_owned_evidence(path, responsibility, scripts_check, boundary)
     status = "missing"
     responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
     if responsibility_info and path == ".":
@@ -3076,7 +3319,9 @@ def lifecycle_cell(
             status = root_status
         elif root_status in {"present", "documented"} and evidence:
             status = root_status
-    evidence.extend(workflow_evidence_for_responsibility(path, responsibility, workflow_commands))
+    evidence.extend(workflow_evidence_for_responsibility(path, responsibility, workflow_commands, boundary))
+    if status == "not_applicable" and evidence:
+        status = "present"
     if status == "missing" and evidence:
         status = "present"
     return {"status": status, "evidence": sorted(set(evidence))}
@@ -3103,11 +3348,19 @@ def lifecycle_server_cell(
         "swift-package",
     }:
         return {"status": "not_applicable", "evidence": []}
-    return lifecycle_cell(lifecycle_scope_path(boundary), "server", scripts_check, workflow_commands)
+    return lifecycle_cell(lifecycle_scope_path(boundary), "server", scripts_check, workflow_commands, boundary)
 
 
-def ci_coverage_cell(path: str, workflow_commands: Dict[str, List[str]]) -> Dict[str, Any]:
-    evidence = workflow_commands.get(path, [])
+def ci_coverage_cell(
+    path: str,
+    workflow_commands: Dict[str, List[str]],
+    boundary: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    evidence = [
+        item
+        for item in workflow_commands.get(path, [])
+        if workflow_command_matches_boundary(item.partition(":")[2], boundary)
+    ]
     return {
         "status": "present" if evidence else "missing",
         "evidence": sorted(set(evidence)),
@@ -3149,6 +3402,8 @@ def render_findings(findings: List[Dict[str, Any]]) -> List[str]:
     if findings:
         for finding in findings:
             lines.append(f"- {finding['severity']}: {finding['title']}")
+            lines.append(f"  - Scope: {finding['path']} ({finding['scope_type']})")
+            lines.append(f"  - Evidence state: {finding['evidence_state']}")
             for evidence in finding["evidence"]:
                 lines.append(f"  - Evidence: {evidence}")
             lines.append(f"  - Impact: {finding['impact']}")
@@ -3177,6 +3432,7 @@ def render_repository_inventory(inventory: Dict[str, Any]) -> List[str]:
     lines = [
         "## Repository Inventory",
         f"- Classification: {inventory['classification']}",
+        f"- Purpose: {inventory['purpose']}",
         f"- Ecosystems: {format_present(inventory['ecosystems'])}",
         f"- Suggested overlays: {format_present(inventory['suggested_overlays'])}",
         "- Boundaries:",
@@ -3184,7 +3440,7 @@ def render_repository_inventory(inventory: Dict[str, Any]) -> List[str]:
     for boundary in inventory["boundaries"]:
         evidence = ", ".join(boundary["evidence"])
         lines.append(
-            f"  - {boundary['path']}: {boundary['kind']} ({boundary['ecosystem']}) - {evidence}"
+            f"  - {boundary['path']}: {boundary['kind']} ({boundary['ecosystem']}, {boundary['scope_type']}) - {evidence}"
         )
     lines.append("")
     return lines
@@ -3193,7 +3449,7 @@ def render_repository_inventory(inventory: Dict[str, Any]) -> List[str]:
 def render_lifecycle_gate_matrix(matrix: Dict[str, Any]) -> List[str]:
     lines = ["## Lifecycle Gate Matrix"]
     for row in matrix["rows"]:
-        lines.append(f"- {row['path']} ({row['kind']})")
+        lines.append(f"- {row['path']} ({row['kind']}, {row['scope_type']})")
         for key in [
             "setup",
             "focused_test",
