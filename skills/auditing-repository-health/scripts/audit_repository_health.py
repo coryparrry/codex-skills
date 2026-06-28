@@ -2369,14 +2369,16 @@ def resolve_declared_package_workspaces(
     workspace: str,
 ) -> Optional[List[Path]]:
     normalized = workspace.strip().rstrip("/")
-    normalized_without_dot = normalized[2:] if normalized.startswith("./") else normalized
+    selector_base = normalize_pnpm_selector_base(normalized)
+    exact_selector = selector_base or normalized
+    normalized_without_dot = exact_selector[2:] if exact_selector.startswith("./") else exact_selector
     for workspace_dir in declared:
         rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
-        if normalized_without_dot == rel or normalized == f"./{rel}":
+        if normalized_without_dot == rel or exact_selector == f"./{rel}":
             return [workspace_dir]
-        if read_package_name(workspace_dir / "package.json") == workspace.strip():
+        if read_package_name(workspace_dir / "package.json") == exact_selector.strip():
             return [workspace_dir]
-    filter_selector = normalize_pnpm_filter_selector(normalized)
+    filter_selector = normalize_pnpm_filter_selector(exact_selector)
     if filter_selector is None:
         return None
     matches = []
@@ -2387,7 +2389,7 @@ def resolve_declared_package_workspaces(
     return unique_paths(matches) or None
 
 
-def normalize_pnpm_filter_selector(selector: str) -> Optional[str]:
+def normalize_pnpm_selector_base(selector: str) -> Optional[str]:
     stripped = selector.strip().rstrip("/")
     if not stripped:
         return None
@@ -2400,6 +2402,13 @@ def normalize_pnpm_filter_selector(selector: str) -> Optional[str]:
             stripped = stripped[: -len(suffix)]
             break
     stripped = stripped.rstrip("/")
+    return stripped or None
+
+
+def normalize_pnpm_filter_selector(selector: str) -> Optional[str]:
+    stripped = normalize_pnpm_selector_base(selector)
+    if not stripped:
+        return None
     if stripped.startswith("./"):
         stripped = stripped[2:]
     if not stripped or not is_pnpm_path_or_glob_selector(stripped):
