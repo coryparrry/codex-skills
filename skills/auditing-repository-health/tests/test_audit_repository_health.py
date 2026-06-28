@@ -2372,6 +2372,44 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual(str(root.resolve()), report["repo"])
             self.assertIn(".github/workflows/ci.yml", report["checks"]["validation"]["ci_workflows"])
 
+    def test_workflow_direct_tools_count_for_matching_lifecycle_cells(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest\n"
+                "        working-directory: packages/worker\n"
+                "      - run: ruff check .\n"
+                "        working-directory: packages/worker\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/worker"]["lint_format"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertIn(
+                ".github/workflows/ci.yml:ruff check .",
+                matrix["packages/worker"]["lint_format"]["evidence"],
+            )
+
     def test_iter_files_prunes_skipped_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

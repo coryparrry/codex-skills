@@ -2787,6 +2787,16 @@ def classify_workflow_name(name: str) -> List[str]:
     words = set(re.split(r"[^a-z0-9]+", name.lower()))
     words.discard("")
     matches = set(classify_command_name(name))
+    direct_matches = {
+        "pytest": "test",
+        "tox": "test",
+        "ruff": "lint",
+        "mypy": "typecheck",
+        "pyright": "typecheck",
+        "tsc": "typecheck",
+    }
+    if name.lower() in direct_matches:
+        matches.add(direct_matches[name.lower()])
     if words & {"build", "package"}:
         matches.add("build")
     if words & {"lint", "fmt", "format"}:
