@@ -2522,6 +2522,36 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
             self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
 
+    def test_package_local_package_json_scripts_only_cover_package_lifecycle_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"private": true, "scripts": {"lint": "eslint ."}}\n')
+            (package_dir / "package.json").write_text(
+                '{"name": "@example/worker", "scripts": {"test": "vitest run", "build": "tsc -p tsconfig.json"}}\n'
+            )
+            (package_dir / "index.ts").write_text("export const worker = true;\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("missing", matrix["."]["focused_test"]["status"])
+            self.assertEqual("missing", matrix["."]["build_package"]["status"])
+            self.assertNotIn("packages/worker/package.json:test", matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn("packages/worker/package.json:build", matrix["."]["build_package"]["evidence"])
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/worker"]["build_package"]["status"])
+            self.assertIn("packages/worker/package.json:test", matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertIn("packages/worker/package.json:build", matrix["packages/worker"]["build_package"]["evidence"])
+
     def test_workflow_job_defaults_run_working_directory_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2703,6 +2733,45 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 "      - name: worker checks\n"
                 "        working-directory: packages/worker\n"
                 "        run: |\n"
+                "          pytest\n"
+                "          ruff check .\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/worker"]["lint_format"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertIn(
+                ".github/workflows/ci.yml:ruff check .",
+                matrix["packages/worker"]["lint_format"]["evidence"],
+            )
+
+    def test_workflow_folded_run_block_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - name: worker checks\n"
+                "        working-directory: packages/worker\n"
+                "        run: >\n"
                 "          pytest\n"
                 "          ruff check .\n"
             )

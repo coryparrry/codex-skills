@@ -3024,19 +3024,57 @@ def workflow_evidence_for_responsibility(
     return evidence
 
 
+def lifecycle_repo_owned_evidence(
+    path: str,
+    responsibility: str,
+    scripts_check: Dict[str, Any],
+) -> List[str]:
+    evidence: List[str] = []
+    responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
+    if responsibility_info:
+        evidence.extend(
+            candidate
+            for candidate in responsibility_info.get("candidates", [])
+            if lifecycle_candidate_scope_path(candidate) == path
+        )
+    for script, sources in scripts_check.get("package_script_sources", {}).items():
+        if responsibility not in classify_workflow_name(script):
+            continue
+        evidence.extend(source for source in sources if lifecycle_candidate_scope_path(source) == path)
+    return sorted(set(evidence))
+
+
+def lifecycle_candidate_scope_path(candidate: str) -> str:
+    source_path, _, _ = candidate.partition(":")
+    name = posixpath.basename(source_path)
+    if name in {
+        "package.json",
+        "GNUmakefile",
+        "makefile",
+        "Makefile",
+        ".justfile",
+        "justfile",
+        "Justfile",
+    }:
+        parent = posixpath.dirname(source_path)
+        return "." if parent in {"", "."} else parent
+    return "."
+
+
 def lifecycle_cell(
     path: str,
     responsibility: str,
     scripts_check: Dict[str, Any],
     workflow_commands: Dict[str, List[str]],
 ) -> Dict[str, Any]:
-    evidence: List[str] = []
+    evidence = lifecycle_repo_owned_evidence(path, responsibility, scripts_check)
     status = "missing"
     responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
     if responsibility_info and path == ".":
-        evidence.extend(responsibility_info.get("candidates", []))
         root_status = responsibility_info.get("status", "missing")
-        if root_status in {"present", "documented", "not_applicable"}:
+        if root_status == "not_applicable":
+            status = root_status
+        elif root_status in {"present", "documented"} and evidence:
             status = root_status
     evidence.extend(workflow_evidence_for_responsibility(path, responsibility, workflow_commands))
     if status == "missing" and evidence:
