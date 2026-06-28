@@ -2917,6 +2917,21 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertNotIn("duplicate-looking documentation", titles)
 
+    def test_skill_requires_classification_before_recommendations(self):
+        root = Path(__file__).resolve().parents[1]
+        skill = (root / "SKILL.md").read_text()
+
+        for phrase in [
+            "Run the bundled auditor first",
+            "Classify the repository before writing findings",
+            "references/report-contract.md",
+            "references/repo-foundation-rubric.md",
+            "references/ecosystem-index.md",
+            "Do not prescribe generic boilerplate",
+            "Every finding must name the affected path or scope",
+        ]:
+            self.assertIn(phrase, skill)
+
     def test_skill_reference_docs_define_report_contract_and_overlays(self):
         root = Path(__file__).resolve().parents[1]
         report_contract = (root / "references" / "report-contract.md").read_text()
