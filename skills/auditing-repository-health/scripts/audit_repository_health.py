@@ -417,6 +417,52 @@ SERVER_MARKERS = {
     "Procfile",
 }
 
+ECOSYSTEM_OVERLAYS = {
+    "node": "references/ecosystems/node-typescript.md",
+    "python": "references/ecosystems/python.md",
+    "go": "references/ecosystems/go.md",
+    "rust": "references/ecosystems/rust.md",
+    "swift": "references/ecosystems/swift-apple.md",
+    "jvm": "references/ecosystems/jvm-gradle-maven.md",
+    "ruby": "references/ecosystems/ruby.md",
+    "docker": "references/ecosystems/docker-services.md",
+    "docs": "references/ecosystems/docs-static-sites.md",
+    "codex-skill": "references/ecosystems/codex-skill-plugin.md",
+    "infra": "references/ecosystems/infra-iac.md",
+}
+
+BOUNDARY_MANIFESTS = {
+    "package.json": ("node-workspace-root", "node"),
+    "pyproject.toml": ("python-package", "python"),
+    "setup.cfg": ("python-package", "python"),
+    "setup.py": ("python-package", "python"),
+    "requirements.txt": ("python-package", "python"),
+    "go.mod": ("go-package", "go"),
+    "Cargo.toml": ("rust-crate", "rust"),
+    "Package.swift": ("swift-package", "swift"),
+    "settings.gradle": ("jvm-build", "jvm"),
+    "settings.gradle.kts": ("jvm-build", "jvm"),
+    "build.gradle": ("jvm-build", "jvm"),
+    "build.gradle.kts": ("jvm-build", "jvm"),
+    "pom.xml": ("jvm-build", "jvm"),
+    "Gemfile": ("ruby-package", "ruby"),
+    "Rakefile": ("ruby-package", "ruby"),
+    "Dockerfile": ("docker-service", "docker"),
+    "docker-compose.yml": ("docker-service", "docker"),
+    "compose.yml": ("docker-service", "docker"),
+    "SKILL.md": ("codex-skill", "codex-skill"),
+    "main.tf": ("infra-iac", "infra"),
+    "Chart.yaml": ("infra-iac", "infra"),
+}
+
+DOCS_SITE_FILES = {
+    "mkdocs.yml",
+    "docusaurus.config.js",
+    "docusaurus.config.ts",
+    "vitepress.config.ts",
+    "netlify.toml",
+}
+
 
 @dataclass
 class Finding:
@@ -438,9 +484,16 @@ class Audit:
         root = self.find_repo_root()
         checks: Dict[str, Any] = {}
         checks["repository_shape"] = self.check_repository_shape(root)
+        checks["repository_inventory"] = self.check_repository_inventory(root)
         checks["documentation"] = self.check_documentation(root)
         checks["scripts"] = self.check_scripts(root)
         checks["validation"] = self.check_validation(root, checks["scripts"])
+        checks["lifecycle_gate_matrix"] = self.check_lifecycle_gate_matrix(
+            root,
+            checks["repository_inventory"],
+            checks["scripts"],
+            checks["validation"],
+        )
         checks["packaging"] = self.check_packaging(root)
         checks["hygiene"] = self.check_hygiene(root)
 
@@ -455,6 +508,8 @@ class Audit:
         }
 
     def find_repo_root(self) -> Path:
+        if looks_like_audit_root(self.requested_repo):
+            return self.requested_repo
         result = self.git(["rev-parse", "--show-toplevel"], self.requested_repo)
         if result.returncode == 0:
             return Path(result.stdout.strip()).resolve()
@@ -562,6 +617,43 @@ class Audit:
                 "Add CONTRIBUTING.md or document contribution expectations in README.",
             )
         return shape
+
+    def check_repository_inventory(self, root: Path) -> Dict[str, Any]:
+        boundaries: List[Dict[str, Any]] = []
+        ecosystems: set[str] = set()
+
+        for path in iter_files(root):
+            rel = relative_path(root, path)
+            kind_and_ecosystem = inventory_boundary_kind(path)
+            if kind_and_ecosystem is None:
+                continue
+
+            kind, ecosystem = kind_and_ecosystem
+            boundary_path = path.parent if kind != "docker-service" else path
+            boundary_rel = relative_path(root, boundary_path)
+            boundary = {
+                "path": boundary_rel,
+                "kind": kind,
+                "ecosystem": ecosystem,
+                "evidence": [rel],
+            }
+            boundaries.append(boundary)
+            ecosystems.add(ecosystem)
+
+        boundaries = merge_boundaries(boundaries)
+        classification = classify_repository_inventory(boundaries)
+        overlays = sorted(
+            ECOSYSTEM_OVERLAYS[ecosystem]
+            for ecosystem in ecosystems
+            if ecosystem in ECOSYSTEM_OVERLAYS
+        )
+
+        return {
+            "classification": classification,
+            "ecosystems": sorted(ecosystems),
+            "boundaries": boundaries,
+            "suggested_overlays": overlays,
+        }
 
     def check_documentation(self, root: Path) -> Dict[str, Any]:
         markdown_files = sorted(iter_files(root, "*.md"))
@@ -746,6 +838,36 @@ class Audit:
             "has_full_gate": cibuild["status"] in {"present", "documented"} or bool(workflows),
         }
 
+    def check_lifecycle_gate_matrix(
+        self,
+        root: Path,
+        inventory: Dict[str, Any],
+        scripts_check: Dict[str, Any],
+        validation_check: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        del validation_check
+        rows = []
+        workflow_commands = workflow_command_evidence(root)
+        for boundary in inventory["boundaries"]:
+            path = boundary["path"]
+            rows.append(
+                {
+                    "path": path,
+                    "kind": boundary["kind"],
+                    "ecosystem": boundary["ecosystem"],
+                    "setup": lifecycle_cell(path, "setup", scripts_check, workflow_commands),
+                    "focused_test": lifecycle_cell(path, "test", scripts_check, workflow_commands),
+                    "full_validation": lifecycle_cell(path, "cibuild", scripts_check, workflow_commands),
+                    "lint_format": lifecycle_cell(path, "lint", scripts_check, workflow_commands),
+                    "typecheck_static": lifecycle_cell(path, "typecheck", scripts_check, workflow_commands),
+                    "build_package": lifecycle_cell(path, "build", scripts_check, workflow_commands),
+                    "server": lifecycle_server_cell(boundary, scripts_check, workflow_commands),
+                    "docs_release": lifecycle_cell(path, "docs", scripts_check, workflow_commands),
+                    "ci_coverage": ci_coverage_cell(path, workflow_commands),
+                }
+            )
+        return {"rows": rows}
+
     def check_packaging(self, root: Path) -> Dict[str, Any]:
         skills_dir = root / "skills"
         mirror_dir = root / "plugins" / "codex-skills" / "skills"
@@ -885,6 +1007,20 @@ def is_scannable(path: Path) -> bool:
     return not any(part in SKIP_DIRS for part in path.parts)
 
 
+def looks_like_audit_root(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if any((path / name).exists() for name in ("README.md", "README", ".git", ".github", "docs", "scripts", "skills")):
+        return True
+    for name in BOUNDARY_MANIFESTS:
+        if (path / name).exists():
+            return True
+    for name in DOCS_SITE_FILES:
+        if (path / name).exists():
+            return True
+    return False
+
+
 def iter_files(root: Path, pattern: str = "*") -> Iterable[Path]:
     for current, dirs, files in os.walk(root):
         dirs[:] = [name for name in dirs if name not in SKIP_DIRS]
@@ -892,6 +1028,57 @@ def iter_files(root: Path, pattern: str = "*") -> Iterable[Path]:
         for name in files:
             if fnmatch.fnmatch(name, pattern):
                 yield current_path / name
+
+
+def relative_path(root: Path, path: Path) -> str:
+    rel = str(path.relative_to(root))
+    return "." if rel == "." else rel
+
+
+def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
+    if path.name == "package.json" and path.parent.name == "docs":
+        return ("docs-site", "node")
+    kind_and_ecosystem = BOUNDARY_MANIFESTS.get(path.name)
+    if kind_and_ecosystem is not None:
+        return kind_and_ecosystem
+    if path.name in DOCS_SITE_FILES:
+        return ("docs-site", "docs")
+    return None
+
+
+def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    for boundary in boundaries:
+        key = (boundary["path"], boundary["kind"], boundary["ecosystem"])
+        existing = by_key.setdefault(
+            key,
+            {
+                "path": boundary["path"],
+                "kind": boundary["kind"],
+                "ecosystem": boundary["ecosystem"],
+                "evidence": [],
+            },
+        )
+        existing["evidence"].extend(boundary["evidence"])
+    merged = []
+    for item in by_key.values():
+        item["evidence"] = sorted(set(item["evidence"]))
+        merged.append(item)
+    return sorted(merged, key=lambda item: (item["path"], item["kind"]))
+
+
+def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
+    package_boundaries = [
+        boundary
+        for boundary in boundaries
+        if boundary["path"] not in {".", "Dockerfile"}
+    ]
+    ecosystems = {boundary["ecosystem"] for boundary in boundaries}
+    if len(package_boundaries) >= 2 or len(ecosystems) >= 3:
+        return "monorepo"
+    if any(boundary["kind"] == "codex-skill" for boundary in boundaries):
+        return "skill-repository"
+    return "single-repository"
 
 
 def safe_read_text(path: Path, limit: int = 100_000) -> str:
@@ -2564,12 +2751,85 @@ def format_bytes(size: int) -> str:
     return f"{size} B"
 
 
+def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
+    evidence: Dict[str, List[str]] = defaultdict(list)
+    for workflow in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        rel_workflow = relative_path(root, workflow)
+        try:
+            text = workflow.read_text(errors="replace")
+        except OSError:
+            continue
+        pending_command: Optional[str] = None
+        pending_directory = "."
+        for line in text.splitlines():
+            stripped = line.strip()
+            normalized = stripped[2:].strip() if stripped.startswith("- ") else stripped
+            if normalized.startswith("run:"):
+                if pending_command is not None:
+                    evidence[pending_directory or "."].append(f"{rel_workflow}:{pending_command}")
+                pending_command = normalized.split(":", 1)[1].strip().strip("\"'")
+                pending_directory = "."
+                continue
+            if normalized.startswith("working-directory:") and pending_command is not None:
+                pending_directory = normalized.split(":", 1)[1].strip().strip("\"'")
+        if pending_command is not None:
+            evidence[pending_directory or "."].append(f"{rel_workflow}:{pending_command}")
+    return dict(evidence)
+
+
+def lifecycle_cell(
+    path: str,
+    responsibility: str,
+    scripts_check: Dict[str, Any],
+    workflow_commands: Dict[str, List[str]],
+) -> Dict[str, Any]:
+    evidence: List[str] = []
+    status = "missing"
+    responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
+    if responsibility_info and path == ".":
+        evidence.extend(responsibility_info.get("candidates", []))
+        root_status = responsibility_info.get("status", "missing")
+        if root_status in {"present", "documented", "not_applicable"}:
+            status = root_status
+    evidence.extend(workflow_commands.get(path, []))
+    if status == "missing" and evidence:
+        status = "present"
+    return {"status": status, "evidence": sorted(set(evidence))}
+
+
+def lifecycle_server_cell(
+    boundary: Dict[str, Any],
+    scripts_check: Dict[str, Any],
+    workflow_commands: Dict[str, List[str]],
+) -> Dict[str, Any]:
+    if boundary["kind"] in {
+        "docs-site",
+        "codex-skill",
+        "go-package",
+        "python-package",
+        "rust-crate",
+        "swift-package",
+    }:
+        return {"status": "not_applicable", "evidence": []}
+    return lifecycle_cell(boundary["path"], "server", scripts_check, workflow_commands)
+
+
+def ci_coverage_cell(path: str, workflow_commands: Dict[str, List[str]]) -> Dict[str, Any]:
+    evidence = workflow_commands.get(path, [])
+    return {
+        "status": "present" if evidence else "missing",
+        "evidence": sorted(set(evidence)),
+    }
+
+
 def render_markdown(report: Dict[str, Any]) -> str:
     lines: List[str] = []
     checks = report["checks"]
     lines.extend(render_verdict(report))
     lines.extend(render_findings(report["findings"]))
     lines.extend(render_repository_shape(checks["repository_shape"]))
+    lines.extend(render_repository_inventory(checks["repository_inventory"]))
+    lines.extend(render_lifecycle_gate_matrix(checks["lifecycle_gate_matrix"]))
     lines.extend(render_documentation(checks["documentation"]))
     lines.extend(render_scripts(checks["scripts"]))
     lines.extend(render_validation(checks["validation"]))
@@ -2619,6 +2879,45 @@ def render_repository_shape(shape: Dict[str, Any]) -> List[str]:
         f"- Manifests: {format_present(shape['manifests'])}",
         "",
     ]
+
+
+def render_repository_inventory(inventory: Dict[str, Any]) -> List[str]:
+    lines = [
+        "## Repository Inventory",
+        f"- Classification: {inventory['classification']}",
+        f"- Ecosystems: {format_present(inventory['ecosystems'])}",
+        f"- Suggested overlays: {format_present(inventory['suggested_overlays'])}",
+        "- Boundaries:",
+    ]
+    for boundary in inventory["boundaries"]:
+        evidence = ", ".join(boundary["evidence"])
+        lines.append(
+            f"  - {boundary['path']}: {boundary['kind']} ({boundary['ecosystem']}) - {evidence}"
+        )
+    lines.append("")
+    return lines
+
+
+def render_lifecycle_gate_matrix(matrix: Dict[str, Any]) -> List[str]:
+    lines = ["## Lifecycle Gate Matrix"]
+    for row in matrix["rows"]:
+        lines.append(f"- {row['path']} ({row['kind']})")
+        for key in [
+            "setup",
+            "focused_test",
+            "full_validation",
+            "lint_format",
+            "typecheck_static",
+            "build_package",
+            "server",
+            "docs_release",
+            "ci_coverage",
+        ]:
+            cell = row[key]
+            evidence = f" - {', '.join(cell['evidence'])}" if cell["evidence"] else ""
+            lines.append(f"  - {key}: {cell['status']}{evidence}")
+    lines.append("")
+    return lines
 
 
 def render_documentation(documentation: Dict[str, Any]) -> List[str]:

@@ -2298,6 +2298,55 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual([], packaging["missing_agents_openai_yaml"])
             self.assertEqual([], packaging["missing_skill_mirrors"])
 
+    def test_polyglot_monorepo_inventory_detects_boundaries(self):
+        fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
+
+        report = self.audit_report(fixture)
+
+        inventory = report["checks"]["repository_inventory"]
+        self.assertEqual("monorepo", inventory["classification"])
+        self.assertEqual(
+            ["docker", "go", "node", "python"],
+            sorted(inventory["ecosystems"]),
+        )
+        boundaries = {item["path"]: item for item in inventory["boundaries"]}
+        self.assertEqual("node-workspace-root", boundaries["."]["kind"])
+        self.assertEqual("go-package", boundaries["packages/api"]["kind"])
+        self.assertEqual("python-package", boundaries["packages/worker"]["kind"])
+        self.assertEqual("docs-site", boundaries["docs"]["kind"])
+        self.assertEqual("docker-service", boundaries["Dockerfile"]["kind"])
+        self.assertIn("references/ecosystems/node-typescript.md", inventory["suggested_overlays"])
+        self.assertIn("references/ecosystems/go.md", inventory["suggested_overlays"])
+        self.assertIn("references/ecosystems/python.md", inventory["suggested_overlays"])
+        self.assertIn("references/ecosystems/docker-services.md", inventory["suggested_overlays"])
+
+    def test_polyglot_lifecycle_gate_matrix_scopes_gates(self):
+        fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
+
+        report = self.audit_report(fixture)
+
+        matrix = {
+            row["path"]: row
+            for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+        }
+        self.assertEqual("present", matrix["."]["focused_test"]["status"])
+        self.assertEqual("present", matrix["."]["full_validation"]["status"])
+        self.assertEqual("present", matrix["packages/api"]["focused_test"]["status"])
+        self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+        self.assertEqual("not_applicable", matrix["docs"]["server"]["status"])
+        self.assertIn("package.json:test", matrix["."]["focused_test"]["evidence"])
+        self.assertIn(".github/workflows/ci.yml:go test ./...", matrix["packages/api"]["focused_test"]["evidence"])
+
+    def test_markdown_report_includes_inventory_sections(self):
+        fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
+
+        result = self.run_audit(fixture)
+
+        self.assertIn("## Repository Inventory", result.stdout)
+        self.assertIn("## Lifecycle Gate Matrix", result.stdout)
+        self.assertIn("packages/worker", result.stdout)
+        self.assertIn("python-package", result.stdout)
+
     def test_iter_files_prunes_skipped_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
