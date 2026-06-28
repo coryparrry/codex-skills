@@ -8,6 +8,7 @@ import ast
 import fnmatch
 import json
 import os
+import posixpath
 import re
 import shlex
 import subprocess
@@ -417,6 +418,52 @@ SERVER_MARKERS = {
     "Procfile",
 }
 
+ECOSYSTEM_OVERLAYS = {
+    "node": "references/ecosystems/node-typescript.md",
+    "python": "references/ecosystems/python.md",
+    "go": "references/ecosystems/go.md",
+    "rust": "references/ecosystems/rust.md",
+    "swift": "references/ecosystems/swift-apple.md",
+    "jvm": "references/ecosystems/jvm-gradle-maven.md",
+    "ruby": "references/ecosystems/ruby.md",
+    "docker": "references/ecosystems/docker-services.md",
+    "docs": "references/ecosystems/docs-static-sites.md",
+    "codex-skill": "references/ecosystems/codex-skill-plugin.md",
+    "infra": "references/ecosystems/infra-iac.md",
+}
+
+BOUNDARY_MANIFESTS = {
+    "package.json": ("node-workspace-root", "node"),
+    "pyproject.toml": ("python-package", "python"),
+    "setup.cfg": ("python-package", "python"),
+    "setup.py": ("python-package", "python"),
+    "requirements.txt": ("python-package", "python"),
+    "go.mod": ("go-package", "go"),
+    "Cargo.toml": ("rust-crate", "rust"),
+    "Package.swift": ("swift-package", "swift"),
+    "settings.gradle": ("jvm-build", "jvm"),
+    "settings.gradle.kts": ("jvm-build", "jvm"),
+    "build.gradle": ("jvm-build", "jvm"),
+    "build.gradle.kts": ("jvm-build", "jvm"),
+    "pom.xml": ("jvm-build", "jvm"),
+    "Gemfile": ("ruby-package", "ruby"),
+    "Rakefile": ("ruby-package", "ruby"),
+    "Dockerfile": ("docker-service", "docker"),
+    "docker-compose.yml": ("docker-service", "docker"),
+    "compose.yml": ("docker-service", "docker"),
+    "SKILL.md": ("codex-skill", "codex-skill"),
+    "main.tf": ("infra-iac", "infra"),
+    "Chart.yaml": ("infra-iac", "infra"),
+}
+
+DOCS_SITE_FILES = {
+    "mkdocs.yml",
+    "docusaurus.config.js",
+    "docusaurus.config.ts",
+    "vitepress.config.ts",
+    "netlify.toml",
+}
+
 
 @dataclass
 class Finding:
@@ -438,9 +485,16 @@ class Audit:
         root = self.find_repo_root()
         checks: Dict[str, Any] = {}
         checks["repository_shape"] = self.check_repository_shape(root)
+        checks["repository_inventory"] = self.check_repository_inventory(root)
         checks["documentation"] = self.check_documentation(root)
         checks["scripts"] = self.check_scripts(root)
         checks["validation"] = self.check_validation(root, checks["scripts"])
+        checks["lifecycle_gate_matrix"] = self.check_lifecycle_gate_matrix(
+            root,
+            checks["repository_inventory"],
+            checks["scripts"],
+            checks["validation"],
+        )
         checks["packaging"] = self.check_packaging(root)
         checks["hygiene"] = self.check_hygiene(root)
 
@@ -457,7 +511,12 @@ class Audit:
     def find_repo_root(self) -> Path:
         result = self.git(["rev-parse", "--show-toplevel"], self.requested_repo)
         if result.returncode == 0:
-            return Path(result.stdout.strip()).resolve()
+            git_root = Path(result.stdout.strip()).resolve()
+            if should_prefer_requested_audit_root(self.requested_repo, git_root):
+                return self.requested_repo
+            return git_root
+        if looks_like_audit_root(self.requested_repo):
+            return self.requested_repo
         self.add_not_checked("git metadata", "path is not inside a Git worktree")
         return self.requested_repo
 
@@ -562,6 +621,43 @@ class Audit:
                 "Add CONTRIBUTING.md or document contribution expectations in README.",
             )
         return shape
+
+    def check_repository_inventory(self, root: Path) -> Dict[str, Any]:
+        boundaries: List[Dict[str, Any]] = []
+        ecosystems: set[str] = set()
+
+        for path in iter_files(root):
+            rel = relative_path(root, path)
+            kind_and_ecosystem = inventory_boundary_kind(path)
+            if kind_and_ecosystem is None:
+                continue
+
+            kind, ecosystem = kind_and_ecosystem
+            boundary_path = path.parent if kind != "docker-service" else path
+            boundary_rel = relative_path(root, boundary_path)
+            boundary = {
+                "path": boundary_rel,
+                "kind": kind,
+                "ecosystem": ecosystem,
+                "evidence": [rel],
+            }
+            boundaries.append(boundary)
+            ecosystems.add(ecosystem)
+
+        boundaries = merge_boundaries(boundaries)
+        classification = classify_repository_inventory(boundaries)
+        overlays = sorted(
+            ECOSYSTEM_OVERLAYS[ecosystem]
+            for ecosystem in ecosystems
+            if ecosystem in ECOSYSTEM_OVERLAYS
+        )
+
+        return {
+            "classification": classification,
+            "ecosystems": sorted(ecosystems),
+            "boundaries": boundaries,
+            "suggested_overlays": overlays,
+        }
 
     def check_documentation(self, root: Path) -> Dict[str, Any]:
         markdown_files = sorted(iter_files(root, "*.md"))
@@ -746,6 +842,37 @@ class Audit:
             "has_full_gate": cibuild["status"] in {"present", "documented"} or bool(workflows),
         }
 
+    def check_lifecycle_gate_matrix(
+        self,
+        root: Path,
+        inventory: Dict[str, Any],
+        scripts_check: Dict[str, Any],
+        validation_check: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        del validation_check
+        rows = []
+        workflow_commands = workflow_command_evidence(root)
+        for boundary in inventory["boundaries"]:
+            path = boundary["path"]
+            scope_path = lifecycle_scope_path(boundary)
+            rows.append(
+                {
+                    "path": path,
+                    "kind": boundary["kind"],
+                    "ecosystem": boundary["ecosystem"],
+                    "setup": lifecycle_cell(scope_path, "setup", scripts_check, workflow_commands),
+                    "focused_test": lifecycle_cell(scope_path, "test", scripts_check, workflow_commands),
+                    "full_validation": lifecycle_cell(scope_path, "cibuild", scripts_check, workflow_commands),
+                    "lint_format": lifecycle_cell(scope_path, "lint", scripts_check, workflow_commands),
+                    "typecheck_static": lifecycle_cell(scope_path, "typecheck", scripts_check, workflow_commands),
+                    "build_package": lifecycle_cell(scope_path, "build", scripts_check, workflow_commands),
+                    "server": lifecycle_server_cell(boundary, scripts_check, workflow_commands),
+                    "docs_release": lifecycle_cell(scope_path, "docs", scripts_check, workflow_commands),
+                    "ci_coverage": ci_coverage_cell(scope_path, workflow_commands),
+                }
+            )
+        return {"rows": rows}
+
     def check_packaging(self, root: Path) -> Dict[str, Any]:
         skills_dir = root / "skills"
         mirror_dir = root / "plugins" / "codex-skills" / "skills"
@@ -885,6 +1012,37 @@ def is_scannable(path: Path) -> bool:
     return not any(part in SKIP_DIRS for part in path.parts)
 
 
+def looks_like_audit_root(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    git_dir = path / ".git"
+    if git_dir.is_dir() or git_dir.is_file():
+        return True
+    if not (path / ".github" / "workflows").is_dir():
+        return False
+    standalone_signals = 0
+    if any((path / name).is_file() for name in ("README.md", "README")):
+        standalone_signals += 1
+    if any((path / name).exists() for name in (*BOUNDARY_MANIFESTS, "pnpm-workspace.yaml")):
+        standalone_signals += 1
+    if (path / "docs").is_dir():
+        standalone_signals += 1
+    if (path / "packages").is_dir():
+        standalone_signals += 1
+    return standalone_signals >= 2
+
+
+def should_prefer_requested_audit_root(requested_repo: Path, git_root: Path) -> bool:
+    if requested_repo == git_root or not looks_like_audit_root(requested_repo):
+        return False
+    try:
+        relative_parts = requested_repo.relative_to(git_root).parts
+    except ValueError:
+        return False
+    workspace_container_dirs = {"apps", "crates", "libs", "modules", "packages", "services"}
+    return not relative_parts or relative_parts[0] not in workspace_container_dirs
+
+
 def iter_files(root: Path, pattern: str = "*") -> Iterable[Path]:
     for current, dirs, files in os.walk(root):
         dirs[:] = [name for name in dirs if name not in SKIP_DIRS]
@@ -892,6 +1050,57 @@ def iter_files(root: Path, pattern: str = "*") -> Iterable[Path]:
         for name in files:
             if fnmatch.fnmatch(name, pattern):
                 yield current_path / name
+
+
+def relative_path(root: Path, path: Path) -> str:
+    rel = str(path.relative_to(root))
+    return "." if rel == "." else rel
+
+
+def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
+    if path.name == "package.json" and path.parent.name == "docs":
+        return ("docs-site", "node")
+    kind_and_ecosystem = BOUNDARY_MANIFESTS.get(path.name)
+    if kind_and_ecosystem is not None:
+        return kind_and_ecosystem
+    if path.name in DOCS_SITE_FILES:
+        return ("docs-site", "docs")
+    return None
+
+
+def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    for boundary in boundaries:
+        key = (boundary["path"], boundary["kind"], boundary["ecosystem"])
+        existing = by_key.setdefault(
+            key,
+            {
+                "path": boundary["path"],
+                "kind": boundary["kind"],
+                "ecosystem": boundary["ecosystem"],
+                "evidence": [],
+            },
+        )
+        existing["evidence"].extend(boundary["evidence"])
+    merged = []
+    for item in by_key.values():
+        item["evidence"] = sorted(set(item["evidence"]))
+        merged.append(item)
+    return sorted(merged, key=lambda item: (item["path"], item["kind"]))
+
+
+def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
+    package_boundaries = [
+        boundary
+        for boundary in boundaries
+        if boundary["path"] not in {".", "Dockerfile"}
+    ]
+    ecosystems = {boundary["ecosystem"] for boundary in boundaries}
+    if len(package_boundaries) >= 2 or len(ecosystems) >= 3:
+        return "monorepo"
+    if any(boundary["kind"] == "codex-skill" for boundary in boundaries):
+        return "skill-repository"
+    return "single-repository"
 
 
 def safe_read_text(path: Path, limit: int = 100_000) -> str:
@@ -2564,12 +2773,317 @@ def format_bytes(size: int) -> str:
     return f"{size} B"
 
 
+def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
+    evidence: Dict[str, List[str]] = defaultdict(list)
+    for workflow in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        rel_workflow = relative_path(root, workflow)
+        try:
+            text = workflow.read_text(errors="replace")
+        except OSError:
+            continue
+        for directory, commands in workflow_step_run_commands(text):
+            for command in commands:
+                evidence[directory or "."].append(f"{rel_workflow}:{command}")
+    return dict(evidence)
+
+
+def workflow_step_run_commands(text: str) -> List[Tuple[str, List[str]]]:
+    lines = text.splitlines()
+    steps: List[Tuple[str, List[str]]] = []
+    workflow_default_directory = "."
+    jobs_indent: Optional[int] = None
+    job_entry_indent: Optional[int] = None
+    current_job_indent: Optional[int] = None
+    current_job_default_directory = "."
+    current_steps_indent: Optional[int] = None
+    current_step_entry_indent: Optional[int] = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if jobs_indent is not None and stripped and indent <= jobs_indent and not stripped.startswith("#") and not stripped.startswith("jobs:"):
+            jobs_indent = None
+            job_entry_indent = None
+            current_job_indent = None
+            current_job_default_directory = workflow_default_directory
+            current_steps_indent = None
+            current_step_entry_indent = None
+        if current_steps_indent is not None and stripped and indent <= current_steps_indent and not stripped.startswith("#") and not stripped.startswith("steps:"):
+            current_steps_indent = None
+            current_step_entry_indent = None
+        if indent == 0 and stripped.startswith("defaults:"):
+            default_directory = parse_defaults_run_directory(lines, index, indent)
+            if default_directory is not None:
+                workflow_default_directory = default_directory
+                if current_job_indent is None:
+                    current_job_default_directory = default_directory
+        elif jobs_indent is not None and current_job_indent is not None and indent > current_job_indent and stripped.startswith("defaults:"):
+            default_directory = parse_defaults_run_directory(lines, index, indent)
+            if default_directory is not None:
+                current_job_default_directory = default_directory
+        if indent == 0 and stripped.startswith("jobs:"):
+            jobs_indent = indent
+            job_entry_indent = None
+            current_job_indent = None
+            current_job_default_directory = workflow_default_directory
+            current_steps_indent = None
+            current_step_entry_indent = None
+            index += 1
+            continue
+        if jobs_indent is not None and stripped.endswith(":") and not stripped.startswith("- ") and indent > jobs_indent:
+            if job_entry_indent is None:
+                job_entry_indent = indent
+            if indent == job_entry_indent:
+                current_job_indent = indent
+                current_job_default_directory = workflow_default_directory
+                current_steps_indent = None
+                current_step_entry_indent = None
+        if current_job_indent is not None and stripped.startswith("steps:") and indent > current_job_indent:
+            current_steps_indent = indent
+            current_step_entry_indent = None
+            index += 1
+            continue
+        if current_steps_indent is None or not stripped.startswith("- ") or indent <= current_steps_indent:
+            index += 1
+            continue
+        if current_step_entry_indent is None:
+            current_step_entry_indent = indent
+        if indent != current_step_entry_indent:
+            index += 1
+            continue
+        step_end = index + 1
+        while step_end < len(lines):
+            next_line = lines[step_end]
+            next_stripped = next_line.lstrip()
+            next_indent = len(next_line) - len(next_stripped)
+            if next_stripped.startswith("- ") and next_indent == indent:
+                break
+            if next_stripped and next_indent <= current_steps_indent and not next_stripped.startswith("#"):
+                break
+            step_end += 1
+        relative_lines = [line[indent + 2:]]
+        for offset in range(index + 1, step_end):
+            raw = lines[offset]
+            relative_lines.append(raw[indent + 2:] if len(raw) >= indent + 2 else "")
+        default_directory = current_job_default_directory if current_job_indent is not None else workflow_default_directory
+        directory, commands = parse_workflow_step(relative_lines, default_directory)
+        if commands:
+            steps.append((directory, commands))
+        index = step_end
+    return steps
+
+
+def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_indent: int) -> Optional[str]:
+    run_indent: Optional[int] = None
+    index = start_index + 1
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if stripped and indent <= defaults_indent and not stripped.startswith("#"):
+            break
+        if run_indent is not None and stripped and indent <= run_indent and not stripped.startswith("#"):
+            run_indent = None
+        if run_indent is None and stripped.startswith("run:") and indent > defaults_indent:
+            run_indent = indent
+            index += 1
+            continue
+        if run_indent is not None and stripped.startswith("working-directory:") and indent > run_indent:
+            return normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
+        index += 1
+    return None
+
+
+def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple[str, List[str]]:
+    directory = normalize_workflow_directory(default_directory)
+    commands: List[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        if stripped.startswith("working-directory:"):
+            directory = normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
+            index += 1
+            continue
+        if stripped.startswith("run:"):
+            value = line.split(":", 1)[1].lstrip()
+            if workflow_block_scalar_header(value):
+                block_lines: List[str] = []
+                index += 1
+                while index < len(lines):
+                    block_line = lines[index]
+                    if block_line.strip() and leading_spaces(block_line) == 0:
+                        break
+                    block_lines.append(block_line)
+                    index += 1
+                commands.extend(workflow_block_commands(block_lines))
+                continue
+            command = workflow_scalar_value(value)
+            if command:
+                commands.append(command)
+        index += 1
+    return normalize_workflow_directory(directory), commands
+
+
+def workflow_block_scalar_header(value: str) -> bool:
+    header = value.strip()
+    return header in {"|", ">", "|-", ">-", "|+", ">+"}
+
+
+def workflow_block_commands(lines: List[str]) -> List[str]:
+    non_empty = [line for line in lines if line.strip()]
+    if not non_empty:
+        return []
+    base_indent = min(leading_spaces(line) for line in non_empty)
+    commands = []
+    for line in lines:
+        if not line.strip():
+            continue
+        command = line[base_indent:].strip()
+        if command and not command.startswith("#"):
+            commands.append(command)
+    return commands
+
+
+def workflow_scalar_value(value: str) -> str:
+    return value.strip().strip("\"'")
+
+
+def normalize_workflow_directory(value: str) -> str:
+    normalized = posixpath.normpath(value.strip() or ".")
+    return "." if normalized in {"", "."} else normalized
+
+
+def leading_spaces(text: str) -> int:
+    return len(text) - len(text.lstrip(" "))
+
+
+def classify_workflow_name(name: str) -> List[str]:
+    words = set(re.split(r"[^a-z0-9]+", name.lower()))
+    words.discard("")
+    matches = set(classify_command_name(name))
+    direct_matches = {
+        "pytest": "test",
+        "tox": "test",
+        "ruff": "lint",
+        "mypy": "typecheck",
+        "pyright": "typecheck",
+        "tsc": "typecheck",
+    }
+    if name.lower() in direct_matches:
+        matches.add(direct_matches[name.lower()])
+    if words & {"build", "package"}:
+        matches.add("build")
+    if words & {"lint", "fmt", "format"}:
+        matches.add("lint")
+    if words & {"typecheck", "types", "mypy", "pyright", "tsc"}:
+        matches.add("typecheck")
+    if words & {"docs", "doc", "documentation"}:
+        matches.add("docs")
+    return sorted(matches)
+
+
+def workflow_command_responsibilities(command: str) -> List[str]:
+    command = command_without_leading_env_assignments(command)
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return []
+    tokens = normalize_pip_command_tokens(tokens)
+    tool = tokens[0]
+    if tool in {"npm", "pnpm", "yarn", "bun"}:
+        script = package_manager_script_from_args(tool, tokens[1:])
+        if script:
+            return classify_workflow_name(script)
+    if tool in {"make", "just"}:
+        target = first_non_option(tokens[1:])
+        if target is not None:
+            return classify_workflow_name(target)
+    if tool in {"go", "cargo"} and len(tokens) > 1:
+        return classify_workflow_name(tokens[1])
+    if tool in {"pytest", "tox", "mypy", "pyright", "ruff"}:
+        return classify_workflow_name(tool)
+    if tool in {"python", "python3"} and len(tokens) > 2 and tokens[1] == "-m":
+        return classify_workflow_name(tokens[2])
+    return classify_workflow_name(tool)
+
+
+def workflow_evidence_for_responsibility(
+    path: str,
+    responsibility: str,
+    workflow_commands: Dict[str, List[str]],
+) -> List[str]:
+    evidence = []
+    for item in workflow_commands.get(path, []):
+        _, _, command = item.partition(":")
+        if responsibility in workflow_command_responsibilities(command):
+            evidence.append(item)
+    return evidence
+
+
+def lifecycle_cell(
+    path: str,
+    responsibility: str,
+    scripts_check: Dict[str, Any],
+    workflow_commands: Dict[str, List[str]],
+) -> Dict[str, Any]:
+    evidence: List[str] = []
+    status = "missing"
+    responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
+    if responsibility_info and path == ".":
+        evidence.extend(responsibility_info.get("candidates", []))
+        root_status = responsibility_info.get("status", "missing")
+        if root_status in {"present", "documented", "not_applicable"}:
+            status = root_status
+    evidence.extend(workflow_evidence_for_responsibility(path, responsibility, workflow_commands))
+    if status == "missing" and evidence:
+        status = "present"
+    return {"status": status, "evidence": sorted(set(evidence))}
+
+
+def lifecycle_scope_path(boundary: Dict[str, Any]) -> str:
+    if boundary["kind"] != "docker-service":
+        return boundary["path"]
+    parent = posixpath.dirname(boundary["path"])
+    return "." if parent in {"", "."} else parent
+
+
+def lifecycle_server_cell(
+    boundary: Dict[str, Any],
+    scripts_check: Dict[str, Any],
+    workflow_commands: Dict[str, List[str]],
+) -> Dict[str, Any]:
+    if boundary["kind"] in {
+        "docs-site",
+        "codex-skill",
+        "go-package",
+        "python-package",
+        "rust-crate",
+        "swift-package",
+    }:
+        return {"status": "not_applicable", "evidence": []}
+    return lifecycle_cell(lifecycle_scope_path(boundary), "server", scripts_check, workflow_commands)
+
+
+def ci_coverage_cell(path: str, workflow_commands: Dict[str, List[str]]) -> Dict[str, Any]:
+    evidence = workflow_commands.get(path, [])
+    return {
+        "status": "present" if evidence else "missing",
+        "evidence": sorted(set(evidence)),
+    }
+
+
 def render_markdown(report: Dict[str, Any]) -> str:
     lines: List[str] = []
     checks = report["checks"]
     lines.extend(render_verdict(report))
     lines.extend(render_findings(report["findings"]))
     lines.extend(render_repository_shape(checks["repository_shape"]))
+    lines.extend(render_repository_inventory(checks["repository_inventory"]))
+    lines.extend(render_lifecycle_gate_matrix(checks["lifecycle_gate_matrix"]))
     lines.extend(render_documentation(checks["documentation"]))
     lines.extend(render_scripts(checks["scripts"]))
     lines.extend(render_validation(checks["validation"]))
@@ -2619,6 +3133,45 @@ def render_repository_shape(shape: Dict[str, Any]) -> List[str]:
         f"- Manifests: {format_present(shape['manifests'])}",
         "",
     ]
+
+
+def render_repository_inventory(inventory: Dict[str, Any]) -> List[str]:
+    lines = [
+        "## Repository Inventory",
+        f"- Classification: {inventory['classification']}",
+        f"- Ecosystems: {format_present(inventory['ecosystems'])}",
+        f"- Suggested overlays: {format_present(inventory['suggested_overlays'])}",
+        "- Boundaries:",
+    ]
+    for boundary in inventory["boundaries"]:
+        evidence = ", ".join(boundary["evidence"])
+        lines.append(
+            f"  - {boundary['path']}: {boundary['kind']} ({boundary['ecosystem']}) - {evidence}"
+        )
+    lines.append("")
+    return lines
+
+
+def render_lifecycle_gate_matrix(matrix: Dict[str, Any]) -> List[str]:
+    lines = ["## Lifecycle Gate Matrix"]
+    for row in matrix["rows"]:
+        lines.append(f"- {row['path']} ({row['kind']})")
+        for key in [
+            "setup",
+            "focused_test",
+            "full_validation",
+            "lint_format",
+            "typecheck_static",
+            "build_package",
+            "server",
+            "docs_release",
+            "ci_coverage",
+        ]:
+            cell = row[key]
+            evidence = f" - {', '.join(cell['evidence'])}" if cell["evidence"] else ""
+            lines.append(f"  - {key}: {cell['status']}{evidence}")
+    lines.append("")
+    return lines
 
 
 def render_documentation(documentation: Dict[str, Any]) -> List[str]:

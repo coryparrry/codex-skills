@@ -2372,7 +2372,318 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual(str(root.resolve()), report["repo"])
             self.assertIn(".github/workflows/ci.yml", report["checks"]["validation"]["ci_workflows"])
 
+    def test_nested_package_with_local_workflow_signals_still_audits_repo_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "api"
+            root_workflows = root / ".github" / "workflows"
+            package_workflows = package_dir / ".github" / "workflows"
+            root_workflows.mkdir(parents=True)
+            package_workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / "AGENTS.md").write_text("# Instructions\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"test":"echo ok"}}\n')
+            (root_workflows / "ci.yml").write_text("name: root-ci\n")
+            (package_dir / "README.md").write_text("# API\n")
+            (package_dir / "go.mod").write_text("module example.com/api\n")
+            (package_workflows / "pkg-ci.yml").write_text("name: package-ci\n")
+            self.commit_all(root)
+
+            report = self.audit_report(package_dir)
+
+            self.assertEqual(str(root.resolve()), report["repo"])
+            self.assertIn(".github/workflows/ci.yml", report["checks"]["validation"]["ci_workflows"])
+
+    def test_nested_standalone_project_path_audits_itself_inside_larger_worktree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            project_dir = root / "third_party" / "service"
+            root_workflows = root / ".github" / "workflows"
+            project_workflows = project_dir / ".github" / "workflows"
+            root_workflows.mkdir(parents=True)
+            project_workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"test":"echo ok"}}\n')
+            (root_workflows / "ci.yml").write_text("name: root-ci\n")
+            (project_dir / "README.md").write_text("# Service\n")
+            (project_dir / "package.json").write_text('{"scripts":{"test":"echo service"}}\n')
+            (project_workflows / "service-ci.yml").write_text("name: service-ci\n")
+            self.commit_all(root)
+
+            report = self.audit_report(project_dir)
+
+            self.assertEqual(str(project_dir.resolve()), report["repo"])
+            self.assertIn(".github/workflows/service-ci.yml", report["checks"]["validation"]["ci_workflows"])
+
     def test_workflow_direct_tools_count_for_matching_lifecycle_cells(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"lint":"echo ok"}}\n')
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest\n"
+                "        working-directory: packages/worker\n"
+                "      - run: ruff check .\n"
+                "        working-directory: packages/worker\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/worker"]["lint_format"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertIn(
+                ".github/workflows/ci.yml:ruff check .",
+                matrix["packages/worker"]["lint_format"]["evidence"],
+            )
+
+    def test_workflow_working_directory_before_run_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"lint":"echo ok"}}\n')
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - working-directory: packages/worker\n"
+                "        run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_workflow_working_directory_is_normalized_for_lifecycle_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"lint":"echo ok"}}\n')
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - working-directory: ./packages/worker/\n"
+                "        run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_workflow_job_defaults_run_working_directory_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    defaults:\n"
+                "      run:\n"
+                "        working-directory: packages/worker\n"
+                "    steps:\n"
+                "      - run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_workflow_global_defaults_run_working_directory_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "defaults:\n"
+                "  run:\n"
+                "    working-directory: packages/worker\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_workflow_matrix_include_run_keys_do_not_count_as_step_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"lint":"echo ok"}}\n')
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    strategy:\n"
+                "      matrix:\n"
+                "        include:\n"
+                "          - name: worker\n"
+                "            run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["."]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_workflow_parser_accepts_valid_non_two_space_indentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "    test:\n"
+                "        runs-on: ubuntu-latest\n"
+                "        steps:\n"
+                "            - working-directory: packages/worker\n"
+                "              run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_docker_service_ci_coverage_matches_workflow_directory_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "Dockerfile").write_text("FROM python:3.12-slim\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  docker:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: docker build .\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["Dockerfile"]["ci_coverage"]["status"])
+            self.assertIn(".github/workflows/ci.yml:docker build .", matrix["Dockerfile"]["ci_coverage"]["evidence"])
+
+    def test_workflow_multiline_run_block_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.init_repo(root)
@@ -2389,10 +2700,11 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 "  test:\n"
                 "    runs-on: ubuntu-latest\n"
                 "    steps:\n"
-                "      - run: pytest\n"
+                "      - name: worker checks\n"
                 "        working-directory: packages/worker\n"
-                "      - run: ruff check .\n"
-                "        working-directory: packages/worker\n"
+                "        run: |\n"
+                "          pytest\n"
+                "          ruff check .\n"
             )
             self.commit_all(root)
 

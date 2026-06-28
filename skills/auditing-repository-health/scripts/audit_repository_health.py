@@ -8,6 +8,7 @@ import ast
 import fnmatch
 import json
 import os
+import posixpath
 import re
 import shlex
 import subprocess
@@ -508,11 +509,14 @@ class Audit:
         }
 
     def find_repo_root(self) -> Path:
-        if looks_like_audit_root(self.requested_repo):
-            return self.requested_repo
         result = self.git(["rev-parse", "--show-toplevel"], self.requested_repo)
         if result.returncode == 0:
-            return Path(result.stdout.strip()).resolve()
+            git_root = Path(result.stdout.strip()).resolve()
+            if should_prefer_requested_audit_root(self.requested_repo, git_root):
+                return self.requested_repo
+            return git_root
+        if looks_like_audit_root(self.requested_repo):
+            return self.requested_repo
         self.add_not_checked("git metadata", "path is not inside a Git worktree")
         return self.requested_repo
 
@@ -850,20 +854,21 @@ class Audit:
         workflow_commands = workflow_command_evidence(root)
         for boundary in inventory["boundaries"]:
             path = boundary["path"]
+            scope_path = lifecycle_scope_path(boundary)
             rows.append(
                 {
                     "path": path,
                     "kind": boundary["kind"],
                     "ecosystem": boundary["ecosystem"],
-                    "setup": lifecycle_cell(path, "setup", scripts_check, workflow_commands),
-                    "focused_test": lifecycle_cell(path, "test", scripts_check, workflow_commands),
-                    "full_validation": lifecycle_cell(path, "cibuild", scripts_check, workflow_commands),
-                    "lint_format": lifecycle_cell(path, "lint", scripts_check, workflow_commands),
-                    "typecheck_static": lifecycle_cell(path, "typecheck", scripts_check, workflow_commands),
-                    "build_package": lifecycle_cell(path, "build", scripts_check, workflow_commands),
+                    "setup": lifecycle_cell(scope_path, "setup", scripts_check, workflow_commands),
+                    "focused_test": lifecycle_cell(scope_path, "test", scripts_check, workflow_commands),
+                    "full_validation": lifecycle_cell(scope_path, "cibuild", scripts_check, workflow_commands),
+                    "lint_format": lifecycle_cell(scope_path, "lint", scripts_check, workflow_commands),
+                    "typecheck_static": lifecycle_cell(scope_path, "typecheck", scripts_check, workflow_commands),
+                    "build_package": lifecycle_cell(scope_path, "build", scripts_check, workflow_commands),
                     "server": lifecycle_server_cell(boundary, scripts_check, workflow_commands),
-                    "docs_release": lifecycle_cell(path, "docs", scripts_check, workflow_commands),
-                    "ci_coverage": ci_coverage_cell(path, workflow_commands),
+                    "docs_release": lifecycle_cell(scope_path, "docs", scripts_check, workflow_commands),
+                    "ci_coverage": ci_coverage_cell(scope_path, workflow_commands),
                 }
             )
         return {"rows": rows}
@@ -1025,6 +1030,17 @@ def looks_like_audit_root(path: Path) -> bool:
     if (path / "packages").is_dir():
         standalone_signals += 1
     return standalone_signals >= 2
+
+
+def should_prefer_requested_audit_root(requested_repo: Path, git_root: Path) -> bool:
+    if requested_repo == git_root or not looks_like_audit_root(requested_repo):
+        return False
+    try:
+        relative_parts = requested_repo.relative_to(git_root).parts
+    except ValueError:
+        return False
+    workspace_container_dirs = {"apps", "crates", "libs", "modules", "packages", "services"}
+    return not relative_parts or relative_parts[0] not in workspace_container_dirs
 
 
 def iter_files(root: Path, pattern: str = "*") -> Iterable[Path]:
@@ -2765,22 +2781,182 @@ def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
             text = workflow.read_text(errors="replace")
         except OSError:
             continue
-        pending_command: Optional[str] = None
-        pending_directory = "."
-        for line in text.splitlines():
-            stripped = line.strip()
-            normalized = stripped[2:].strip() if stripped.startswith("- ") else stripped
-            if normalized.startswith("run:"):
-                if pending_command is not None:
-                    evidence[pending_directory or "."].append(f"{rel_workflow}:{pending_command}")
-                pending_command = normalized.split(":", 1)[1].strip().strip("\"'")
-                pending_directory = "."
-                continue
-            if normalized.startswith("working-directory:") and pending_command is not None:
-                pending_directory = normalized.split(":", 1)[1].strip().strip("\"'")
-        if pending_command is not None:
-            evidence[pending_directory or "."].append(f"{rel_workflow}:{pending_command}")
+        for directory, commands in workflow_step_run_commands(text):
+            for command in commands:
+                evidence[directory or "."].append(f"{rel_workflow}:{command}")
     return dict(evidence)
+
+
+def workflow_step_run_commands(text: str) -> List[Tuple[str, List[str]]]:
+    lines = text.splitlines()
+    steps: List[Tuple[str, List[str]]] = []
+    workflow_default_directory = "."
+    jobs_indent: Optional[int] = None
+    job_entry_indent: Optional[int] = None
+    current_job_indent: Optional[int] = None
+    current_job_default_directory = "."
+    current_steps_indent: Optional[int] = None
+    current_step_entry_indent: Optional[int] = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if jobs_indent is not None and stripped and indent <= jobs_indent and not stripped.startswith("#") and not stripped.startswith("jobs:"):
+            jobs_indent = None
+            job_entry_indent = None
+            current_job_indent = None
+            current_job_default_directory = workflow_default_directory
+            current_steps_indent = None
+            current_step_entry_indent = None
+        if current_steps_indent is not None and stripped and indent <= current_steps_indent and not stripped.startswith("#") and not stripped.startswith("steps:"):
+            current_steps_indent = None
+            current_step_entry_indent = None
+        if indent == 0 and stripped.startswith("defaults:"):
+            default_directory = parse_defaults_run_directory(lines, index, indent)
+            if default_directory is not None:
+                workflow_default_directory = default_directory
+                if current_job_indent is None:
+                    current_job_default_directory = default_directory
+        elif jobs_indent is not None and current_job_indent is not None and indent > current_job_indent and stripped.startswith("defaults:"):
+            default_directory = parse_defaults_run_directory(lines, index, indent)
+            if default_directory is not None:
+                current_job_default_directory = default_directory
+        if indent == 0 and stripped.startswith("jobs:"):
+            jobs_indent = indent
+            job_entry_indent = None
+            current_job_indent = None
+            current_job_default_directory = workflow_default_directory
+            current_steps_indent = None
+            current_step_entry_indent = None
+            index += 1
+            continue
+        if jobs_indent is not None and stripped.endswith(":") and not stripped.startswith("- ") and indent > jobs_indent:
+            if job_entry_indent is None:
+                job_entry_indent = indent
+            if indent == job_entry_indent:
+                current_job_indent = indent
+                current_job_default_directory = workflow_default_directory
+                current_steps_indent = None
+                current_step_entry_indent = None
+        if current_job_indent is not None and stripped.startswith("steps:") and indent > current_job_indent:
+            current_steps_indent = indent
+            current_step_entry_indent = None
+            index += 1
+            continue
+        if current_steps_indent is None or not stripped.startswith("- ") or indent <= current_steps_indent:
+            index += 1
+            continue
+        if current_step_entry_indent is None:
+            current_step_entry_indent = indent
+        if indent != current_step_entry_indent:
+            index += 1
+            continue
+        step_end = index + 1
+        while step_end < len(lines):
+            next_line = lines[step_end]
+            next_stripped = next_line.lstrip()
+            next_indent = len(next_line) - len(next_stripped)
+            if next_stripped.startswith("- ") and next_indent == indent:
+                break
+            if next_stripped and next_indent <= current_steps_indent and not next_stripped.startswith("#"):
+                break
+            step_end += 1
+        relative_lines = [line[indent + 2:]]
+        for offset in range(index + 1, step_end):
+            raw = lines[offset]
+            relative_lines.append(raw[indent + 2:] if len(raw) >= indent + 2 else "")
+        default_directory = current_job_default_directory if current_job_indent is not None else workflow_default_directory
+        directory, commands = parse_workflow_step(relative_lines, default_directory)
+        if commands:
+            steps.append((directory, commands))
+        index = step_end
+    return steps
+
+
+def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_indent: int) -> Optional[str]:
+    run_indent: Optional[int] = None
+    index = start_index + 1
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if stripped and indent <= defaults_indent and not stripped.startswith("#"):
+            break
+        if run_indent is not None and stripped and indent <= run_indent and not stripped.startswith("#"):
+            run_indent = None
+        if run_indent is None and stripped.startswith("run:") and indent > defaults_indent:
+            run_indent = indent
+            index += 1
+            continue
+        if run_indent is not None and stripped.startswith("working-directory:") and indent > run_indent:
+            return normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
+        index += 1
+    return None
+
+
+def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple[str, List[str]]:
+    directory = normalize_workflow_directory(default_directory)
+    commands: List[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        if stripped.startswith("working-directory:"):
+            directory = normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
+            index += 1
+            continue
+        if stripped.startswith("run:"):
+            value = line.split(":", 1)[1].lstrip()
+            if workflow_block_scalar_header(value):
+                block_lines: List[str] = []
+                index += 1
+                while index < len(lines):
+                    block_line = lines[index]
+                    if block_line.strip() and leading_spaces(block_line) == 0:
+                        break
+                    block_lines.append(block_line)
+                    index += 1
+                commands.extend(workflow_block_commands(block_lines))
+                continue
+            command = workflow_scalar_value(value)
+            if command:
+                commands.append(command)
+        index += 1
+    return normalize_workflow_directory(directory), commands
+
+
+def workflow_block_scalar_header(value: str) -> bool:
+    header = value.strip()
+    return header in {"|", ">", "|-", ">-", "|+", ">+"}
+
+
+def workflow_block_commands(lines: List[str]) -> List[str]:
+    non_empty = [line for line in lines if line.strip()]
+    if not non_empty:
+        return []
+    base_indent = min(leading_spaces(line) for line in non_empty)
+    commands = []
+    for line in lines:
+        if not line.strip():
+            continue
+        command = line[base_indent:].strip()
+        if command and not command.startswith("#"):
+            commands.append(command)
+    return commands
+
+
+def workflow_scalar_value(value: str) -> str:
+    return value.strip().strip("\"'")
+
+
+def normalize_workflow_directory(value: str) -> str:
+    normalized = posixpath.normpath(value.strip() or ".")
+    return "." if normalized in {"", "."} else normalized
+
+
+def leading_spaces(text: str) -> int:
+    return len(text) - len(text.lstrip(" "))
 
 
 def classify_workflow_name(name: str) -> List[str]:
@@ -2868,6 +3044,13 @@ def lifecycle_cell(
     return {"status": status, "evidence": sorted(set(evidence))}
 
 
+def lifecycle_scope_path(boundary: Dict[str, Any]) -> str:
+    if boundary["kind"] != "docker-service":
+        return boundary["path"]
+    parent = posixpath.dirname(boundary["path"])
+    return "." if parent in {"", "."} else parent
+
+
 def lifecycle_server_cell(
     boundary: Dict[str, Any],
     scripts_check: Dict[str, Any],
@@ -2882,7 +3065,7 @@ def lifecycle_server_cell(
         "swift-package",
     }:
         return {"status": "not_applicable", "evidence": []}
-    return lifecycle_cell(boundary["path"], "server", scripts_check, workflow_commands)
+    return lifecycle_cell(lifecycle_scope_path(boundary), "server", scripts_check, workflow_commands)
 
 
 def ci_coverage_cell(path: str, workflow_commands: Dict[str, List[str]]) -> Dict[str, Any]:
