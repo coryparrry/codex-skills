@@ -2332,6 +2332,9 @@ class AuditRepositoryHealthTests(unittest.TestCase):
         self.assertEqual("present", matrix["."]["focused_test"]["status"])
         self.assertEqual("present", matrix["."]["full_validation"]["status"])
         self.assertEqual("present", matrix["packages/api"]["focused_test"]["status"])
+        self.assertEqual("missing", matrix["packages/api"]["setup"]["status"])
+        self.assertEqual("missing", matrix["packages/api"]["full_validation"]["status"])
+        self.assertEqual("present", matrix["packages/api"]["ci_coverage"]["status"])
         self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
         self.assertEqual("not_applicable", matrix["docs"]["server"]["status"])
         self.assertIn("package.json:test", matrix["."]["focused_test"]["evidence"])
@@ -2346,6 +2349,28 @@ class AuditRepositoryHealthTests(unittest.TestCase):
         self.assertIn("## Lifecycle Gate Matrix", result.stdout)
         self.assertIn("packages/worker", result.stdout)
         self.assertIn("python-package", result.stdout)
+
+    def test_nested_package_path_still_audits_repo_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / "AGENTS.md").write_text("# Instructions\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts":{"test":"echo ok"}}\n')
+            (workflows / "ci.yml").write_text("name: ci\n")
+            (package_dir / "README.md").write_text("# API\n")
+            (package_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(package_dir)
+
+            self.assertEqual(str(root.resolve()), report["repo"])
+            self.assertIn(".github/workflows/ci.yml", report["checks"]["validation"]["ci_workflows"])
 
     def test_iter_files_prunes_skipped_directories(self):
         with tempfile.TemporaryDirectory() as tmp:

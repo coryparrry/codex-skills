@@ -1010,15 +1010,21 @@ def is_scannable(path: Path) -> bool:
 def looks_like_audit_root(path: Path) -> bool:
     if not path.is_dir():
         return False
-    if any((path / name).exists() for name in ("README.md", "README", ".git", ".github", "docs", "scripts", "skills")):
+    git_dir = path / ".git"
+    if git_dir.is_dir() or git_dir.is_file():
         return True
-    for name in BOUNDARY_MANIFESTS:
-        if (path / name).exists():
-            return True
-    for name in DOCS_SITE_FILES:
-        if (path / name).exists():
-            return True
-    return False
+    if not (path / ".github" / "workflows").is_dir():
+        return False
+    standalone_signals = 0
+    if any((path / name).is_file() for name in ("README.md", "README")):
+        standalone_signals += 1
+    if any((path / name).exists() for name in (*BOUNDARY_MANIFESTS, "pnpm-workspace.yaml")):
+        standalone_signals += 1
+    if (path / "docs").is_dir():
+        standalone_signals += 1
+    if (path / "packages").is_dir():
+        standalone_signals += 1
+    return standalone_signals >= 2
 
 
 def iter_files(root: Path, pattern: str = "*") -> Iterable[Path]:
@@ -2777,6 +2783,61 @@ def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
     return dict(evidence)
 
 
+def classify_workflow_name(name: str) -> List[str]:
+    words = set(re.split(r"[^a-z0-9]+", name.lower()))
+    words.discard("")
+    matches = set(classify_command_name(name))
+    if words & {"build", "package"}:
+        matches.add("build")
+    if words & {"lint", "fmt", "format"}:
+        matches.add("lint")
+    if words & {"typecheck", "types", "mypy", "pyright", "tsc"}:
+        matches.add("typecheck")
+    if words & {"docs", "doc", "documentation"}:
+        matches.add("docs")
+    return sorted(matches)
+
+
+def workflow_command_responsibilities(command: str) -> List[str]:
+    command = command_without_leading_env_assignments(command)
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return []
+    tokens = normalize_pip_command_tokens(tokens)
+    tool = tokens[0]
+    if tool in {"npm", "pnpm", "yarn", "bun"}:
+        script = package_manager_script_from_args(tool, tokens[1:])
+        if script:
+            return classify_workflow_name(script)
+    if tool in {"make", "just"}:
+        target = first_non_option(tokens[1:])
+        if target is not None:
+            return classify_workflow_name(target)
+    if tool in {"go", "cargo"} and len(tokens) > 1:
+        return classify_workflow_name(tokens[1])
+    if tool in {"pytest", "tox", "mypy", "pyright", "ruff"}:
+        return classify_workflow_name(tool)
+    if tool in {"python", "python3"} and len(tokens) > 2 and tokens[1] == "-m":
+        return classify_workflow_name(tokens[2])
+    return classify_workflow_name(tool)
+
+
+def workflow_evidence_for_responsibility(
+    path: str,
+    responsibility: str,
+    workflow_commands: Dict[str, List[str]],
+) -> List[str]:
+    evidence = []
+    for item in workflow_commands.get(path, []):
+        _, _, command = item.partition(":")
+        if responsibility in workflow_command_responsibilities(command):
+            evidence.append(item)
+    return evidence
+
+
 def lifecycle_cell(
     path: str,
     responsibility: str,
@@ -2791,7 +2852,7 @@ def lifecycle_cell(
         root_status = responsibility_info.get("status", "missing")
         if root_status in {"present", "documented", "not_applicable"}:
             status = root_status
-    evidence.extend(workflow_commands.get(path, []))
+    evidence.extend(workflow_evidence_for_responsibility(path, responsibility, workflow_commands))
     if status == "missing" and evidence:
         status = "present"
     return {"status": status, "evidence": sorted(set(evidence))}
