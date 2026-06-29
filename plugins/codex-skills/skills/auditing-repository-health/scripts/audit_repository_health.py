@@ -2882,6 +2882,15 @@ def make_command_target_missing(
     if parsed is None:
         return False
     makefile, targets = parsed
+    return parsed_make_command_target_missing(root, makefile, targets, root_make_targets)
+
+
+def parsed_make_command_target_missing(
+    root: Path,
+    makefile: Path,
+    targets: List[str],
+    root_make_targets: List[str],
+) -> bool:
     if not targets:
         return not makefile.is_file()
     if not makefile.is_file():
@@ -3414,7 +3423,9 @@ def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> L
     parsed = parse_make_command(root, command_base, tokens[1:])
     if parsed is None:
         return []
-    makefile, _ = parsed
+    makefile, targets = parsed
+    if parsed_make_command_target_missing(root, makefile, targets, read_make_targets(default_makefile(root))):
+        return []
     boundary = nearest_inventory_boundary(root, makefile.parent)
     if boundary is None:
         return []

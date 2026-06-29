@@ -4029,6 +4029,42 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
 
+    def test_workflow_make_directory_missing_target_does_not_count_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            api_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            (api_dir / "Makefile").write_text("build:\n\t@go build ./...\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: make -C packages/api test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertIn("packages/api", [item["path"] for item in findings])
+
     def test_root_go_test_explicit_package_paths_count_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
