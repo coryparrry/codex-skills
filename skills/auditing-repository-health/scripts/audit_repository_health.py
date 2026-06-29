@@ -250,6 +250,33 @@ PACKAGE_MANAGER_INSTALL_NO_VALUE_OPTIONS = {
     "--strict-peer-deps",
 }
 
+GO_TEST_VALUE_OPTIONS = {
+    "-bench",
+    "-benchtime",
+    "-blockprofile",
+    "-blockprofilerate",
+    "-covermode",
+    "-coverpkg",
+    "-coverprofile",
+    "-count",
+    "-cpu",
+    "-exec",
+    "-gcflags",
+    "-ldflags",
+    "-list",
+    "-memprofile",
+    "-memprofilerate",
+    "-mutexprofile",
+    "-mutexprofilefraction",
+    "-o",
+    "-parallel",
+    "-run",
+    "-tags",
+    "-timeout",
+    "-trace",
+    "-vet",
+}
+
 PACKAGE_DEPENDENCY_FIELDS = (
     "dependencies",
     "devDependencies",
@@ -477,6 +504,13 @@ DOCS_SITE_FILES = {
     "docusaurus.config.ts",
     "vitepress.config.ts",
     "netlify.toml",
+}
+
+DOCS_SITE_PACKAGE_FILES = {
+    "mkdocs.yml",
+    "docusaurus.config.js",
+    "docusaurus.config.ts",
+    "vitepress.config.ts",
 }
 
 
@@ -1109,7 +1143,7 @@ def relative_path(root: Path, path: Path) -> str:
 
 
 def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
-    if path.name == "package.json" and path.parent.name == "docs":
+    if path.name == "package.json" and docs_site_package_manifest(path):
         return ("docs-site", "node")
     kind_and_ecosystem = BOUNDARY_MANIFESTS.get(path.name)
     if kind_and_ecosystem is not None:
@@ -1117,6 +1151,12 @@ def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
     if path.name in DOCS_SITE_FILES:
         return ("docs-site", "docs")
     return None
+
+
+def docs_site_package_manifest(path: Path) -> bool:
+    if path.parent.name == "docs":
+        return True
+    return any((path.parent / name).is_file() for name in DOCS_SITE_PACKAGE_FILES)
 
 
 def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -3082,14 +3122,70 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
         tokens = command.split()
     if not tokens:
         return [directory or "."]
+    if tokens[0] == "go":
+        scope_paths = go_test_scope_paths(root, directory or ".", tokens)
+        return scope_paths or [directory or "."]
     if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
         return [directory or "."]
-    command_base = root if directory in {"", "."} else (root / directory).resolve()
+    command_base = workflow_command_base(root, directory or ".")
     parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None or parsed.package_dirs is None:
         return [directory or "."]
     scope_paths = package_dirs_to_scope_paths(root, parsed.package_dirs)
     return scope_paths or [directory or "."]
+
+
+def workflow_command_base(root: Path, directory: str) -> Path:
+    return root if directory in {"", "."} else (root / directory).resolve()
+
+
+def go_test_scope_paths(root: Path, directory: str, tokens: List[str]) -> List[str]:
+    if len(tokens) < 2 or tokens[1] != "test":
+        return []
+    command_base = workflow_command_base(root, directory)
+    package_dirs: List[Path] = []
+    args = tokens[2:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in {"--", "-args"}:
+            break
+        if go_test_option_with_inline_value(arg):
+            index += 1
+            continue
+        if arg in GO_TEST_VALUE_OPTIONS:
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        package_dir = go_test_package_path(root, command_base, arg)
+        if package_dir is not None:
+            package_dirs.append(package_dir)
+        index += 1
+    return package_dirs_to_scope_paths(root, unique_paths(package_dirs))
+
+
+def go_test_option_with_inline_value(arg: str) -> bool:
+    if not arg.startswith("-") or "=" not in arg:
+        return False
+    return arg.split("=", 1)[0] in GO_TEST_VALUE_OPTIONS
+
+
+def go_test_package_path(root: Path, command_base: Path, arg: str) -> Optional[Path]:
+    package_arg = arg.strip()
+    if package_arg.endswith("/..."):
+        package_arg = package_arg[:-4] or "."
+    if not go_test_package_arg_looks_like_path(package_arg):
+        return None
+    resolved = resolve_repo_path(root, command_base, package_arg)
+    if resolved is None or not resolved.is_dir():
+        return None
+    return resolved
+
+
+def go_test_package_arg_looks_like_path(arg: str) -> bool:
+    return arg in {".", ".."} or arg.startswith(("./", "../")) or "/" in arg
 
 
 def package_dirs_to_scope_paths(root: Path, package_dirs: List[Path]) -> List[str]:
@@ -3219,6 +3315,9 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
     while index < len(lines):
         line = lines[index]
         stripped = line.strip()
+        if leading_spaces(line) != 0:
+            index += 1
+            continue
         if stripped.startswith("working-directory:"):
             directory = normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
             index += 1

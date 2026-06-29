@@ -2320,6 +2320,46 @@ class AuditRepositoryHealthTests(unittest.TestCase):
         self.assertIn("references/ecosystems/python.md", inventory["suggested_overlays"])
         self.assertIn("references/ecosystems/docker-services.md", inventory["suggested_overlays"])
 
+    def test_docs_site_package_json_outside_docs_is_not_test_required_node_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            website = root / "website"
+            website.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (website / "docusaurus.config.js").write_text("module.exports = {};\n")
+            (website / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "docs-site",
+                        "private": True,
+                        "scripts": {
+                            "build": "docusaurus build",
+                            "start": "docusaurus start",
+                        },
+                    }
+                )
+                + "\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            boundaries = [
+                item
+                for item in report["checks"]["repository_inventory"]["boundaries"]
+                if item["path"] == "website"
+            ]
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertTrue(boundaries)
+            self.assertEqual({"docs-site"}, {item["kind"] for item in boundaries})
+            self.assertNotIn("website", [item["path"] for item in findings])
+
     def test_polyglot_lifecycle_gate_matrix_scopes_gates(self):
         fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
 
@@ -2900,6 +2940,45 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
             self.assertEqual([], matrix["packages/worker"]["lint_format"]["evidence"])
+
+    def test_action_inputs_do_not_count_as_top_level_workflow_run_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - uses: example/action@v1\n"
+                "        with:\n"
+                "          run: pytest\n"
+                "          working-directory: packages/worker\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertIn("packages/worker", [item["path"] for item in findings])
 
     def test_polyglot_monorepo_reports_scoped_missing_focused_test_finding(self):
         fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
@@ -3503,6 +3582,54 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
             self.assertEqual([], matrix["packages/worker"]["lint_format"]["evidence"])
+
+    def test_root_go_test_explicit_package_paths_count_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            api_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            (worker_dir / "go.mod").write_text("module example.com/worker\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: go test ./packages/api/... packages/worker/...\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/api"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:go test ./packages/api/... packages/worker/...",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+            self.assertIn(
+                ".github/workflows/ci.yml:go test ./packages/api/... packages/worker/...",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
+            self.assertNotIn("packages/worker", [item["path"] for item in findings])
 
     def test_workflow_folded_run_block_preserves_blank_line_command_breaks(self):
         with tempfile.TemporaryDirectory() as tmp:
