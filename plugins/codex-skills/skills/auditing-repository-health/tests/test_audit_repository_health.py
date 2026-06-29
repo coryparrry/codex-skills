@@ -2367,6 +2367,48 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("website", [item["path"] for item in findings])
 
+    def test_workspace_package_named_docs_without_docs_markers_requires_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            docs_package = root / "packages" / "docs"
+            docs_package.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "workspace-root",
+                        "private": True,
+                        "workspaces": ["packages/*"],
+                    }
+                )
+                + "\n"
+            )
+            (docs_package / "package.json").write_text(
+                json.dumps({"name": "docs", "private": True}) + "\n"
+            )
+            (docs_package / "src").mkdir()
+            (docs_package / "src" / "index.js").write_text("export const docs = true;\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            boundaries = {
+                item["path"]: item
+                for item in report["checks"]["repository_inventory"]["boundaries"]
+            }
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("node-workspace-root", boundaries["packages/docs"]["kind"])
+            self.assertNotEqual("docs-site", boundaries["packages/docs"]["kind"])
+            self.assertEqual("missing", matrix["packages/docs"]["focused_test"]["status"])
+            self.assertIn("packages/docs", missing_focused_paths)
+
     def test_nested_docs_site_readme_commands_use_docs_site_boundary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3643,6 +3685,50 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/api"]["focused_test"]["evidence"],
             )
 
+    def test_unresolved_pnpm_filter_workflow_command_does_not_credit_root_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            api_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (api_dir / "package.json").write_text(
+                json.dumps({"name": "api", "private": True}) + "\n"
+            )
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter ./packages/missing test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+            invalid_evidence = ".github/workflows/ci.yml:pnpm --filter ./packages/missing test"
+
+            self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["."]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn("packages/api", missing_focused_paths)
+
     def test_npm_all_workspaces_with_workspace_selector_ci_credits_only_selected_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -4569,6 +4655,50 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
+
+    def test_missing_pytest_workflow_path_does_not_credit_root_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (package_dir / "pyproject.toml").write_text(
+                "[project]\nname = 'worker'\nversion = '0.1.0'\n"
+            )
+            (package_dir / "src").mkdir()
+            (package_dir / "src" / "worker.py").write_text("VALUE = 1\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest packages/missing/tests\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+            invalid_evidence = ".github/workflows/ci.yml:pytest packages/missing/tests"
+
+            self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["."]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/worker"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn("packages/worker", missing_focused_paths)
 
     def test_root_pytest_node_id_path_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:

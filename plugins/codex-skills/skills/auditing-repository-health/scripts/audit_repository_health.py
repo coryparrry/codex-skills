@@ -58,6 +58,7 @@ NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
 TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
 TEST_ASSET_FIXTURE_DIRS = {"fixtures", "test-data", "testdata"}
 TEST_ASSET_EXAMPLE_DIRS = {"examples"}
+WORKSPACE_PACKAGE_CONTAINER_DIRS = {"apps", "crates", "libs", "modules", "packages", "services"}
 PACKAGE_DOCUMENTATION_BOUNDARY_KINDS = {
     "docs-site",
     "go-package",
@@ -1278,9 +1279,9 @@ def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
 
 
 def docs_site_package_manifest(path: Path) -> bool:
-    if path.parent.name == "docs":
+    if any((path.parent / name).is_file() for name in DOCS_SITE_PACKAGE_FILES):
         return True
-    return any((path.parent / name).is_file() for name in DOCS_SITE_PACKAGE_FILES)
+    return path.parent.name == "docs" and path.parent.parent.name not in WORKSPACE_PACKAGE_CONTAINER_DIRS
 
 
 def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -3392,32 +3393,37 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
         tokens = shlex.split(command)
     except ValueError:
         tokens = command.split()
+    directory = directory or "."
     if not tokens:
-        return [directory or "."]
+        return [directory]
     if tokens[0] == "go":
-        scope_paths = go_test_scope_paths(root, directory or ".", tokens)
-        return scope_paths or [directory or "."]
+        scope_paths = go_test_scope_paths(root, directory, tokens)
+        if scope_paths:
+            return scope_paths
+        return [] if go_test_has_explicit_package_path_arg(tokens) else [directory]
     if tokens[0] in DIRECT_TEST_PATH_TOOLS:
-        scope_paths = direct_test_tool_scope_paths(root, directory or ".", tokens)
-        return scope_paths or [directory or "."]
+        scope_paths = direct_test_tool_scope_paths(root, directory, tokens)
+        if scope_paths:
+            return scope_paths
+        return [] if direct_test_tool_has_explicit_path_arg(tokens[0], tokens) else [directory]
     if tokens[0] == "make":
-        scope_paths = make_command_scope_paths(root, directory or ".", tokens)
+        scope_paths = make_command_scope_paths(root, directory, tokens)
         if scope_paths is None:
             return []
-        return scope_paths or [directory or "."]
+        return scope_paths or [directory]
     if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
-        return [directory or "."]
-    command_base = workflow_command_base(root, directory or ".")
+        return [directory]
+    command_base = workflow_command_base(root, directory)
     parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None or parsed.package_dirs is None:
-        return [directory or "."]
+        return [] if package_manager_command_has_explicit_scope(tokens) else [directory]
     package_dirs = parsed.package_dirs
     if parsed.script is not None:
         package_dirs = package_dirs_declaring_script(package_dirs, parsed.script)
     scope_paths = package_dirs_to_scope_paths(root, package_dirs)
     if parsed.script is not None:
         return scope_paths
-    return scope_paths or [directory or "."]
+    return scope_paths or [directory]
 
 
 def workflow_command_base(root: Path, directory: str) -> Path:
@@ -3473,6 +3479,30 @@ def go_test_package_arg_looks_like_path(arg: str) -> bool:
     return arg in {".", ".."} or arg.startswith(("./", "../")) or "/" in arg
 
 
+def go_test_has_explicit_package_path_arg(tokens: List[str]) -> bool:
+    if len(tokens) < 2 or tokens[1] != "test":
+        return False
+    args = tokens[2:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in {"--", "-args"}:
+            break
+        if go_test_option_with_inline_value(arg):
+            index += 1
+            continue
+        if arg in GO_TEST_VALUE_OPTIONS:
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        if go_test_package_arg_looks_like_path(arg.strip().removesuffix("/...")):
+            return True
+        index += 1
+    return False
+
+
 def direct_test_tool_scope_paths(root: Path, directory: str, tokens: List[str]) -> List[str]:
     command_base = workflow_command_base(root, directory)
     package_dirs: List[Path] = []
@@ -3497,6 +3527,27 @@ def direct_test_tool_scope_paths(root: Path, directory: str, tokens: List[str]) 
             package_dirs.append(package_dir)
         index += 1
     return package_dirs_to_scope_paths(root, unique_paths(package_dirs))
+
+
+def direct_test_tool_has_explicit_path_arg(tool: str, tokens: List[str]) -> bool:
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            index += 1
+            continue
+        if direct_test_tool_option_with_inline_value(tool, arg):
+            index += 1
+            continue
+        if arg in DIRECT_TEST_VALUE_OPTIONS.get(tool, set()):
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        return True
+    return False
 
 
 def direct_test_tool_option_with_inline_value(tool: str, arg: str) -> bool:
@@ -3527,6 +3578,34 @@ def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> O
     if boundary is None:
         return []
     return package_dirs_to_scope_paths(root, [boundary])
+
+
+def package_manager_command_has_explicit_scope(tokens: List[str]) -> bool:
+    if not tokens:
+        return False
+    tool = tokens[0]
+    index = 1
+    while index < len(tokens):
+        arg = tokens[index]
+        if arg == "--":
+            break
+        if package_manager_arg_is_scope_option(tool, arg):
+            return True
+        index += 1
+    return False
+
+
+def package_manager_arg_is_scope_option(tool: str, arg: str) -> bool:
+    options = (
+        PACKAGE_MANAGER_DIRECTORY_OPTIONS.get(tool, set())
+        | PACKAGE_MANAGER_WORKSPACE_OPTIONS.get(tool, set())
+        | PACKAGE_MANAGER_ALL_WORKSPACES_OPTIONS.get(tool, set())
+    )
+    if arg in options:
+        return True
+    if any(arg.startswith(f"{option}=") for option in options):
+        return True
+    return tool == "pnpm" and arg.startswith("-C") and arg != "-C"
 
 
 def nearest_inventory_boundary(root: Path, path: Path) -> Optional[Path]:
