@@ -1993,7 +1993,7 @@ def package_manager_target_missing(
 ) -> bool:
     parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None:
-        return package_manager_parse_failure_is_invalid_scoped_command(tokens)
+        return package_manager_parse_failure_target_missing(root, command_base, tokens)
     if parsed.package_dirs is None:
         return True
     if package_manager_builtin_target_missing(root, command_base, tokens):
@@ -3684,6 +3684,36 @@ def package_manager_parse_failure_is_invalid_scoped_command(tokens: List[str]) -
             return False
         if arg in invalid_options or any(arg.startswith(f"{option}=") for option in invalid_options):
             return True
+    return False
+
+
+def package_manager_parse_failure_target_missing(root: Path, command_base: Path, tokens: List[str]) -> bool:
+    return package_manager_parse_failure_is_invalid_scoped_command(
+        tokens
+    ) or package_manager_parse_failure_has_unresolved_directory(root, command_base, tokens)
+
+
+def package_manager_parse_failure_has_unresolved_directory(root: Path, command_base: Path, tokens: List[str]) -> bool:
+    if not tokens:
+        return False
+    tool = tokens[0]
+    directory = command_base
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        if args[index] == "--":
+            return False
+        directory_option = package_manager_directory_option_value(tool, args, index)
+        if directory_option is not None:
+            value, index = directory_option
+            resolved = resolve_repo_path(root, directory, value)
+            if resolved is None:
+                return True
+            directory = resolved
+            continue
+        if args[index] in PACKAGE_MANAGER_DIRECTORY_OPTIONS.get(tool, set()):
+            return True
+        index += 1
     return False
 
 
