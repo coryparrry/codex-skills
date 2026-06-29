@@ -2357,7 +2357,14 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             ]
 
             self.assertTrue(boundaries)
+            self.assertEqual(1, len(boundaries))
             self.assertEqual({"docs-site"}, {item["kind"] for item in boundaries})
+            self.assertEqual("single-repository", report["checks"]["repository_inventory"]["classification"])
+            self.assertEqual("docs", report["checks"]["repository_inventory"]["purpose"])
+            self.assertEqual(
+                ["website/docusaurus.config.js", "website/package.json"],
+                boundaries[0]["evidence"],
+            )
             self.assertNotIn("website", [item["path"] for item in findings])
 
     def test_polyglot_lifecycle_gate_matrix_scopes_gates(self):
@@ -3136,6 +3143,56 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
+
+    def test_recursive_pnpm_if_present_workflow_only_credits_packages_declaring_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            has_test = root / "packages" / "has-test"
+            no_test = root / "packages" / "no-test"
+            workflows = root / ".github" / "workflows"
+            has_test.mkdir(parents=True)
+            no_test.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"private": true}\n')
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (has_test / "package.json").write_text(
+                '{"name": "has-test", "scripts": {"test": "vitest run"}}\n'
+            )
+            (has_test / "index.js").write_text("console.log('has-test')\n")
+            (no_test / "package.json").write_text('{"name": "no-test", "scripts": {"lint": "eslint ."}}\n')
+            (no_test / "index.js").write_text("console.log('no-test')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm -r test --if-present\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/has-test"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm -r test --if-present",
+                matrix["packages/has-test"]["focused_test"]["evidence"],
+            )
+            self.assertEqual("missing", matrix["packages/no-test"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/no-test"]["focused_test"]["evidence"])
+            self.assertIn("packages/no-test", [item["path"] for item in findings])
 
     def test_pnpm_path_glob_filter_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:

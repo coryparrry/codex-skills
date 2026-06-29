@@ -1162,7 +1162,7 @@ def docs_site_package_manifest(path: Path) -> bool:
 def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     by_key: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     for boundary in boundaries:
-        key = (boundary["path"], boundary["kind"], boundary["ecosystem"])
+        key = boundary_merge_key(boundary)
         existing = by_key.setdefault(
             key,
             {
@@ -1174,11 +1174,26 @@ def merge_boundaries(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             },
         )
         existing["evidence"].extend(boundary["evidence"])
+        existing["ecosystem"] = merge_boundary_ecosystem(existing, boundary)
     merged = []
     for item in by_key.values():
         item["evidence"] = sorted(set(item["evidence"]))
         merged.append(item)
     return sorted(merged, key=lambda item: (item["path"], item["kind"]))
+
+
+def boundary_merge_key(boundary: Dict[str, Any]) -> Tuple[str, str, str]:
+    if boundary["kind"] == "docs-site":
+        return (boundary["path"], boundary["kind"], "docs-site")
+    return (boundary["path"], boundary["kind"], boundary["ecosystem"])
+
+
+def merge_boundary_ecosystem(existing: Dict[str, Any], boundary: Dict[str, Any]) -> str:
+    if existing["kind"] == "docs-site":
+        ecosystems = {existing["ecosystem"], boundary["ecosystem"]}
+        if "node" in ecosystems:
+            return "node"
+    return existing["ecosystem"]
 
 
 def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
@@ -3131,7 +3146,12 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None or parsed.package_dirs is None:
         return [directory or "."]
-    scope_paths = package_dirs_to_scope_paths(root, parsed.package_dirs)
+    package_dirs = parsed.package_dirs
+    if parsed.script is not None:
+        package_dirs = package_dirs_declaring_script(package_dirs, parsed.script)
+    scope_paths = package_dirs_to_scope_paths(root, package_dirs)
+    if parsed.script is not None:
+        return scope_paths
     return scope_paths or [directory or "."]
 
 
@@ -3198,6 +3218,14 @@ def package_dirs_to_scope_paths(root: Path, package_dirs: List[Path]) -> List[st
         if rel not in scope_paths:
             scope_paths.append(rel)
     return scope_paths
+
+
+def package_dirs_declaring_script(package_dirs: List[Path], script: str) -> List[Path]:
+    return [
+        package_dir
+        for package_dir in package_dirs
+        if script in read_package_scripts(package_dir / "package.json")
+    ]
 
 
 def workflow_step_run_commands(text: str) -> List[Tuple[str, List[str]]]:
