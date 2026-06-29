@@ -3505,6 +3505,44 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
             self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
 
+    def test_workflow_dynamic_cd_line_does_not_credit_later_command_to_old_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - name: dynamic worker tests\n"
+                "        run: |\n"
+                "          cd \"$PKG\"\n"
+                "          pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertNotIn(matrix["."]["focused_test"]["status"], {"present", "documented"})
+            self.assertEqual([], matrix["."]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["."]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
+
     def test_workflow_expression_cd_chain_does_not_credit_root_or_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -5011,6 +5049,34 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
 
+    def test_inline_cd_go_package_command_counts_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\nRun API tests with `cd packages/api && go test ./...`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("documented", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn(
+                "README.md:go test ./...",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
+
     def test_fenced_cd_chain_pytest_command_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -5058,6 +5124,35 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 "Run external tests:\n\n"
                 "```sh\n"
                 "cd ../external && pytest\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (package_dir / "tests").mkdir()
+            (package_dir / "tests" / "test_worker.py").write_text("def test_worker():\n    assert True\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertEqual("missing", matrix["."]["focused_test"]["status"])
+            self.assertEqual([], matrix["."]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_fenced_dynamic_cd_line_does_not_credit_later_command_to_old_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run worker tests:\n\n"
+                "```sh\n"
+                "cd \"$PKG\"\n"
+                "pytest\n"
                 "```\n"
             )
             (root / ".gitignore").write_text("__pycache__/\n")

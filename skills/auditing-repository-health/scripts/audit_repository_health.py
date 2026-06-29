@@ -1669,24 +1669,27 @@ def discover_documented_commands(
                 if stripped:
                     previous_text = stripped
                 continue
-            commands = [
-                (command, context)
-                for command, context in extract_inline_command_contexts(line)
-                if looks_like_command(command)
-            ]
-            if not commands:
+            inline_records: List[Tuple[Path, str, str, bool]] = []
+            for command, context in extract_inline_command_contexts(line):
+                is_split_chain = len(split_simple_shell_chain(command)) > 1
+                _, command_records = documented_shell_command_records(root, default_command_base, command)
+                for command_base, recorded_command in command_records:
+                    if looks_like_command(recorded_command):
+                        inline_records.append((command_base, recorded_command, context, is_split_chain))
+            if not inline_records:
                 if stripped:
                     previous_text = stripped
                 continue
-            for command, context in commands:
+            for command_base, command, context, is_split_chain in inline_records:
+                command_context = documented_command_segment_context(context, command, is_split_chain)
                 record_documented_command(
                     root,
-                    default_command_base,
+                    command_base,
                     documented,
                     stale,
                     documented_command_directories,
                     rel,
-                    context,
+                    command_context,
                     command,
                     package_scripts,
                     make_targets,
@@ -1914,18 +1917,21 @@ def simple_cd_command_target(command: str) -> Optional[str]:
 
 def documented_shell_command_records(
     root: Path,
-    command_base: Path,
+    command_base: Optional[Path],
     command: str,
-) -> Tuple[Path, List[Tuple[Path, str]]]:
+) -> Tuple[Optional[Path], List[Tuple[Path, str]]]:
     parts = split_simple_shell_chain(command)
     current_base = command_base
     records: List[Tuple[Path, str]] = []
     for part in parts:
+        if current_base is None:
+            break
         changed_directory = command_changed_directory(root, current_base, part)
         if changed_directory is not None:
             current_base = changed_directory
             continue
         if simple_cd_command_target(part) is not None:
+            current_base = None
             break
         records.append((current_base, part))
     return current_base, records
@@ -4165,7 +4171,7 @@ def workflow_literal_block_command_records(
     if not non_empty:
         return []
     base_indent = min(leading_spaces(line) for line in non_empty)
-    current_directory = normalize_workflow_directory(directory)
+    current_directory: Optional[str] = normalize_workflow_directory(directory)
     records: List[Tuple[str, str]] = []
     for line in lines:
         if not line.strip():
@@ -4182,17 +4188,22 @@ def workflow_literal_block_command_records(
 
 
 def workflow_shell_command_records(
-    directory: str,
+    directory: Optional[str],
     command: str,
-) -> Tuple[str, List[Tuple[str, str]]]:
-    current_directory = normalize_workflow_directory(directory)
+) -> Tuple[Optional[str], List[Tuple[str, str]]]:
+    if directory is None:
+        return None, []
+    current_directory: Optional[str] = normalize_workflow_directory(directory)
     records: List[Tuple[str, str]] = []
     for part in split_simple_shell_chain(command):
+        if current_directory is None:
+            break
         changed_directory = workflow_simple_cd_directory(current_directory, part)
         if changed_directory is not None:
             current_directory = changed_directory
             continue
         if simple_cd_command_target(part) is not None:
+            current_directory = None
             break
         records.append((current_directory, part))
     return current_directory, records
