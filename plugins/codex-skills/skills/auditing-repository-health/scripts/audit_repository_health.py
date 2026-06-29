@@ -204,12 +204,14 @@ PACKAGE_MANAGER_INCLUDE_WORKSPACE_ROOT_OPTIONS = {
 
 PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
     "--frozen-lockfile",
+    "--foreground-scripts",
     "--if-present",
     "--ignore-scripts",
     "--immutable",
     "--offline",
     "--prefer-offline",
     "--silent",
+    "--verbose",
 }
 
 PACKAGE_MANAGER_INSTALL_VALUE_OPTIONS = {
