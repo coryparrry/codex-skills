@@ -3364,9 +3364,10 @@ def direct_test_tool_option_with_inline_value(tool: str, arg: str) -> bool:
 
 
 def direct_test_tool_package_path(root: Path, command_base: Path, arg: str) -> Optional[Path]:
-    if "::" in arg:
+    path_arg = arg.split("::", 1)[0]
+    if not path_arg:
         return None
-    resolved = resolve_repo_path(root, command_base, arg)
+    resolved = resolve_repo_path(root, command_base, path_arg)
     if resolved is None or not resolved.exists():
         return None
     return nearest_inventory_boundary(root, resolved)
