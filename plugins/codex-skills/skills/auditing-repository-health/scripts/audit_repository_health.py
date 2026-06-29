@@ -665,7 +665,9 @@ class Audit:
 
     def git(self, args: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         command = ["git", *args]
-        result = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
+        env = os.environ.copy()
+        env["GIT_OPTIONAL_LOCKS"] = "0"
+        result = subprocess.run(command, cwd=cwd, text=True, capture_output=True, env=env)
         self.commands_run.append(
             {
                 "command": shlex.join(command),
@@ -782,6 +784,8 @@ class Audit:
             for ecosystem in ecosystems
             if ecosystem in ECOSYSTEM_OVERLAYS
         )
+        if any(boundary["kind"] == "docs-site" for boundary in boundaries):
+            overlays = sorted({*overlays, ECOSYSTEM_OVERLAYS["docs"]})
 
         return {
             "classification": classification,

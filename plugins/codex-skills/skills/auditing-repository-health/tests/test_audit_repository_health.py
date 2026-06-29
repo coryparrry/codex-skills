@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "audit_repository_health.py"
@@ -48,6 +49,23 @@ class AuditRepositoryHealthTests(unittest.TestCase):
     def commit_all(self, root, message="fixture"):
         self.run_git("add", ".", cwd=root)
         self.run_git("commit", "-m", message, cwd=root)
+
+    def test_git_helper_disables_optional_locks_for_read_only_probes(self):
+        module = load_audit_module()
+        audit = module.Audit(Path.cwd())
+        completed = subprocess.CompletedProcess(
+            ["git", "status"],
+            0,
+            stdout="",
+            stderr="",
+        )
+
+        with mock.patch.object(module.subprocess, "run", return_value=completed) as run:
+            result = audit.git(["status"], Path.cwd())
+
+        self.assertIs(result, completed)
+        self.assertEqual("0", run.call_args.kwargs["env"]["GIT_OPTIONAL_LOCKS"])
+        self.assertEqual(["git", "status"], run.call_args.args[0])
 
     def write_npm_fixture(self, root, readme, root_package_json, packages):
         self.init_repo(root)
@@ -2598,6 +2616,14 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual({"docs-site"}, {item["kind"] for item in boundaries})
             self.assertEqual("single-repository", report["checks"]["repository_inventory"]["classification"])
             self.assertEqual("docs", report["checks"]["repository_inventory"]["purpose"])
+            self.assertIn(
+                "references/ecosystems/docs-static-sites.md",
+                report["checks"]["repository_inventory"]["suggested_overlays"],
+            )
+            self.assertIn(
+                "references/ecosystems/node-typescript.md",
+                report["checks"]["repository_inventory"]["suggested_overlays"],
+            )
             self.assertEqual(
                 ["website/docusaurus.config.js", "website/package.json"],
                 boundaries[0]["evidence"],
@@ -2787,6 +2813,8 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             inventory = report["checks"]["repository_inventory"]
             self.assertEqual("single-repository", inventory["classification"])
             self.assertEqual("docs", inventory["purpose"])
+            self.assertIn("references/ecosystems/docs-static-sites.md", inventory["suggested_overlays"])
+            self.assertIn("references/ecosystems/node-typescript.md", inventory["suggested_overlays"])
 
     def test_polyglot_lifecycle_gate_matrix_scopes_gates(self):
         fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
