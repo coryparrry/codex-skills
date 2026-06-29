@@ -59,6 +59,7 @@ TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
 TEST_ASSET_FIXTURE_DIRS = {"fixtures", "test-data", "testdata"}
 TEST_ASSET_EXAMPLE_DIRS = {"examples"}
 PACKAGE_DOCUMENTATION_BOUNDARY_KINDS = {
+    "docs-site",
     "go-package",
     "jvm-build",
     "node-workspace-root",

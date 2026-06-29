@@ -2367,6 +2367,41 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("website", [item["path"] for item in findings])
 
+    def test_nested_docs_site_readme_commands_use_docs_site_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            web = root / "packages" / "web"
+            docs = web / "docs"
+            docs.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (web / "package.json").write_text(json.dumps({"name": "web"}) + "\n")
+            (docs / "README.md").write_text("# Docs\n\nBuild docs with `npm run build`.\n")
+            (docs / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "web-docs",
+                        "private": True,
+                        "scripts": {"build": "docusaurus build"},
+                    }
+                )
+                + "\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+
+            self.assertEqual("present", matrix["packages/web/docs"]["build_package"]["status"])
+            self.assertNotIn("packages/web/docs/README.md:npm run build", stale_evidence)
+
     def test_root_package_and_nested_go_package_classifies_as_monorepo(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
