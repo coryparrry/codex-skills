@@ -13,7 +13,7 @@ import re
 import shlex
 import subprocess
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -346,14 +346,16 @@ class WorkspaceSelection:
     names: List[str]
     all_workspaces: bool = False
     include_root: bool = False
+    exclusions: List[str] = field(default_factory=list)
 
     def extend(self, other: "WorkspaceSelection") -> None:
         self.names.extend(other.names)
+        self.exclusions.extend(other.exclusions)
         self.all_workspaces = self.all_workspaces or other.all_workspaces
         self.include_root = self.include_root or other.include_root
 
     def enabled(self) -> bool:
-        return bool(self.names) or self.all_workspaces
+        return bool(self.names) or bool(self.exclusions) or self.all_workspaces
 
 
 @dataclass(frozen=True)
@@ -1007,10 +1009,9 @@ class Audit:
                 "kind": boundary["kind"],
                 "ecosystem": boundary["ecosystem"],
                 "scope_type": boundary["scope_type"],
-                "setup": lifecycle_cell(
+                "setup": lifecycle_setup_cell(
                     root,
                     scope_path,
-                    "setup",
                     scripts_check,
                     workflow_commands,
                     documented_command_directories,
@@ -2011,6 +2012,8 @@ def documented_command_target_missing(
 ) -> bool:
     if documented_package_target_missing(root, command_base, command, package_scripts, make_targets, just_targets):
         return True
+    if documented_direct_test_target_missing(root, command_base, command):
+        return True
     target = local_command_target(command)
     if target is None:
         return False
@@ -2026,6 +2029,94 @@ def documented_command_target_missing(
             return True
         return not documented_local_command_target_exists(path, direct_target == target)
     return False
+
+
+def documented_direct_test_target_missing(root: Path, command_base: Path, command: str) -> bool:
+    command = command_without_leading_env_assignments(command)
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    if not tokens:
+        return False
+    try:
+        directory = relative_path(root, command_base)
+    except ValueError:
+        directory = "."
+    if tokens[0] == "go":
+        return documented_go_test_has_missing_local_path_arg(root, directory, tokens)
+    if tokens[0] in DIRECT_TEST_PATH_TOOLS:
+        return documented_direct_test_has_missing_local_path_arg(root, directory, tokens)
+    return False
+
+
+def documented_go_test_has_missing_local_path_arg(root: Path, directory: str, tokens: List[str]) -> bool:
+    if len(tokens) < 2 or tokens[1] != "test":
+        return False
+    command_base = workflow_command_base(root, directory)
+    args = tokens[2:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in {"--", "-args"}:
+            break
+        if go_test_option_with_inline_value(arg):
+            index += 1
+            continue
+        if arg in GO_TEST_VALUE_OPTIONS:
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        package_arg = arg.strip().removesuffix("/...")
+        if documented_go_test_arg_looks_like_local_path(package_arg):
+            resolved = resolve_repo_path(root, command_base, package_arg)
+            if resolved is None or not resolved.is_dir() or nearest_inventory_boundary(root, resolved) is None:
+                return True
+        index += 1
+    return False
+
+
+def documented_direct_test_has_missing_local_path_arg(root: Path, directory: str, tokens: List[str]) -> bool:
+    command_base = workflow_command_base(root, directory)
+    tool = tokens[0]
+    args = tokens[1:]
+    index = 0
+    pyargs_mode = False
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            index += 1
+            continue
+        if tool == "pytest" and arg == "--pyargs":
+            pyargs_mode = True
+            index += 1
+            continue
+        if direct_test_tool_option_with_inline_value(tool, arg):
+            index += 1
+            continue
+        if arg in DIRECT_TEST_VALUE_OPTIONS.get(tool, set()):
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        path_arg = arg.split("::", 1)[0]
+        if not pyargs_mode and documented_test_arg_looks_like_local_path(path_arg):
+            resolved = resolve_repo_path(root, command_base, path_arg)
+            if resolved is None or not resolved.exists() or nearest_inventory_boundary(root, resolved) is None:
+                return True
+        index += 1
+    return False
+
+
+def documented_test_arg_looks_like_local_path(arg: str) -> bool:
+    return arg in {".", ".."} or arg.startswith(("./", "../", "/")) or "/" in arg
+
+
+def documented_go_test_arg_looks_like_local_path(arg: str) -> bool:
+    return arg in {".", ".."} or arg.startswith(("./", "../", "/"))
 
 
 def documented_local_command_target_exists(path: Path, requires_executable: bool) -> bool:
@@ -2292,7 +2383,7 @@ def parse_package_manager_command(
         workspace_option = package_manager_workspace_option_value(tool, args, index)
         if workspace_option is not None:
             value, next_index = workspace_option
-            workspace_selection.names.append(value)
+            add_workspace_selection_name(workspace_selection, tool, value)
             index = next_index
             continue
         workspace_toggle = package_manager_all_workspaces_option_value(tool, args, index)
@@ -2361,6 +2452,13 @@ def package_manager_workspace_selection(tool: str, args: List[str]) -> Workspace
     return WorkspaceSelection([])
 
 
+def add_workspace_selection_name(selection: WorkspaceSelection, tool: str, value: str) -> None:
+    if tool == "pnpm" and value.startswith("!") and len(value) > 1:
+        selection.exclusions.append(value[1:])
+        return
+    selection.names.append(value)
+
+
 def package_manager_run_workspace_selection(tool: str, tokens: List[str]) -> WorkspaceSelection:
     selection = WorkspaceSelection([])
     index = 0
@@ -2376,7 +2474,7 @@ def package_manager_run_workspace_selection(tool: str, tokens: List[str]) -> Wor
         workspace_option = package_manager_workspace_option_value(tool, tokens, index)
         if workspace_option is not None:
             value, index = workspace_option
-            selection.names.append(value)
+            add_workspace_selection_name(selection, tool, value)
             continue
         workspace_toggle = package_manager_all_workspaces_option_value(tool, tokens, index)
         if workspace_toggle is not None:
@@ -2416,7 +2514,7 @@ def package_manager_post_command_workspace_selection(tool: str, tokens: List[str
         workspace_option = package_manager_workspace_option_value(tool, tokens, index)
         if workspace_option is not None:
             value, index = workspace_option
-            selection.names.append(value)
+            add_workspace_selection_name(selection, tool, value)
             continue
         workspace_toggle = package_manager_all_workspaces_option_value(tool, tokens, index)
         if workspace_toggle is not None:
@@ -2692,13 +2790,26 @@ def resolve_package_workspaces(
 ) -> Optional[List[Path]]:
     declared = declared_package_workspaces(root, package_root, tool)
     selected: List[Path] = []
-    if selection.all_workspaces and not selection.names:
+    inclusions = selection.names
+    exclusions = selection.exclusions
+    if selection.all_workspaces and not inclusions:
         selected.extend(declared)
-    for workspace in selection.names:
+    if tool == "pnpm" and exclusions and not inclusions and not selection.all_workspaces:
+        selected.extend(declared)
+    for workspace in inclusions:
         resolved = resolve_declared_package_workspaces(package_root, declared, workspace, tool)
         if resolved is None:
             return None
         selected.extend(resolved)
+    if tool == "pnpm" and exclusions:
+        excluded: List[Path] = []
+        for workspace in exclusions:
+            resolved = resolve_declared_package_workspaces(package_root, declared, workspace, tool)
+            if resolved is None:
+                return None
+            excluded.extend(resolved)
+        excluded_resolved = {workspace.resolve() for workspace in unique_paths(excluded)}
+        selected = [workspace for workspace in selected if workspace.resolve() not in excluded_resolved]
     if selection.include_root:
         selected.append(package_root)
     selected = unique_paths(selected)
@@ -2963,7 +3074,16 @@ def parse_pnpm_relation_selector(selector: str) -> Optional[PnpmRelationSelector
     leading = pnpm_leading_relation(stripped)
     trailing = pnpm_trailing_relation(stripped)
     if leading is not None and trailing is not None:
-        return None
+        leading_base, leading_include_base = leading
+        inner_trailing = pnpm_trailing_relation(leading_base)
+        if inner_trailing is None:
+            return None
+        base, trailing_include_base = inner_trailing
+        return PnpmRelationSelector(
+            base.rstrip("/"),
+            "both",
+            leading_include_base and trailing_include_base,
+        )
     if leading is not None:
         base, include_base = leading
         return PnpmRelationSelector(base.rstrip("/"), "dependents", include_base)
@@ -2998,6 +3118,11 @@ def resolve_pnpm_relation_workspaces(
     relation_selector: PnpmRelationSelector,
 ) -> List[Path]:
     graph = pnpm_workspace_dependency_graph(declared)
+    if relation_selector.direction == "both":
+        dependencies = transitive_related_workspaces(graph, base_workspace)
+        dependents = transitive_related_workspaces(reverse_workspace_dependency_graph(graph), base_workspace)
+        selected = ([base_workspace] if relation_selector.include_base else []) + dependencies + dependents
+        return unique_paths(selected)
     if relation_selector.direction == "dependents":
         graph = reverse_workspace_dependency_graph(graph)
     related = transitive_related_workspaces(graph, base_workspace)
@@ -4604,6 +4729,47 @@ def lifecycle_cell(
     if status == "missing" and evidence:
         status = "present"
     return {"status": status, "evidence": sorted(set(evidence))}
+
+
+def lifecycle_setup_cell(
+    root: Path,
+    path: str,
+    scripts_check: Dict[str, Any],
+    workflow_commands: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
+    boundary: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    setup = lifecycle_cell(
+        root,
+        path,
+        "setup",
+        scripts_check,
+        workflow_commands,
+        documented_command_directories,
+        boundary,
+    )
+    bootstrap = lifecycle_cell(
+        root,
+        path,
+        "bootstrap",
+        scripts_check,
+        workflow_commands,
+        documented_command_directories,
+        boundary,
+    )
+    evidence = sorted(set(setup["evidence"]) | set(bootstrap["evidence"]))
+    statuses = {setup["status"], bootstrap["status"]}
+    if "present" in statuses:
+        status = "present"
+    elif "documented" in statuses:
+        status = "documented"
+    elif setup["status"] == "not_applicable":
+        status = "not_applicable"
+    else:
+        status = "missing"
+    if status in {"missing", "not_applicable"} and evidence:
+        status = "present"
+    return {"status": status, "evidence": evidence}
 
 
 def lifecycle_scope_path(boundary: Dict[str, Any]) -> str:

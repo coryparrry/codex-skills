@@ -1137,6 +1137,41 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
             self.assertIn("README.md:npm ci", responsibilities["bootstrap"]["candidates"])
 
+    def test_bootstrap_evidence_satisfies_lifecycle_matrix_setup_cell(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
+            (scripts / "bootstrap").write_text("#!/usr/bin/env bash\nnpm ci\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertEqual("present", matrix["."]["setup"]["status"])
+            self.assertIn("scripts/bootstrap", matrix["."]["setup"]["evidence"])
+
+    def test_documented_npm_ci_satisfies_lifecycle_matrix_setup_cell(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n\nInstall dependencies with `npm ci`.\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text('{"dependencies": {"left-pad": "1.3.0"}}\n')
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertEqual("documented", matrix["."]["setup"]["status"])
+            self.assertIn("README.md:npm ci", matrix["."]["setup"]["evidence"])
+
     def test_npm_ci_without_lockfile_is_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -4778,6 +4813,66 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertNotIn(evidence, matrix["packages/app"]["focused_test"]["evidence"])
             self.assertIn(evidence, matrix["packages/core"]["focused_test"]["evidence"])
 
+    def test_pnpm_both_sided_relation_path_glob_filter_counts_dependencies_and_dependents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            core_dir = root / "packages" / "core"
+            shared_dir = root / "packages" / "shared"
+            workflows = root / ".github" / "workflows"
+            for directory in (app_dir, core_dir, shared_dir, workflows):
+                directory.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (shared_dir / "package.json").write_text(
+                json.dumps({"name": "shared", "private": True, "scripts": {"test": "vitest run"}})
+                + "\n"
+            )
+            (core_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "core",
+                        "private": True,
+                        "dependencies": {"shared": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (app_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "app",
+                        "private": True,
+                        "dependencies": {"core": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter \"...{packages/core}...\" test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            evidence = '.github/workflows/ci.yml:pnpm --filter "...{packages/core}..." test'
+
+            self.assertIn(evidence, matrix["packages/app"]["focused_test"]["evidence"])
+            self.assertIn(evidence, matrix["packages/core"]["focused_test"]["evidence"])
+            self.assertIn(evidence, matrix["packages/shared"]["focused_test"]["evidence"])
+
     def test_pnpm_brace_path_filter_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -4815,6 +4910,49 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 '.github/workflows/ci.yml:pnpm --filter "{packages/**}" test',
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
+
+    def test_pnpm_exclusion_filter_subtracts_selected_workspaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            docs_dir = root / "packages" / "docs"
+            workflows = root / ".github" / "workflows"
+            for directory in (api_dir, docs_dir, workflows):
+                directory.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            for package_dir, package_name in ((api_dir, "api"), (docs_dir, "docs")):
+                (package_dir / "package.json").write_text(
+                    json.dumps(
+                        {
+                            "name": package_name,
+                            "private": True,
+                            "scripts": {"test": "vitest run"},
+                        }
+                    )
+                    + "\n"
+                )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter \"./packages/*\" --filter \"!docs\" test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            evidence = '.github/workflows/ci.yml:pnpm --filter "./packages/*" --filter "!docs" test'
+
+            self.assertIn(evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(evidence, matrix["packages/docs"]["focused_test"]["evidence"])
 
     def test_pnpm_filter_prod_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -5277,6 +5415,59 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
 
+    def test_documented_go_missing_package_path_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\nRun API tests with `go test ./packages/missing/...`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            titles = {finding["title"] for finding in report["findings"]}
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+            invalid_evidence = "README.md:go test ./packages/missing/..."
+
+            self.assertIn("documented command target missing", titles)
+            self.assertIn(invalid_evidence, stale_evidence)
+            if "." in matrix:
+                self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+
+    def test_documented_go_import_package_path_is_not_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\nRun API tests with `go test github.com/acme/project/packages/api`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+
+            self.assertNotIn("README.md:go test github.com/acme/project/packages/api", stale_evidence)
+
     def test_documented_cd_go_package_command_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -5309,6 +5500,67 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/api"]["focused_test"]["evidence"],
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
+
+    def test_documented_pytest_missing_path_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\nRun worker tests with `pytest packages/missing/tests`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text(
+                "[project]\nname = 'worker'\nversion = '0.1.0'\n"
+            )
+            (package_dir / "src").mkdir()
+            (package_dir / "src" / "worker.py").write_text("VALUE = 1\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            titles = {finding["title"] for finding in report["findings"]}
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+            invalid_evidence = "README.md:pytest packages/missing/tests"
+
+            self.assertIn("documented command target missing", titles)
+            self.assertIn(invalid_evidence, stale_evidence)
+            if "." in matrix:
+                self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/worker"]["focused_test"]["evidence"])
+
+    def test_documented_pytest_pyargs_module_is_not_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\nRun worker tests with `pytest --pyargs worker`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text(
+                "[project]\nname = 'worker'\nversion = '0.1.0'\n"
+            )
+            (package_dir / "src").mkdir()
+            (package_dir / "src" / "worker.py").write_text("VALUE = 1\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+
+            self.assertNotIn("README.md:pytest --pyargs worker", stale_evidence)
 
     def test_inline_cd_go_package_command_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
