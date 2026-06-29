@@ -3307,6 +3307,8 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
         return scope_paths or [directory or "."]
     if tokens[0] == "make":
         scope_paths = make_command_scope_paths(root, directory or ".", tokens)
+        if scope_paths is None:
+            return [directory or "."] if directory in {"", "."} else []
         return scope_paths or [directory or "."]
     if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
         return [directory or "."]
@@ -3418,14 +3420,14 @@ def direct_test_tool_package_path(root: Path, command_base: Path, arg: str) -> O
     return nearest_inventory_boundary(root, resolved)
 
 
-def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> List[str]:
+def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> Optional[List[str]]:
     command_base = workflow_command_base(root, directory)
     parsed = parse_make_command(root, command_base, tokens[1:])
     if parsed is None:
         return []
     makefile, targets = parsed
     if parsed_make_command_target_missing(root, makefile, targets, read_make_targets(default_makefile(root))):
-        return []
+        return None
     boundary = nearest_inventory_boundary(root, makefile.parent)
     if boundary is None:
         return []
