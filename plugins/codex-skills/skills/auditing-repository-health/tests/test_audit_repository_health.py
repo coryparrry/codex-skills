@@ -2944,6 +2944,47 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn(".github/workflows/ci.yml:pytest", matrix["packages/worker"]["focused_test"]["evidence"])
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
 
+    def test_workflow_literal_run_block_nested_cd_does_not_scope_later_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - name: conditional worker tests\n"
+                "        run: |\n"
+                "          if false; then\n"
+                "            cd packages/worker\n"
+                "          fi\n"
+                "          pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertIn("packages/worker", [item["path"] for item in findings])
+
     def test_workflow_folded_run_block_does_not_split_into_independent_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

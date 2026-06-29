@@ -3359,10 +3359,10 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> List[
                         break
                     block_lines.append(block_line)
                     index += 1
-                block_commands = workflow_block_commands(block_lines, block_style)
                 if block_style == "literal":
-                    commands.extend(workflow_literal_block_command_records(directory, block_commands))
+                    commands.extend(workflow_literal_block_command_records(directory, block_lines))
                 else:
+                    block_commands = workflow_block_commands(block_lines, block_style)
                     commands.extend((directory, command) for command in block_commands)
                 continue
             command = workflow_scalar_value(value)
@@ -3435,14 +3435,25 @@ def workflow_block_commands(lines: List[str], block_style: str) -> List[str]:
 
 def workflow_literal_block_command_records(
     directory: str,
-    commands: List[str],
+    lines: List[str],
 ) -> List[Tuple[str, str]]:
+    non_empty = [line for line in lines if line.strip()]
+    if not non_empty:
+        return []
+    base_indent = min(leading_spaces(line) for line in non_empty)
     current_directory = normalize_workflow_directory(directory)
     records: List[Tuple[str, str]] = []
-    for command in commands:
+    for line in lines:
+        if not line.strip():
+            continue
+        indent = leading_spaces(line)
+        command = line[base_indent:].strip()
+        if not command or command.startswith("#"):
+            continue
         changed_directory = workflow_simple_cd_directory(current_directory, command)
         if changed_directory is not None:
-            current_directory = changed_directory
+            if indent == base_indent:
+                current_directory = changed_directory
             continue
         records.append((current_directory, command))
     return records
