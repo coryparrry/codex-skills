@@ -2490,8 +2490,26 @@ def read_package_dependency_names(path: Path) -> List[str]:
         dependencies = data.get(field)
         if not isinstance(dependencies, dict):
             continue
-        names.extend(name for name in dependencies if isinstance(name, str))
+        for name, spec in dependencies.items():
+            if not isinstance(name, str):
+                continue
+            names.append(pnpm_workspace_alias_dependency_name(spec) or name)
     return names
+
+
+def pnpm_workspace_alias_dependency_name(spec: Any) -> Optional[str]:
+    if not isinstance(spec, str) or not spec.startswith("workspace:"):
+        return None
+    target = spec[len("workspace:"):].strip()
+    if not target or target[0] in "*^~<>=0123456789":
+        return None
+    if target.startswith(("./", "../")):
+        return None
+    if target.startswith("@"):
+        version_separator = target.rfind("@")
+        return target[:version_separator] if version_separator > 0 else target
+    name, _, _ = target.partition("@")
+    return name or None
 
 
 def reverse_workspace_dependency_graph(graph: Dict[Path, List[Path]]) -> Dict[Path, List[Path]]:
