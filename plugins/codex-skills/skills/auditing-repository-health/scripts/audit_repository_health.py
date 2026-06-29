@@ -277,6 +277,25 @@ GO_TEST_VALUE_OPTIONS = {
     "-vet",
 }
 
+DIRECT_TEST_PATH_TOOLS = {"pytest"}
+
+DIRECT_TEST_VALUE_OPTIONS = {
+    "pytest": {
+        "-c",
+        "-k",
+        "-m",
+        "-o",
+        "--basetemp",
+        "--confcutdir",
+        "--deselect",
+        "--ignore",
+        "--ignore-glob",
+        "--junit-xml",
+        "--junitxml",
+        "--rootdir",
+    },
+}
+
 PACKAGE_DEPENDENCY_FIELDS = (
     "dependencies",
     "devDependencies",
@@ -3241,6 +3260,9 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     if tokens[0] == "go":
         scope_paths = go_test_scope_paths(root, directory or ".", tokens)
         return scope_paths or [directory or "."]
+    if tokens[0] in DIRECT_TEST_PATH_TOOLS:
+        scope_paths = direct_test_tool_scope_paths(root, directory or ".", tokens)
+        return scope_paths or [directory or "."]
     if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
         return [directory or "."]
     command_base = workflow_command_base(root, directory or ".")
@@ -3307,6 +3329,62 @@ def go_test_package_path(root: Path, command_base: Path, arg: str) -> Optional[P
 
 def go_test_package_arg_looks_like_path(arg: str) -> bool:
     return arg in {".", ".."} or arg.startswith(("./", "../")) or "/" in arg
+
+
+def direct_test_tool_scope_paths(root: Path, directory: str, tokens: List[str]) -> List[str]:
+    command_base = workflow_command_base(root, directory)
+    package_dirs: List[Path] = []
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            index += 1
+            continue
+        if direct_test_tool_option_with_inline_value(tokens[0], arg):
+            index += 1
+            continue
+        if arg in DIRECT_TEST_VALUE_OPTIONS.get(tokens[0], set()):
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        package_dir = direct_test_tool_package_path(root, command_base, arg)
+        if package_dir is not None:
+            package_dirs.append(package_dir)
+        index += 1
+    return package_dirs_to_scope_paths(root, unique_paths(package_dirs))
+
+
+def direct_test_tool_option_with_inline_value(tool: str, arg: str) -> bool:
+    if not arg.startswith("-") or "=" not in arg:
+        return False
+    return arg.split("=", 1)[0] in DIRECT_TEST_VALUE_OPTIONS.get(tool, set())
+
+
+def direct_test_tool_package_path(root: Path, command_base: Path, arg: str) -> Optional[Path]:
+    if "::" in arg:
+        return None
+    resolved = resolve_repo_path(root, command_base, arg)
+    if resolved is None or not resolved.exists():
+        return None
+    return nearest_inventory_boundary(root, resolved)
+
+
+def nearest_inventory_boundary(root: Path, path: Path) -> Optional[Path]:
+    current = path if path.is_dir() else path.parent
+    root = root.resolve()
+    while True:
+        if any((current / name).exists() for name in BOUNDARY_MANIFESTS):
+            return current
+        if current == root:
+            return None
+        try:
+            current.relative_to(root)
+        except ValueError:
+            return None
+        current = current.parent
 
 
 def package_dirs_to_scope_paths(root: Path, package_dirs: List[Path]) -> List[str]:

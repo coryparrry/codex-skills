@@ -3953,6 +3953,47 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertNotIn("packages/api", [item["path"] for item in findings])
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
 
+    def test_root_pytest_explicit_package_path_counts_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            tests_dir = package_dir / "tests"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            tests_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (tests_dir / "test_worker.py").write_text("def test_worker():\n    assert True\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest packages/worker/tests\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pytest packages/worker/tests",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/worker", [item["path"] for item in findings])
+
     def test_workflow_folded_run_block_preserves_blank_line_command_breaks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
