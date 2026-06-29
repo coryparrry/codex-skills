@@ -751,7 +751,7 @@ class Audit:
             rel = relative_path(root, path)
             if is_nested_test_asset_boundary_manifest(root, path):
                 continue
-            kind_and_ecosystem = inventory_boundary_kind(path)
+            kind_and_ecosystem = inventory_boundary_kind(root, path)
             if kind_and_ecosystem is None:
                 continue
 
@@ -1280,8 +1280,8 @@ def is_nested_test_asset_boundary_manifest(root: Path, path: Path) -> bool:
     return False
 
 
-def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
-    if path.name == "package.json" and docs_site_package_manifest(path):
+def inventory_boundary_kind(root: Path, path: Path) -> Optional[Tuple[str, str]]:
+    if path.name == "package.json" and docs_site_package_manifest(root, path):
         return ("docs-site", "node")
     kind_and_ecosystem = BOUNDARY_MANIFESTS.get(path.name)
     if kind_and_ecosystem is not None:
@@ -1291,9 +1291,15 @@ def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
     return None
 
 
-def docs_site_package_manifest(path: Path) -> bool:
+def docs_site_package_manifest(root: Path, path: Path) -> bool:
     if any((path.parent / name).is_file() for name in DOCS_SITE_PACKAGE_FILES):
         return True
+    try:
+        rel_parent = path.parent.relative_to(root)
+    except ValueError:
+        return False
+    if not rel_parent.parts:
+        return False
     return path.parent.name == "docs" and path.parent.parent.name not in WORKSPACE_PACKAGE_CONTAINER_DIRS
 
 
@@ -1635,20 +1641,25 @@ def discover_documented_commands(
                 if is_fenced_reference_context(fence_context):
                     continue
                 command = stripped.lstrip("$ ").strip()
-                changed_directory = command_changed_directory(root, fence_command_base, command)
-                if changed_directory is not None:
-                    fence_command_base = changed_directory
-                    continue
-                if looks_like_command(command):
+                is_split_chain = len(split_simple_shell_chain(command)) > 1
+                fence_command_base, command_records = documented_shell_command_records(root, fence_command_base, command)
+                for command_base, recorded_command in command_records:
+                    if not looks_like_command(recorded_command):
+                        continue
+                    command_context = documented_command_segment_context(
+                        fence_context,
+                        recorded_command,
+                        is_split_chain,
+                    )
                     record_documented_command(
                         root,
-                        fence_command_base,
+                        command_base,
                         documented,
                         stale,
                         documented_command_directories,
                         rel,
-                        fence_context,
-                        command,
+                        command_context,
+                        recorded_command,
                         package_scripts,
                         make_targets,
                         just_targets,
@@ -1712,7 +1723,7 @@ def documented_command_files(root: Path, package_doc_boundaries: List[Path]) -> 
 def package_documentation_boundaries(root: Path) -> List[Path]:
     boundaries = []
     for path in iter_files(root):
-        kind_and_ecosystem = inventory_boundary_kind(path)
+        kind_and_ecosystem = inventory_boundary_kind(root, path)
         if kind_and_ecosystem is None or is_nested_test_asset_boundary_manifest(root, path):
             continue
         kind, _ = kind_and_ecosystem
@@ -1890,6 +1901,77 @@ def command_changed_directory(root: Path, command_base: Path, command: str) -> O
     if directory is None or not directory.is_dir():
         return None
     return directory
+
+
+def documented_shell_command_records(
+    root: Path,
+    command_base: Path,
+    command: str,
+) -> Tuple[Path, List[Tuple[Path, str]]]:
+    parts = split_simple_shell_chain(command)
+    current_base = command_base
+    records: List[Tuple[Path, str]] = []
+    for part in parts:
+        changed_directory = command_changed_directory(root, current_base, part)
+        if changed_directory is not None:
+            current_base = changed_directory
+            continue
+        records.append((current_base, part))
+    return current_base, records
+
+
+def split_simple_shell_chain(command: str) -> List[str]:
+    parts: List[str] = []
+    current: List[str] = []
+    quote = ""
+    escaped = False
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if escaped:
+            current.append(char)
+            escaped = False
+            index += 1
+            continue
+        if char == "\\":
+            current.append(char)
+            escaped = True
+            index += 1
+            continue
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char in {"'", '"'}:
+            current.append(char)
+            quote = char
+            index += 1
+            continue
+        if command.startswith("&&", index):
+            part = "".join(current).strip()
+            if part:
+                parts.append(part)
+            current = []
+            index += 2
+            continue
+        if char == ";":
+            part = "".join(current).strip()
+            if part:
+                parts.append(part)
+            current = []
+            index += 1
+            continue
+        if char in {"|", "<", ">", "(", ")"}:
+            stripped = command.strip()
+            return [stripped] if stripped else []
+        current.append(char)
+        index += 1
+    part = "".join(current).strip()
+    if part:
+        parts.append(part)
+    return parts or [command.strip()]
 
 
 def documented_command_target_missing(
@@ -2753,6 +2835,18 @@ def resolve_declared_package_workspaces(
     relation_selector = parse_pnpm_relation_selector(normalized) if tool == "pnpm" else None
     selector_base = relation_selector.base if relation_selector is not None else normalize_pnpm_selector_base(normalized)
     exact_selector = selector_base or normalized
+    if tool == "pnpm":
+        package_name_matches = resolve_pnpm_package_name_workspaces(declared, exact_selector)
+        if package_name_matches is not None:
+            if relation_selector is not None:
+                return resolve_pnpm_relation_workspaces_for_bases(
+                    declared,
+                    package_name_matches,
+                    relation_selector,
+                ) or None
+            if has_pnpm_relation_adornment(normalized):
+                return None
+            return unique_paths(package_name_matches) or None
     normalized_without_dot = exact_selector[2:] if exact_selector.startswith("./") else exact_selector
     for workspace_dir in declared:
         rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
@@ -2773,6 +2867,54 @@ def resolve_declared_package_workspaces(
         if pnpm_filter_selector_matches_workspace(filter_selector, rel):
             matches.append(workspace_dir)
     return unique_paths(matches) or None
+
+
+def resolve_pnpm_package_name_workspaces(
+    declared: List[Path],
+    selector: str,
+) -> Optional[List[Path]]:
+    normalized = selector.strip().rstrip("/")
+    if not normalized:
+        return None
+    names = [
+        (workspace_dir, name)
+        for workspace_dir in declared
+        if (name := read_package_name(workspace_dir / "package.json"))
+    ]
+    exact_matches = [workspace_dir for workspace_dir, name in names if name == normalized]
+    if exact_matches:
+        return exact_matches
+    if pnpm_selector_allows_unscoped_fallback(normalized):
+        unscoped_matches = [
+            workspace_dir
+            for workspace_dir, name in names
+            if pnpm_package_unscoped_name(name) == normalized
+        ]
+        if unscoped_matches:
+            return unscoped_matches if len(unscoped_matches) == 1 else []
+    if any(char in normalized for char in "*?["):
+        glob_matches = [
+            workspace_dir
+            for workspace_dir, name in names
+            if fnmatch.fnmatch(name, normalized)
+        ]
+        if glob_matches:
+            return glob_matches
+    return None
+
+
+def pnpm_selector_allows_unscoped_fallback(selector: str) -> bool:
+    return (
+        not selector.startswith(("@", ".", "/", "~"))
+        and "/" not in selector
+        and not any(char in selector for char in "*?[")
+    )
+
+
+def pnpm_package_unscoped_name(name: str) -> str:
+    if name.startswith("@") and "/" in name:
+        return name.rsplit("/", 1)[1]
+    return name
 
 
 def parse_pnpm_relation_selector(selector: str) -> Optional[PnpmRelationSelector]:
@@ -2821,6 +2963,17 @@ def resolve_pnpm_relation_workspaces(
         graph = reverse_workspace_dependency_graph(graph)
     related = transitive_related_workspaces(graph, base_workspace)
     selected = ([base_workspace] if relation_selector.include_base else []) + related
+    return unique_paths(selected)
+
+
+def resolve_pnpm_relation_workspaces_for_bases(
+    declared: List[Path],
+    base_workspaces: List[Path],
+    relation_selector: PnpmRelationSelector,
+) -> List[Path]:
+    selected: List[Path] = []
+    for base_workspace in base_workspaces:
+        selected.extend(resolve_pnpm_relation_workspaces(declared, base_workspace, relation_selector))
     return unique_paths(selected)
 
 
@@ -3214,6 +3367,19 @@ def classify_documented_command(line: str, command: str) -> List[str]:
     if documented_pip_install_command(command) and "setup" not in matches:
         matches.append("setup")
     return matches
+
+
+def documented_command_segment_context(context: str, command: str, is_split_chain: bool) -> str:
+    if not is_split_chain:
+        return context
+    responsibilities = [
+        responsibility
+        for responsibility in workflow_command_responsibilities(command)
+        if responsibility in DOC_RESPONSIBILITY_KEYWORDS
+    ]
+    if not responsibilities:
+        return context
+    return " ".join(DOC_RESPONSIBILITY_KEYWORDS[responsibility][0] for responsibility in responsibilities)
 
 
 def documented_pip_install_command(command: str) -> bool:
@@ -3907,11 +4073,14 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> List[
                     commands.extend(workflow_literal_block_command_records(directory, block_lines))
                 else:
                     block_commands = workflow_block_commands(block_lines, block_style)
-                    commands.extend((directory, command) for command in block_commands)
+                    for command in block_commands:
+                        _, records = workflow_shell_command_records(directory, command)
+                        commands.extend(records)
                 continue
             command = workflow_scalar_value(value)
             if command:
-                commands.append((directory, command))
+                _, records = workflow_shell_command_records(directory, command)
+                commands.extend(records)
         index += 1
     return commands
 
@@ -3994,13 +4163,26 @@ def workflow_literal_block_command_records(
         command = line[base_indent:].strip()
         if not command or command.startswith("#"):
             continue
-        changed_directory = workflow_simple_cd_directory(current_directory, command)
-        if changed_directory is not None:
-            if indent == base_indent:
-                current_directory = changed_directory
-            continue
-        records.append((current_directory, command))
+        next_directory, command_records = workflow_shell_command_records(current_directory, command)
+        records.extend(command_records)
+        if indent == base_indent:
+            current_directory = next_directory
     return records
+
+
+def workflow_shell_command_records(
+    directory: str,
+    command: str,
+) -> Tuple[str, List[Tuple[str, str]]]:
+    current_directory = normalize_workflow_directory(directory)
+    records: List[Tuple[str, str]] = []
+    for part in split_simple_shell_chain(command):
+        changed_directory = workflow_simple_cd_directory(current_directory, part)
+        if changed_directory is not None:
+            current_directory = changed_directory
+            continue
+        records.append((current_directory, part))
+    return current_directory, records
 
 
 def workflow_simple_cd_directory(current_directory: str, command: str) -> Optional[str]:
