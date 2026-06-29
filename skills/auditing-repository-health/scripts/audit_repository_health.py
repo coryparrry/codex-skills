@@ -3646,6 +3646,13 @@ def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
 
 
 def workflow_command_scope_paths(root: Path, directory: str, command: str) -> List[str]:
+    chain_parts = split_simple_shell_chain(command.strip())
+    if len(chain_parts) > 1:
+        scope_paths: List[str] = []
+        _, command_records = workflow_shell_command_records(directory, command)
+        for command_directory, command_part in command_records:
+            scope_paths.extend(workflow_command_scope_paths(root, command_directory, command_part))
+        return sorted(set(scope_paths))
     command = command_without_leading_env_assignments(command)
     try:
         tokens = shlex.split(command)
@@ -4278,6 +4285,12 @@ def classify_workflow_name(name: str) -> List[str]:
 
 
 def workflow_command_responsibilities(command: str) -> List[str]:
+    chain_parts = split_simple_shell_chain(command.strip())
+    if len(chain_parts) > 1:
+        matches = set()
+        for part in chain_parts:
+            matches.update(workflow_command_responsibilities(part))
+        return sorted(matches)
     command = command_without_leading_env_assignments(command)
     try:
         tokens = shlex.split(command)

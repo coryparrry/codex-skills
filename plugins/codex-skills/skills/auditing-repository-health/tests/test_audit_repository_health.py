@@ -5515,6 +5515,29 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual([], matrix["packages/worker"]["ci_coverage"]["evidence"])
             self.assertIn("packages/worker", [item["path"] for item in findings])
 
+    def test_workflow_shell_predicate_chain_keeps_later_validation_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_dir = root / "packages" / "worker"
+            package_dir.mkdir(parents=True)
+            (package_dir / "pyproject.toml").write_text(
+                "[project]\nname = 'worker'\nversion = '0.1.0'\n"
+            )
+
+            module = load_audit_module()
+            self.assertEqual(
+                ["packages/worker"],
+                module.workflow_command_scope_paths(
+                    root,
+                    "packages/worker",
+                    "test -f pyproject.toml && pytest",
+                ),
+            )
+            self.assertEqual(
+                ["test"],
+                module.workflow_command_responsibilities("test -f pyproject.toml && pytest"),
+            )
+
     def test_root_go_test_explicit_package_paths_count_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
