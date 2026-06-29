@@ -374,6 +374,8 @@ EXPLICIT_TEST_WORDS = {"test", "tests", "spec"}
 
 CI_WORKFLOW_EXTENSIONS = {".yaml", ".yml"}
 
+SHELL_PREDICATE_COMMANDS = {"test", "[", "[["}
+
 COMMAND_FILE_EXTENSIONS = {
     ".bash",
     ".cjs",
@@ -705,7 +707,11 @@ class Audit:
             "has_license": any(root.glob("LICENSE*")),
             "has_contributing": any(root.glob("CONTRIBUTING*")),
             "has_security": any(root.glob("SECURITY*")),
-            "has_ci_workflows": workflows_dir.is_dir() and any(workflows_dir.iterdir()),
+            "has_ci_workflows": workflows_dir.is_dir()
+            and any(
+                path.is_file() and path.suffix.lower() in CI_WORKFLOW_EXTENSIONS
+                for path in workflows_dir.iterdir()
+            ),
             "manifests": manifests,
         }
 
@@ -3648,6 +3654,8 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     directory = directory or "."
     if not tokens:
         return [directory]
+    if tokens[0] in SHELL_PREDICATE_COMMANDS:
+        return []
     if tokens[0] == "go":
         scope_paths = go_test_scope_paths(root, directory, tokens)
         if scope_paths:
@@ -4279,6 +4287,8 @@ def workflow_command_responsibilities(command: str) -> List[str]:
         return []
     tokens = normalize_pip_command_tokens(tokens)
     tool = tokens[0]
+    if tool in SHELL_PREDICATE_COMMANDS:
+        return []
     if tool in {"npm", "pnpm", "yarn", "bun"}:
         command_args = package_manager_builtin_command_args(tokens)
         script = package_manager_script_from_args(tool, command_args)

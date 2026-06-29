@@ -108,6 +108,7 @@ class AuditRepositoryHealthTests(unittest.TestCase):
 
             titles = {finding["title"] for finding in report["findings"]}
             self.assertIn("no reusable closeout gate", titles)
+            self.assertFalse(report["checks"]["repository_shape"]["has_ci_workflows"])
             self.assertEqual([], report["checks"]["validation"]["ci_workflows"])
 
     def test_markdown_report_maps_scripts_and_required_sections(self):
@@ -5475,6 +5476,44 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/api"]["ci_coverage"]["status"])
             self.assertEqual([], matrix["packages/api"]["ci_coverage"]["evidence"])
             self.assertIn("packages/api", [item["path"] for item in findings])
+
+    def test_workflow_shell_predicate_does_not_count_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            worker_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (worker_dir / "pyproject.toml").write_text(
+                "[project]\nname = 'worker'\nversion = '0.1.0'\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - working-directory: packages/worker\n"
+                "        run: test -f pyproject.toml\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["packages/worker"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["ci_coverage"]["evidence"])
+            self.assertIn("packages/worker", [item["path"] for item in findings])
 
     def test_root_go_test_explicit_package_paths_count_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
