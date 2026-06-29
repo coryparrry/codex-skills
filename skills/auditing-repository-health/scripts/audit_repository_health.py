@@ -934,14 +934,14 @@ class Audit:
                 "kind": boundary["kind"],
                 "ecosystem": boundary["ecosystem"],
                 "scope_type": boundary["scope_type"],
-                "setup": lifecycle_cell(scope_path, "setup", scripts_check, workflow_commands, boundary),
-                "focused_test": lifecycle_cell(scope_path, "test", scripts_check, workflow_commands, boundary),
-                "full_validation": lifecycle_cell(scope_path, "cibuild", scripts_check, workflow_commands, boundary),
-                "lint_format": lifecycle_cell(scope_path, "lint", scripts_check, workflow_commands, boundary),
-                "typecheck_static": lifecycle_cell(scope_path, "typecheck", scripts_check, workflow_commands, boundary),
-                "build_package": lifecycle_cell(scope_path, "build", scripts_check, workflow_commands, boundary),
-                "server": lifecycle_server_cell(boundary, scripts_check, workflow_commands),
-                "docs_release": lifecycle_cell(scope_path, "docs", scripts_check, workflow_commands, boundary),
+                "setup": lifecycle_cell(root, scope_path, "setup", scripts_check, workflow_commands, boundary),
+                "focused_test": lifecycle_cell(root, scope_path, "test", scripts_check, workflow_commands, boundary),
+                "full_validation": lifecycle_cell(root, scope_path, "cibuild", scripts_check, workflow_commands, boundary),
+                "lint_format": lifecycle_cell(root, scope_path, "lint", scripts_check, workflow_commands, boundary),
+                "typecheck_static": lifecycle_cell(root, scope_path, "typecheck", scripts_check, workflow_commands, boundary),
+                "build_package": lifecycle_cell(root, scope_path, "build", scripts_check, workflow_commands, boundary),
+                "server": lifecycle_server_cell(root, boundary, scripts_check, workflow_commands),
+                "docs_release": lifecycle_cell(root, scope_path, "docs", scripts_check, workflow_commands, boundary),
                 "ci_coverage": ci_coverage_cell(scope_path, workflow_commands, boundary),
             }
             rows.append(row)
@@ -1199,15 +1199,26 @@ def merge_boundary_ecosystem(existing: Dict[str, Any], boundary: Dict[str, Any])
 def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
     if has_source_plugin_mirror(boundaries):
         return "source-plugin-mirror"
-    package_boundaries = [
-        boundary
+    boundary_roots = {
+        classification_boundary_scope(boundary)
         for boundary in boundaries
-        if boundary["path"] not in {".", "Dockerfile"}
-    ]
+        if counts_toward_repository_classification(boundary)
+    }
     ecosystems = {boundary["ecosystem"] for boundary in boundaries}
-    if len(package_boundaries) >= 2 or len(ecosystems) >= 3:
+    if len(boundary_roots) >= 2 or len(ecosystems) >= 3:
         return "monorepo"
     return "single-repository"
+
+
+def counts_toward_repository_classification(boundary: Dict[str, Any]) -> bool:
+    return boundary["path"] != "Dockerfile"
+
+
+def classification_boundary_scope(boundary: Dict[str, Any]) -> str:
+    if boundary["kind"] != "docker-service":
+        return boundary["path"]
+    parent = posixpath.dirname(boundary["path"])
+    return "." if parent in {"", "."} else parent
 
 
 def has_source_plugin_mirror(boundaries: List[Dict[str, Any]]) -> bool:
@@ -3609,6 +3620,7 @@ def workflow_evidence_for_responsibility(
 
 
 def lifecycle_repo_owned_evidence(
+    root: Path,
     path: str,
     responsibility: str,
     scripts_check: Dict[str, Any],
@@ -3617,10 +3629,11 @@ def lifecycle_repo_owned_evidence(
     evidence: List[str] = []
     responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
     if responsibility_info:
+        documented_candidates = set(scripts_check.get("documented_commands", {}).get(responsibility, []))
         evidence.extend(
             candidate
             for candidate in responsibility_info.get("candidates", [])
-            if lifecycle_candidate_scope_path(candidate) == path
+            if lifecycle_candidate_matches_path(root, candidate, path, documented_candidates)
             and repo_owned_candidate_matches_boundary(candidate, boundary)
         )
     for script, sources in scripts_check.get("package_script_sources", {}).items():
@@ -3633,6 +3646,46 @@ def lifecycle_repo_owned_evidence(
             and repo_owned_candidate_matches_boundary(source, boundary, script)
         )
     return sorted(set(evidence))
+
+
+def lifecycle_documented_evidence(
+    root: Path,
+    path: str,
+    responsibility: str,
+    scripts_check: Dict[str, Any],
+    boundary: Optional[Dict[str, Any]] = None,
+) -> List[str]:
+    documented_candidates = set(scripts_check.get("documented_commands", {}).get(responsibility, []))
+    return sorted(
+        candidate
+        for candidate in documented_candidates
+        if lifecycle_candidate_matches_path(root, candidate, path, documented_candidates)
+        and repo_owned_candidate_matches_boundary(candidate, boundary)
+    )
+
+
+def lifecycle_candidate_matches_path(
+    root: Path,
+    candidate: str,
+    path: str,
+    documented_candidates: set[str],
+) -> bool:
+    if lifecycle_candidate_scope_path(candidate) == path:
+        return True
+    if candidate not in documented_candidates:
+        return False
+    return path in documented_candidate_scope_paths(root, candidate)
+
+
+def documented_candidate_scope_paths(root: Path, candidate: str) -> List[str]:
+    _, _, command = candidate.partition(":")
+    if not command:
+        return []
+    return [
+        scope_path
+        for scope_path in workflow_command_scope_paths(root, ".", command)
+        if scope_path != "."
+    ]
 
 
 def lifecycle_candidate_scope_path(candidate: str) -> str:
@@ -3653,13 +3706,15 @@ def lifecycle_candidate_scope_path(candidate: str) -> str:
 
 
 def lifecycle_cell(
+    root: Path,
     path: str,
     responsibility: str,
     scripts_check: Dict[str, Any],
     workflow_commands: Dict[str, List[str]],
     boundary: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    evidence = lifecycle_repo_owned_evidence(path, responsibility, scripts_check, boundary)
+    evidence = lifecycle_repo_owned_evidence(root, path, responsibility, scripts_check, boundary)
+    documented_evidence = lifecycle_documented_evidence(root, path, responsibility, scripts_check, boundary)
     status = "missing"
     responsibility_info = scripts_check.get("responsibilities", {}).get(responsibility)
     if responsibility_info and path == ".":
@@ -3668,6 +3723,8 @@ def lifecycle_cell(
             status = root_status
         elif root_status in {"present", "documented"} and evidence:
             status = root_status
+    elif evidence:
+        status = "documented" if set(evidence) <= set(documented_evidence) else "present"
     evidence.extend(workflow_evidence_for_responsibility(path, responsibility, workflow_commands, boundary))
     if status == "not_applicable" and evidence:
         status = "present"
@@ -3684,6 +3741,7 @@ def lifecycle_scope_path(boundary: Dict[str, Any]) -> str:
 
 
 def lifecycle_server_cell(
+    root: Path,
     boundary: Dict[str, Any],
     scripts_check: Dict[str, Any],
     workflow_commands: Dict[str, List[str]],
@@ -3697,7 +3755,7 @@ def lifecycle_server_cell(
         "swift-package",
     }:
         return {"status": "not_applicable", "evidence": []}
-    return lifecycle_cell(lifecycle_scope_path(boundary), "server", scripts_check, workflow_commands, boundary)
+    return lifecycle_cell(root, lifecycle_scope_path(boundary), "server", scripts_check, workflow_commands, boundary)
 
 
 def ci_coverage_cell(

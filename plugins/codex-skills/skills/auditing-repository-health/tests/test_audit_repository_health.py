@@ -2367,6 +2367,56 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("website", [item["path"] for item in findings])
 
+    def test_root_package_and_nested_go_package_classifies_as_monorepo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "web-app", "private": True}) + "\n"
+            )
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            inventory = report["checks"]["repository_inventory"]
+            boundaries = {item["path"]: item for item in inventory["boundaries"]}
+            self.assertEqual("monorepo", inventory["classification"])
+            self.assertEqual("node-workspace-root", boundaries["."]["kind"])
+            self.assertEqual("go-package", boundaries["packages/api"]["kind"])
+
+    def test_single_root_static_site_remains_single_repository(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example Docs\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "docusaurus.config.js").write_text("module.exports = {};\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "docs-site",
+                        "private": True,
+                        "scripts": {
+                            "build": "docusaurus build",
+                            "start": "docusaurus start",
+                        },
+                    }
+                )
+                + "\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            inventory = report["checks"]["repository_inventory"]
+            self.assertEqual("single-repository", inventory["classification"])
+            self.assertEqual("docs", inventory["purpose"])
+
     def test_polyglot_lifecycle_gate_matrix_scopes_gates(self):
         fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
 
@@ -3714,6 +3764,33 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
 
+    def test_documented_go_package_command_counts_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\nRun API tests with `go test ./packages/api/...`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("documented", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn(
+                "README.md:go test ./packages/api/...",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
 
     def test_workflow_folded_run_block_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
