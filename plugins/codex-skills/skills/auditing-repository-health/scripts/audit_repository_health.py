@@ -1985,7 +1985,7 @@ def package_manager_target_missing(
 ) -> bool:
     parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None:
-        return False
+        return package_manager_command_has_explicit_scope(tokens)
     if parsed.package_dirs is None:
         return True
     if package_manager_builtin_target_missing(root, command_base, tokens):

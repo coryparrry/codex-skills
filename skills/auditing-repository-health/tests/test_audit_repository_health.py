@@ -792,6 +792,46 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", responsibilities["test"]["status"])
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
 
+    def test_invalid_scoped_pnpm_documented_command_is_stale_not_lifecycle_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            api_dir = root / "packages" / "api"
+            self.init_repo(root)
+            api_dir.mkdir(parents=True)
+            command = "pnpm --foreground-scripts --filter api test"
+            evidence = f"README.md:{command}"
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                f"Run API tests with `{command}`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (api_dir / "package.json").write_text(
+                json.dumps({"name": "api", "private": True}) + "\n"
+            )
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            stale_evidence = [
+                item
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for item in finding["evidence"]
+            ]
+            documented_tests = report["checks"]["scripts"]["documented_commands"].get("test", [])
+
+            self.assertIn(evidence, stale_evidence)
+            self.assertNotIn(evidence, documented_tests)
+            self.assertEqual("missing", matrix["."]["focused_test"]["status"])
+            self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
+            self.assertNotIn(evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(evidence, matrix["packages/api"]["focused_test"]["evidence"])
+
     def test_post_subcommand_npm_prefix_options_select_package_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
