@@ -3122,10 +3122,9 @@ def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
             text = workflow.read_text(errors="replace")
         except OSError:
             continue
-        for directory, commands in workflow_step_run_commands(text):
-            for command in commands:
-                for scope_path in workflow_command_scope_paths(root, directory or ".", command):
-                    evidence[scope_path].append(f"{rel_workflow}:{command}")
+        for directory, command in workflow_step_run_commands(text):
+            for scope_path in workflow_command_scope_paths(root, directory or ".", command):
+                evidence[scope_path].append(f"{rel_workflow}:{command}")
     return dict(evidence)
 
 
@@ -3228,9 +3227,9 @@ def package_dirs_declaring_script(package_dirs: List[Path], script: str) -> List
     ]
 
 
-def workflow_step_run_commands(text: str) -> List[Tuple[str, List[str]]]:
+def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
     lines = text.splitlines()
-    steps: List[Tuple[str, List[str]]] = []
+    commands: List[Tuple[str, str]] = []
     workflow_default_directory = "."
     jobs_indent: Optional[int] = None
     job_entry_indent: Optional[int] = None
@@ -3308,11 +3307,9 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, List[str]]]:
             raw = lines[offset]
             relative_lines.append(raw[indent + 2:] if len(raw) >= indent + 2 else "")
         default_directory = current_job_default_directory if current_job_indent is not None else workflow_default_directory
-        directory, commands = parse_workflow_step(relative_lines, default_directory)
-        if commands:
-            steps.append((directory, commands))
+        commands.extend(parse_workflow_step(relative_lines, default_directory))
         index = step_end
-    return steps
+    return commands
 
 
 def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_indent: int) -> Optional[str]:
@@ -3336,9 +3333,9 @@ def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_in
     return None
 
 
-def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple[str, List[str]]:
-    directory = normalize_workflow_directory(default_directory)
-    commands: List[str] = []
+def parse_workflow_step(lines: List[str], default_directory: str = ".") -> List[Tuple[str, str]]:
+    directory = workflow_step_directory(lines, default_directory)
+    commands: List[Tuple[str, str]] = []
     step_key_indent = workflow_step_key_indent(lines)
     index = 0
     while index < len(lines):
@@ -3348,7 +3345,6 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
             index += 1
             continue
         if stripped.startswith("working-directory:"):
-            directory = normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
             index += 1
             continue
         if stripped.startswith("run:"):
@@ -3363,13 +3359,29 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
                         break
                     block_lines.append(block_line)
                     index += 1
-                commands.extend(workflow_block_commands(block_lines, block_style))
+                block_commands = workflow_block_commands(block_lines, block_style)
+                if block_style == "literal":
+                    commands.extend(workflow_literal_block_command_records(directory, block_commands))
+                else:
+                    commands.extend((directory, command) for command in block_commands)
                 continue
             command = workflow_scalar_value(value)
             if command:
-                commands.append(command)
+                commands.append((directory, command))
         index += 1
-    return normalize_workflow_directory(directory), commands
+    return commands
+
+
+def workflow_step_directory(lines: List[str], default_directory: str = ".") -> str:
+    directory = normalize_workflow_directory(default_directory)
+    step_key_indent = workflow_step_key_indent(lines)
+    for line in lines:
+        stripped = line.strip()
+        if leading_spaces(line) != step_key_indent:
+            continue
+        if stripped.startswith("working-directory:"):
+            directory = normalize_workflow_directory(workflow_scalar_value(stripped.split(":", 1)[1]))
+    return directory
 
 
 def workflow_step_key_indent(lines: List[str]) -> int:
@@ -3419,6 +3431,38 @@ def workflow_block_commands(lines: List[str], block_style: str) -> List[str]:
         if command and not command.startswith("#"):
             commands.append(command)
     return commands
+
+
+def workflow_literal_block_command_records(
+    directory: str,
+    commands: List[str],
+) -> List[Tuple[str, str]]:
+    current_directory = normalize_workflow_directory(directory)
+    records: List[Tuple[str, str]] = []
+    for command in commands:
+        changed_directory = workflow_simple_cd_directory(current_directory, command)
+        if changed_directory is not None:
+            current_directory = changed_directory
+            continue
+        records.append((current_directory, command))
+    return records
+
+
+def workflow_simple_cd_directory(current_directory: str, command: str) -> Optional[str]:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+    if len(tokens) != 2 or tokens[0] != "cd":
+        return None
+    target = tokens[1]
+    if not target or target == "-" or target.startswith(("/", "~", "$")) or any(char in target for char in "*?["):
+        return None
+    base = "" if current_directory in {"", "."} else current_directory
+    normalized = normalize_workflow_directory(posixpath.join(base, target))
+    if normalized == ".." or normalized.startswith("../"):
+        return None
+    return normalized
 
 
 def folded_workflow_paragraph_commands(
