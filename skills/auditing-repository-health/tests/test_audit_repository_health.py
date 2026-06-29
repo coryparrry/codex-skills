@@ -3869,6 +3869,103 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
             self.assertIn("packages/api", missing_focused_paths)
 
+    def test_pnpm_foreground_scripts_before_filter_does_not_credit_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            api_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (api_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "api",
+                        "private": True,
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --foreground-scripts --filter api test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            invalid_evidence = ".github/workflows/ci.yml:pnpm --foreground-scripts --filter api test"
+
+            self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["."]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["ci_coverage"]["status"])
+
+    def test_npm_foreground_scripts_before_workspace_counts_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            api_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "workspace-root",
+                        "private": True,
+                        "workspaces": ["packages/*"],
+                    }
+                )
+                + "\n"
+            )
+            (api_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "api",
+                        "private": True,
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: npm --foreground-scripts --workspace api test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            evidence = ".github/workflows/ci.yml:npm --foreground-scripts --workspace api test"
+
+            self.assertEqual("present", matrix["packages/api"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/api"]["ci_coverage"]["status"])
+            self.assertIn(evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertIn(evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertNotIn(evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(evidence, matrix["."]["ci_coverage"]["evidence"])
+
     def test_npm_all_workspaces_with_workspace_selector_ci_credits_only_selected_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

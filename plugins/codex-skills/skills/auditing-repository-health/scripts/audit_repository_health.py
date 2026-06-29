@@ -204,7 +204,6 @@ PACKAGE_MANAGER_INCLUDE_WORKSPACE_ROOT_OPTIONS = {
 
 PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
     "--frozen-lockfile",
-    "--foreground-scripts",
     "--if-present",
     "--ignore-scripts",
     "--immutable",
@@ -212,6 +211,10 @@ PACKAGE_MANAGER_NO_VALUE_OPTIONS = {
     "--prefer-offline",
     "--silent",
     "--verbose",
+}
+
+PACKAGE_MANAGER_TOOL_NO_VALUE_OPTIONS = {
+    "npm": {"--foreground-scripts"},
 }
 
 PACKAGE_MANAGER_INSTALL_VALUE_OPTIONS = {
@@ -2027,7 +2030,7 @@ def package_manager_install_has_package_spec(tokens: List[str]) -> bool:
         arg = args[index]
         if arg == "--":
             return False
-        if is_package_manager_no_value_option(arg):
+        if is_package_manager_no_value_option(arg, tokens[0]):
             index += 1
             continue
         directory_option = package_manager_directory_option_value(tokens[0], args, index)
@@ -2100,7 +2103,7 @@ def package_manager_builtin_command_args(tokens: List[str]) -> List[str]:
             _, index = include_root
             continue
         arg = args[index]
-        if is_package_manager_no_value_option(arg):
+        if is_package_manager_no_value_option(arg, tool):
             index += 1
             continue
         if arg.startswith("-"):
@@ -2136,7 +2139,7 @@ def npm_ci_lockfile_root(root: Path, command_base: Path, tokens: List[str]) -> O
             _, index = package_manager_include_workspace_root_option("npm", args, index)
             continue
         arg = args[index]
-        if is_package_manager_no_value_option(arg):
+        if is_package_manager_no_value_option(arg, "npm"):
             index += 1
             continue
         if arg.startswith("-"):
@@ -2189,9 +2192,7 @@ def parse_package_manager_command(
             index = next_index
             continue
         arg = args[index]
-        if arg in PACKAGE_MANAGER_NO_VALUE_OPTIONS or (
-            arg.startswith("--") and "=" in arg and package_manager_option_name(arg) in PACKAGE_MANAGER_NO_VALUE_OPTIONS
-        ):
+        if is_package_manager_no_value_option(arg, tool):
             index += 1
             continue
         if arg.startswith("-"):
@@ -2258,7 +2259,7 @@ def package_manager_run_workspace_selection(tool: str, tokens: List[str]) -> Wor
             enabled, index = include_root
             selection.include_root = selection.include_root or enabled
             continue
-        if is_package_manager_no_value_option(token):
+        if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
         if token.startswith("-") or saw_script:
@@ -2294,7 +2295,7 @@ def package_manager_post_command_workspace_selection(tool: str, tokens: List[str
             enabled, index = include_root
             selection.include_root = selection.include_root or enabled
             continue
-        if is_package_manager_no_value_option(token):
+        if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
         break
@@ -2343,7 +2344,7 @@ def package_manager_run_command_directory(root: Path, directory: Path, tool: str
         if package_manager_include_workspace_root_option(tool, tokens, index) is not None:
             _, index = package_manager_include_workspace_root_option(tool, tokens, index)
             continue
-        if is_package_manager_no_value_option(token):
+        if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
         if token.startswith("-") or saw_script:
@@ -2376,7 +2377,7 @@ def package_manager_post_command_directory(root: Path, directory: Path, tool: st
         if package_manager_include_workspace_root_option(tool, tokens, index) is not None:
             _, index = package_manager_include_workspace_root_option(tool, tokens, index)
             continue
-        if is_package_manager_no_value_option(token):
+        if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
         break
@@ -2405,7 +2406,7 @@ def first_package_manager_run_arg(tool: str, tokens: List[str]) -> Optional[str]
         if include_root is not None:
             _, index = include_root
             continue
-        if is_package_manager_no_value_option(token):
+        if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
         if token.startswith("-"):
@@ -2443,7 +2444,7 @@ def package_manager_run_without_script(command: str) -> bool:
             _, index = directory_option
             continue
         token = args[index]
-        if is_package_manager_no_value_option(token):
+        if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
         if token.startswith("-"):
@@ -2957,9 +2958,17 @@ def normalize_package_manager_command(tool: str, command: str) -> str:
     return PACKAGE_MANAGER_COMMAND_ALIASES.get(tool, {}).get(command, command)
 
 
-def is_package_manager_no_value_option(arg: str) -> bool:
-    return arg in PACKAGE_MANAGER_NO_VALUE_OPTIONS or (
-        arg.startswith("--") and "=" in arg and package_manager_option_name(arg) in PACKAGE_MANAGER_NO_VALUE_OPTIONS
+def package_manager_no_value_options(tool: Optional[str] = None) -> set[str]:
+    options = set(PACKAGE_MANAGER_NO_VALUE_OPTIONS)
+    if tool is not None:
+        options.update(PACKAGE_MANAGER_TOOL_NO_VALUE_OPTIONS.get(tool, set()))
+    return options
+
+
+def is_package_manager_no_value_option(arg: str, tool: Optional[str] = None) -> bool:
+    options = package_manager_no_value_options(tool)
+    return arg in options or (
+        arg.startswith("--") and "=" in arg and package_manager_option_name(arg) in options
     )
 
 
@@ -3594,12 +3603,21 @@ def package_manager_command_has_explicit_scope(tokens: List[str]) -> bool:
             break
         if package_manager_arg_is_scope_option(tool, arg):
             return True
-        if is_package_manager_no_value_option(arg):
+        if is_package_manager_no_value_option(arg, tool):
             index += 1
             continue
         if arg.startswith("-"):
-            return False
+            return package_manager_args_contain_scope_option(tool, args, index + 1)
         return tool == "yarn" and normalize_package_manager_command(tool, arg) == "workspace"
+    return False
+
+
+def package_manager_args_contain_scope_option(tool: str, args: List[str], start: int) -> bool:
+    for arg in args[start:]:
+        if arg == "--":
+            return False
+        if package_manager_arg_is_scope_option(tool, arg):
+            return True
     return False
 
 
