@@ -2521,7 +2521,7 @@ def resolve_package_workspaces(
 ) -> Optional[List[Path]]:
     declared = declared_package_workspaces(root, package_root, tool)
     selected: List[Path] = []
-    if selection.all_workspaces:
+    if selection.all_workspaces and not selection.names:
         selected.extend(declared)
     for workspace in selection.names:
         resolved = resolve_declared_package_workspaces(package_root, declared, workspace, tool)

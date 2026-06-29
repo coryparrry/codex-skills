@@ -3581,6 +3581,130 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
 
+    def test_pnpm_recursive_filter_ci_credits_only_selected_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            api_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "workspace-root",
+                        "private": True,
+                    }
+                )
+                + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            for package_dir, package_name in ((api_dir, "api"), (worker_dir, "worker")):
+                (package_dir / "package.json").write_text(
+                    json.dumps(
+                        {
+                            "name": package_name,
+                            "private": True,
+                            "scripts": {"test": "vitest run"},
+                        }
+                    )
+                    + "\n"
+                )
+                (package_dir / "index.js").write_text(f"console.log('{package_name}')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm -r --filter worker test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["ci_coverage"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm -r --filter worker test",
+                matrix["packages/worker"]["ci_coverage"]["evidence"],
+            )
+            self.assertEqual("missing", matrix["packages/api"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertNotIn(
+                ".github/workflows/ci.yml:pnpm -r --filter worker test",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+
+    def test_npm_all_workspaces_with_workspace_selector_ci_credits_only_selected_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            api_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "workspace-root",
+                        "private": True,
+                        "workspaces": ["packages/*"],
+                    }
+                )
+                + "\n"
+            )
+            for package_dir, package_name in ((api_dir, "api"), (worker_dir, "worker")):
+                (package_dir / "package.json").write_text(
+                    json.dumps(
+                        {
+                            "name": package_name,
+                            "private": True,
+                            "scripts": {"test": "vitest run"},
+                        }
+                    )
+                    + "\n"
+                )
+                (package_dir / "index.js").write_text(f"console.log('{package_name}')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: npm --workspaces --workspace worker test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["ci_coverage"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:npm --workspaces --workspace worker test",
+                matrix["packages/worker"]["ci_coverage"]["evidence"],
+            )
+            self.assertEqual("missing", matrix["packages/api"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertNotIn(
+                ".github/workflows/ci.yml:npm --workspaces --workspace worker test",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+
     def test_recursive_pnpm_if_present_workflow_only_credits_packages_declaring_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
