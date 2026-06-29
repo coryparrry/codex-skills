@@ -3825,6 +3825,47 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
 
+    def test_repeated_documented_command_contexts_do_not_share_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Validate the root package:\n\n"
+                "```sh\n"
+                "make\n"
+                "```\n\n"
+                "Run API tests:\n\n"
+                "```sh\n"
+                "cd packages/api\n"
+                "make\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "Makefile").write_text("build:\n\t@echo build\n")
+            (api_dir / "Makefile").write_text("test:\n\t@echo test\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertIn("README.md:make", responsibilities["cibuild"]["candidates"])
+            self.assertIn("README.md:make", responsibilities["test"]["candidates"])
+            self.assertEqual("documented", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn("README.md:make", matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["full_validation"]["status"])
+            self.assertEqual([], matrix["packages/api"]["full_validation"]["evidence"])
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
+
     def test_workflow_folded_run_block_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

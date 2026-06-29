@@ -526,13 +526,16 @@ class Finding:
     fix_shape: str
 
 
+DocumentedCommandDirectories = Dict[str, Dict[str, List[str]]]
+
+
 class Audit:
     def __init__(self, repo: Path) -> None:
         self.requested_repo = repo.resolve()
         self.commands_run: List[Dict[str, str]] = []
         self.not_checked: List[Dict[str, str]] = []
         self.findings: List[Finding] = []
-        self.documented_command_directories: Dict[str, List[str]] = {}
+        self.documented_command_directories: DocumentedCommandDirectories = {}
 
     def run(self) -> Dict[str, Any]:
         root = self.find_repo_root()
@@ -1490,9 +1493,9 @@ def discover_documented_commands(
     package_scripts: Dict[str, str],
     make_targets: List[str],
     just_targets: List[str],
-) -> Tuple[Dict[str, List[str]], List[str], Dict[str, List[str]]]:
+) -> Tuple[Dict[str, List[str]], List[str], DocumentedCommandDirectories]:
     documented: Dict[str, List[str]] = defaultdict(list)
-    documented_command_directories: Dict[str, List[str]] = defaultdict(list)
+    documented_command_directories: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
     stale: List[str] = []
     for path in documented_command_files(root):
         rel = str(path.relative_to(root))
@@ -1559,7 +1562,10 @@ def discover_documented_commands(
                 )
             if stripped:
                 previous_text = stripped
-    return documented, stale, dict(documented_command_directories)
+    return documented, stale, {
+        evidence: dict(by_responsibility)
+        for evidence, by_responsibility in documented_command_directories.items()
+    }
 
 
 def documented_command_files(root: Path) -> Iterable[Path]:
@@ -1610,7 +1616,7 @@ def record_documented_command(
     command_base: Path,
     documented: Dict[str, List[str]],
     stale: List[str],
-    documented_command_directories: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
     rel: str,
     context: str,
     command: str,
@@ -1630,8 +1636,9 @@ def record_documented_command(
     command_directory = documented_command_directory(root, command_base)
     for responsibility in responsibilities:
         documented[responsibility].append(evidence)
-    if responsibilities and command_directory not in documented_command_directories[evidence]:
-        documented_command_directories[evidence].append(command_directory)
+        directories = documented_command_directories.setdefault(evidence, {}).setdefault(responsibility, [])
+        if command_directory not in directories:
+            directories.append(command_directory)
 
 
 def documented_command_directory(root: Path, command_base: Path) -> str:
@@ -3708,7 +3715,7 @@ def lifecycle_repo_owned_evidence(
     path: str,
     responsibility: str,
     scripts_check: Dict[str, Any],
-    documented_command_directories: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
     boundary: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     evidence: List[str] = []
@@ -3722,6 +3729,7 @@ def lifecycle_repo_owned_evidence(
                 root,
                 candidate,
                 path,
+                responsibility,
                 documented_candidates,
                 documented_command_directories,
             )
@@ -3744,7 +3752,7 @@ def lifecycle_documented_evidence(
     path: str,
     responsibility: str,
     scripts_check: Dict[str, Any],
-    documented_command_directories: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
     boundary: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     documented_candidates = set(scripts_check.get("documented_commands", {}).get(responsibility, []))
@@ -3755,6 +3763,7 @@ def lifecycle_documented_evidence(
             root,
             candidate,
             path,
+            responsibility,
             documented_candidates,
             documented_command_directories,
         )
@@ -3766,26 +3775,33 @@ def lifecycle_candidate_matches_path(
     root: Path,
     candidate: str,
     path: str,
+    responsibility: str,
     documented_candidates: set[str],
-    documented_command_directories: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
 ) -> bool:
     if lifecycle_candidate_scope_path(candidate) == path:
         return True
     if candidate not in documented_candidates:
         return False
-    return path in documented_candidate_scope_paths(root, candidate, documented_command_directories)
+    return path in documented_candidate_scope_paths(
+        root,
+        candidate,
+        responsibility,
+        documented_command_directories,
+    )
 
 
 def documented_candidate_scope_paths(
     root: Path,
     candidate: str,
-    documented_command_directories: Dict[str, List[str]],
+    responsibility: str,
+    documented_command_directories: DocumentedCommandDirectories,
 ) -> List[str]:
     _, _, command = candidate.partition(":")
     if not command:
         return []
     scope_paths: List[str] = []
-    for directory in documented_command_directories.get(candidate, ["."]):
+    for directory in documented_command_directories.get(candidate, {}).get(responsibility, ["."]):
         for scope_path in workflow_command_scope_paths(root, directory, command):
             if scope_path != "." and scope_path not in scope_paths:
                 scope_paths.append(scope_path)
@@ -3815,7 +3831,7 @@ def lifecycle_cell(
     responsibility: str,
     scripts_check: Dict[str, Any],
     workflow_commands: Dict[str, List[str]],
-    documented_command_directories: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
     boundary: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     evidence = lifecycle_repo_owned_evidence(
@@ -3854,7 +3870,7 @@ def lifecycle_server_cell(
     boundary: Dict[str, Any],
     scripts_check: Dict[str, Any],
     workflow_commands: Dict[str, List[str]],
-    documented_command_directories: Dict[str, List[str]],
+    documented_command_directories: DocumentedCommandDirectories,
 ) -> Dict[str, Any]:
     if boundary["kind"] in {
         "docs-site",
