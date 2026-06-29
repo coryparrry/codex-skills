@@ -189,7 +189,7 @@ PACKAGE_MANAGER_DIRECTORY_OPTIONS = {
 
 PACKAGE_MANAGER_WORKSPACE_OPTIONS = {
     "npm": {"-w", "--workspace"},
-    "pnpm": {"-F", "--filter"},
+    "pnpm": {"-F", "--filter", "--filter-prod"},
 }
 
 PACKAGE_MANAGER_ALL_WORKSPACES_OPTIONS = {
@@ -2878,6 +2878,12 @@ def resolve_declared_package_workspaces(
     for workspace_dir in declared:
         rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
         if normalized_without_dot == rel or exact_selector == f"./{rel}":
+            if relation_selector is not None:
+                return resolve_pnpm_relation_workspaces_for_bases(
+                    declared,
+                    [workspace_dir],
+                    relation_selector,
+                ) or None
             return [workspace_dir]
         if read_package_name(workspace_dir / "package.json") == exact_selector.strip():
             if relation_selector is not None:
@@ -2893,6 +2899,12 @@ def resolve_declared_package_workspaces(
         rel = str(workspace_dir.relative_to(package_root)).replace(os.sep, "/")
         if pnpm_filter_selector_matches_workspace(filter_selector, rel):
             matches.append(workspace_dir)
+    if relation_selector is not None and matches:
+        return resolve_pnpm_relation_workspaces_for_bases(
+            declared,
+            unique_paths(matches),
+            relation_selector,
+        ) or None
     return unique_paths(matches) or None
 
 
@@ -3116,7 +3128,11 @@ def is_pnpm_path_or_glob_selector(selector: str) -> bool:
 
 
 def pnpm_filter_selector_matches_workspace(selector: str, rel: str) -> bool:
-    return fnmatch.fnmatch(rel, selector) or fnmatch.fnmatch(f"./{rel}", selector)
+    return any(
+        fnmatch.fnmatch(rel, expanded_selector)
+        or fnmatch.fnmatch(f"./{rel}", expanded_selector)
+        for expanded_selector in expand_brace_glob(selector)
+    )
 
 
 def unique_paths(paths: List[Path]) -> List[Path]:
@@ -4580,16 +4596,9 @@ def lifecycle_server_cell(
     workflow_commands: Dict[str, List[str]],
     documented_command_directories: DocumentedCommandDirectories,
 ) -> Dict[str, Any]:
-    if boundary["kind"] in {
-        "docs-site",
-        "codex-skill",
-        "go-package",
-        "python-package",
-        "rust-crate",
-        "swift-package",
-    }:
+    if boundary["kind"] in {"docs-site", "codex-skill"}:
         return {"status": "not_applicable", "evidence": []}
-    return lifecycle_cell(
+    cell = lifecycle_cell(
         root,
         lifecycle_scope_path(boundary),
         "server",
@@ -4598,6 +4607,10 @@ def lifecycle_server_cell(
         documented_command_directories,
         boundary,
     )
+    if boundary["kind"] in {"go-package", "python-package", "rust-crate", "swift-package"}:
+        if cell["status"] == "missing" and not cell["evidence"]:
+            return {"status": "not_applicable", "evidence": []}
+    return cell
 
 
 def ci_coverage_cell(
