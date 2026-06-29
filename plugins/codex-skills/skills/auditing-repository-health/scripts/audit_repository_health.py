@@ -3429,7 +3429,7 @@ def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> O
         return []
     makefile, targets = parsed
     if parsed_make_command_target_missing(root, makefile, targets, read_make_targets(default_makefile(root))):
-        return None if makefile.is_file() else []
+        return [] if makefile.parent.resolve() == root.resolve() and not makefile.is_file() else None
     boundary = nearest_inventory_boundary(root, makefile.parent)
     if boundary is None:
         return []

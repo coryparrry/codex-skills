@@ -2688,6 +2688,43 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
             self.assertIn("packages/api", missing_focused_paths)
 
+    def test_missing_package_makefile_workflow_command_does_not_credit_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            package_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (package_dir / "go.mod").write_text("module example.com/api\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - working-directory: packages/api\n"
+                "        run: make test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+            invalid_evidence = ".github/workflows/ci.yml:make test"
+
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn("packages/api", missing_focused_paths)
+
     def test_workflow_job_defaults_run_working_directory_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
