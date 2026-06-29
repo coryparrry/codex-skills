@@ -3792,6 +3792,39 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
 
+    def test_documented_cd_go_package_command_counts_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                "Run API tests:\n\n"
+                "```sh\n"
+                "cd packages/api\n"
+                "go test ./...\n"
+                "```\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("documented", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn(
+                "README.md:go test ./...",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
+
     def test_workflow_folded_run_block_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
