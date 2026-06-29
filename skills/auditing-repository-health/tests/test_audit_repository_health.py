@@ -3179,6 +3179,58 @@ class AuditRepositoryHealthTests(unittest.TestCase):
         self.assertIn("Scope: packages/worker (package-specific)", result.stdout)
         self.assertIn("Evidence state: proven", result.stdout)
 
+    def test_nested_fixture_manifests_do_not_create_inventory_boundaries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            fixture_package = (
+                root
+                / "skills"
+                / "auditing-repository-health"
+                / "tests"
+                / "fixtures"
+                / "polyglot-monorepo"
+                / "packages"
+                / "worker"
+            )
+            top_level_example = root / "examples" / "real-package"
+            fixture_package.mkdir(parents=True)
+            top_level_example.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (fixture_package / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (top_level_example / "package.json").write_text(json.dumps({"name": "real-package"}) + "\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            boundary_paths = {
+                boundary["path"]
+                for boundary in report["checks"]["repository_inventory"]["boundaries"]
+            }
+            matrix_paths = {
+                row["path"]
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            missing_focused_paths = {
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            }
+
+            self.assertIn("examples/real-package", boundary_paths)
+            self.assertNotIn(
+                "skills/auditing-repository-health/tests/fixtures/polyglot-monorepo/packages/worker",
+                boundary_paths,
+            )
+            self.assertNotIn(
+                "skills/auditing-repository-health/tests/fixtures/polyglot-monorepo/packages/worker",
+                matrix_paths,
+            )
+            self.assertNotIn(
+                "skills/auditing-repository-health/tests/fixtures/polyglot-monorepo/packages/worker",
+                missing_focused_paths,
+            )
+
     def test_source_plugin_mirror_inventory_classification_wins_over_generic_monorepo(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3215,6 +3267,36 @@ class AuditRepositoryHealthTests(unittest.TestCase):
 
             self.assertEqual("single-repository", inventory["classification"])
             self.assertEqual("skill/plugin", inventory["purpose"])
+
+    def test_root_only_repository_lifecycle_matrix_includes_shared_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            scripts_dir = root / "scripts"
+            src_dir = root / "src"
+            scripts_dir.mkdir()
+            src_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (src_dir / "app.py").write_text("print('hello')\n")
+            (scripts_dir / "test.sh").write_text("#!/usr/bin/env bash\npython3 src/app.py\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertIn(".", matrix)
+            self.assertEqual("repository-root", matrix["."]["kind"])
+            self.assertEqual("generic", matrix["."]["ecosystem"])
+            self.assertEqual("root/shared", matrix["."]["scope_type"])
+            self.assertEqual("present", matrix["."]["focused_test"]["status"])
+            self.assertIn("scripts/test.sh", matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(".", missing_focused_paths)
 
     def test_workspace_targeted_root_ci_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3904,6 +3986,48 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
             self.assertEqual([], matrix["packages/worker"]["lint_format"]["evidence"])
+
+    def test_workflow_make_directory_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            api_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            (api_dir / "Makefile").write_text("test:\n\t@go test ./...\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: make -C packages/api test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/api"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/api"]["ci_coverage"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:make -C packages/api test",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+            self.assertIn(
+                ".github/workflows/ci.yml:make -C packages/api test",
+                matrix["packages/api"]["ci_coverage"]["evidence"],
+            )
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
 
     def test_root_go_test_explicit_package_paths_count_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:

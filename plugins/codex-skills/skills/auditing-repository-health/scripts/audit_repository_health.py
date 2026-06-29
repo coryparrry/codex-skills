@@ -55,6 +55,9 @@ GENERATED_PATTERNS = [
 ]
 
 NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
+TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
+TEST_ASSET_FIXTURE_DIRS = {"fixtures"}
+TEST_ASSET_EXAMPLE_DIRS = {"examples"}
 
 RESPONSIBILITY_PATHS = {
     "bootstrap": [
@@ -722,6 +725,8 @@ class Audit:
 
         for path in iter_files(root):
             rel = relative_path(root, path)
+            if is_nested_test_asset_boundary_manifest(root, path):
+                continue
             kind_and_ecosystem = inventory_boundary_kind(path)
             if kind_and_ecosystem is None:
                 continue
@@ -955,7 +960,7 @@ class Audit:
         rows = []
         workflow_commands = workflow_command_evidence(root)
         documented_command_directories = self.documented_command_directories
-        for boundary in inventory["boundaries"]:
+        for boundary in lifecycle_boundaries(inventory):
             path = boundary["path"]
             scope_path = lifecycle_scope_path(boundary)
             row = {
@@ -1233,6 +1238,19 @@ def relative_path(root: Path, path: Path) -> str:
     return "." if rel == "." else rel
 
 
+def is_nested_test_asset_boundary_manifest(root: Path, path: Path) -> bool:
+    try:
+        parts = path.relative_to(root).parts
+    except ValueError:
+        return False
+    for index, part in enumerate(parts[:-1]):
+        if part in TEST_ASSET_FIXTURE_DIRS:
+            return index == 0 or any(parent in TEST_ASSET_PARENT_DIRS for parent in parts[:index])
+        if part in TEST_ASSET_EXAMPLE_DIRS and any(parent in TEST_ASSET_PARENT_DIRS for parent in parts[:index]):
+            return True
+    return False
+
+
 def inventory_boundary_kind(path: Path) -> Optional[Tuple[str, str]]:
     if path.name == "package.json" and docs_site_package_manifest(path):
         return ("docs-site", "node")
@@ -1361,6 +1379,21 @@ def expects_package_focused_tests(boundary: Dict[str, Any]) -> bool:
         "docs-site",
         "infra-iac",
     }
+
+
+def lifecycle_boundaries(inventory: Dict[str, Any]) -> List[Dict[str, Any]]:
+    boundaries = list(inventory["boundaries"])
+    if boundaries:
+        return boundaries
+    return [
+        {
+            "path": ".",
+            "kind": "repository-root",
+            "ecosystem": "generic",
+            "scope_type": "root/shared",
+            "evidence": [],
+        }
+    ]
 
 
 def safe_read_text(path: Path, limit: int = 100_000) -> str:
@@ -3263,6 +3296,9 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     if tokens[0] in DIRECT_TEST_PATH_TOOLS:
         scope_paths = direct_test_tool_scope_paths(root, directory or ".", tokens)
         return scope_paths or [directory or "."]
+    if tokens[0] == "make":
+        scope_paths = make_command_scope_paths(root, directory or ".", tokens)
+        return scope_paths or [directory or "."]
     if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
         return [directory or "."]
     command_base = workflow_command_base(root, directory or ".")
@@ -3371,6 +3407,18 @@ def direct_test_tool_package_path(root: Path, command_base: Path, arg: str) -> O
     if resolved is None or not resolved.exists():
         return None
     return nearest_inventory_boundary(root, resolved)
+
+
+def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> List[str]:
+    command_base = workflow_command_base(root, directory)
+    parsed = parse_make_command(root, command_base, tokens[1:])
+    if parsed is None:
+        return []
+    makefile, _ = parsed
+    boundary = nearest_inventory_boundary(root, makefile.parent)
+    if boundary is None:
+        return []
+    return package_dirs_to_scope_paths(root, [boundary])
 
 
 def nearest_inventory_boundary(root: Path, path: Path) -> Optional[Path]:
@@ -3723,6 +3771,12 @@ def workflow_command_responsibilities(command: str) -> List[str]:
         if builtin_command:
             return classify_workflow_name(builtin_command)
     if tool in {"make", "just"}:
+        if tool == "make":
+            matches = set()
+            for target in make_command_targets_for_responsibility(tokens[1:]):
+                matches.update(classify_workflow_name(target))
+            if matches:
+                return sorted(matches)
         target = first_non_option(tokens[1:])
         if target is not None:
             return classify_workflow_name(target)
@@ -3733,6 +3787,14 @@ def workflow_command_responsibilities(command: str) -> List[str]:
     if tool in {"python", "python3"} and len(tokens) > 2 and tokens[1] == "-m":
         return classify_workflow_name(tokens[2])
     return classify_workflow_name(tool)
+
+
+def make_command_targets_for_responsibility(args: List[str]) -> List[str]:
+    parsed = parse_make_command(Path("/"), Path("/"), args)
+    if parsed is None:
+        return []
+    _, targets = parsed
+    return targets
 
 
 def workflow_command_matches_boundary(command: str, boundary: Optional[Dict[str, Any]]) -> bool:
