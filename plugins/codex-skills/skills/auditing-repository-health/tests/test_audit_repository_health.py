@@ -3729,6 +3729,56 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
             self.assertIn("packages/api", missing_focused_paths)
 
+    def test_unresolved_yarn_workspace_workflow_command_does_not_credit_root_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            api_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "workspace-root",
+                        "private": True,
+                        "workspaces": ["packages/*"],
+                    }
+                )
+                + "\n"
+            )
+            (api_dir / "package.json").write_text(
+                json.dumps({"name": "api", "private": True}) + "\n"
+            )
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: yarn workspace missing test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+            invalid_evidence = ".github/workflows/ci.yml:yarn workspace missing test"
+
+            self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["."]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn("packages/api", missing_focused_paths)
+
     def test_npm_all_workspaces_with_workspace_selector_ci_credits_only_selected_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

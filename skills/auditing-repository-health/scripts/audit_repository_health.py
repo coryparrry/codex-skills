@@ -3584,6 +3584,8 @@ def package_manager_command_has_explicit_scope(tokens: List[str]) -> bool:
     if not tokens:
         return False
     tool = tokens[0]
+    if tool == "yarn" and len(tokens) > 1 and normalize_package_manager_command(tool, tokens[1]) == "workspace":
+        return True
     index = 1
     while index < len(tokens):
         arg = tokens[index]
