@@ -3584,16 +3584,20 @@ def package_manager_command_has_explicit_scope(tokens: List[str]) -> bool:
     if not tokens:
         return False
     tool = tokens[0]
-    index = 1
-    while index < len(tokens):
-        arg = tokens[index]
+    args = tokens[1:]
+    index = 0
+    while index < len(args):
+        arg = args[index]
         if arg == "--":
             break
-        if tool == "yarn" and normalize_package_manager_command(tool, arg) == "workspace":
-            return True
         if package_manager_arg_is_scope_option(tool, arg):
             return True
-        index += 1
+        if is_package_manager_no_value_option(arg):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            return False
+        return tool == "yarn" and normalize_package_manager_command(tool, arg) == "workspace"
     return False
 
 

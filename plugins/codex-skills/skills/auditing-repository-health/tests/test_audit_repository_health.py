@@ -3785,6 +3785,34 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
             self.assertIn("packages/api", missing_focused_paths)
 
+    def test_yarn_option_value_named_workspace_keeps_root_scope_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: yarn --cache-folder workspace test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            evidence = ".github/workflows/ci.yml:yarn --cache-folder workspace test"
+
+            self.assertEqual("present", matrix["."]["ci_coverage"]["status"])
+            self.assertIn(evidence, matrix["."]["ci_coverage"]["evidence"])
+
     def test_npm_all_workspaces_with_workspace_selector_ci_credits_only_selected_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
