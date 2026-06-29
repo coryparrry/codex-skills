@@ -1907,7 +1907,9 @@ def simple_cd_command_target(command: str) -> Optional[str]:
         tokens = command.split()
     if not tokens or tokens[0] != "cd":
         return None
-    return " ".join(tokens[1:])
+    if len(tokens) != 2:
+        return ""
+    return tokens[1]
 
 
 def documented_shell_command_records(

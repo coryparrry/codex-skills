@@ -3541,6 +3541,38 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/worker"]["focused_test"]["status"])
             self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
 
+    def test_workflow_multi_argument_cd_chain_does_not_credit_joined_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "foo bar"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'joined-path'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: cd foo bar && pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("missing", matrix["foo bar"]["focused_test"]["status"])
+            self.assertEqual([], matrix["foo bar"]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["foo bar"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["foo bar"]["ci_coverage"]["evidence"])
+
     def test_workflow_literal_run_block_nested_cd_does_not_scope_later_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
