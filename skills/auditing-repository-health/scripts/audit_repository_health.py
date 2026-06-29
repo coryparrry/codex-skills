@@ -3697,7 +3697,6 @@ def package_manager_parse_failure_has_unresolved_directory(root: Path, command_b
     if not tokens:
         return False
     tool = tokens[0]
-    directory = command_base
     args = tokens[1:]
     index = 0
     while index < len(args):
@@ -3706,10 +3705,8 @@ def package_manager_parse_failure_has_unresolved_directory(root: Path, command_b
         directory_option = package_manager_directory_option_value(tool, args, index)
         if directory_option is not None:
             value, index = directory_option
-            resolved = resolve_repo_path(root, directory, value)
-            if resolved is None:
+            if resolve_repo_path(root, command_base, value) is None:
                 return True
-            directory = resolved
             continue
         if args[index] in PACKAGE_MANAGER_DIRECTORY_OPTIONS.get(tool, set()):
             return True
