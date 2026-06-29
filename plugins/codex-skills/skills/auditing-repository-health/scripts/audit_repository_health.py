@@ -58,6 +58,15 @@ NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
 TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
 TEST_ASSET_FIXTURE_DIRS = {"fixtures", "test-data", "testdata"}
 TEST_ASSET_EXAMPLE_DIRS = {"examples"}
+PACKAGE_DOCUMENTATION_BOUNDARY_KINDS = {
+    "go-package",
+    "jvm-build",
+    "node-workspace-root",
+    "python-package",
+    "ruby-package",
+    "rust-crate",
+    "swift-package",
+}
 
 RESPONSIBILITY_PATHS = {
     "bootstrap": [
@@ -960,7 +969,12 @@ class Audit:
         rows = []
         workflow_commands = workflow_command_evidence(root)
         documented_command_directories = self.documented_command_directories
-        for boundary in lifecycle_boundaries(inventory):
+        include_root_shared = should_include_root_shared_lifecycle_boundary(
+            inventory,
+            scripts_check,
+            workflow_commands,
+        )
+        for boundary in lifecycle_boundaries(inventory, include_root_shared):
             path = boundary["path"]
             scope_path = lifecycle_scope_path(boundary)
             row = {
@@ -1111,10 +1125,10 @@ class Audit:
 
     def check_hygiene(self, root: Path) -> Dict[str, Any]:
         branch_result = self.git(["rev-parse", "--abbrev-ref", "HEAD"], root)
-        status_result = self.git(["status", "--short", "--branch", "--untracked-files=all"], root)
+        status_result = self.git(["status", "--short", "--branch", "--untracked-files=all", "--", "."], root)
         count_result = self.git(["count-objects", "-vH"], root)
-        tracked_result = self.git(["ls-files", "-z"], root)
-        ignored_result = self.git(["status", "--ignored", "--short"], root)
+        tracked_result = self.git(["ls-files", "-z", "--", "."], root)
+        ignored_result = self.git(["status", "--ignored", "--short", "--", "."], root)
 
         branch = branch_result.stdout.strip() if branch_result.returncode == 0 else None
         status_lines = status_result.stdout.splitlines() if status_result.returncode == 0 else []
@@ -1313,8 +1327,7 @@ def classify_repository_inventory(boundaries: List[Dict[str, Any]]) -> str:
         for boundary in boundaries
         if counts_toward_repository_classification(boundary)
     }
-    ecosystems = {boundary["ecosystem"] for boundary in boundaries}
-    if len(boundary_roots) >= 2 or len(ecosystems) >= 3:
+    if len(boundary_roots) >= 2:
         return "monorepo"
     return "single-repository"
 
@@ -1381,19 +1394,56 @@ def expects_package_focused_tests(boundary: Dict[str, Any]) -> bool:
     }
 
 
-def lifecycle_boundaries(inventory: Dict[str, Any]) -> List[Dict[str, Any]]:
+def lifecycle_boundaries(
+    inventory: Dict[str, Any],
+    include_root_shared: bool = False,
+) -> List[Dict[str, Any]]:
     boundaries = list(inventory["boundaries"])
+    if include_root_shared and not any(boundary["path"] == "." for boundary in boundaries):
+        boundaries.insert(0, root_shared_lifecycle_boundary())
     if boundaries:
         return boundaries
-    return [
-        {
-            "path": ".",
-            "kind": "repository-root",
-            "ecosystem": "generic",
-            "scope_type": "root/shared",
-            "evidence": [],
-        }
-    ]
+    return [root_shared_lifecycle_boundary()]
+
+
+def root_shared_lifecycle_boundary() -> Dict[str, Any]:
+    return {
+        "path": ".",
+        "kind": "repository-root",
+        "ecosystem": "generic",
+        "scope_type": "root/shared",
+        "evidence": [],
+    }
+
+
+def should_include_root_shared_lifecycle_boundary(
+    inventory: Dict[str, Any],
+    scripts_check: Dict[str, Any],
+    workflow_commands: Dict[str, List[str]],
+) -> bool:
+    boundaries = inventory["boundaries"]
+    if any(boundary["path"] == "." for boundary in boundaries):
+        return False
+    if inventory["classification"] in {"monorepo", "source-plugin-mirror"}:
+        return True
+    if workflow_commands.get("."):
+        return True
+    return scripts_check_has_root_owned_lifecycle_candidate(scripts_check)
+
+
+def scripts_check_has_root_owned_lifecycle_candidate(scripts_check: Dict[str, Any]) -> bool:
+    documented_candidates = {
+        candidate
+        for candidates in scripts_check.get("documented_commands", {}).values()
+        for candidate in candidates
+    }
+    for responsibility_info in scripts_check.get("responsibilities", {}).values():
+        for candidate in responsibility_info.get("candidates", []):
+            if candidate in documented_candidates:
+                continue
+            if lifecycle_candidate_scope_path(candidate) == ".":
+                return True
+    return False
 
 
 def safe_read_text(path: Path, limit: int = 100_000) -> str:
@@ -1551,18 +1601,20 @@ def discover_documented_commands(
     documented: Dict[str, List[str]] = defaultdict(list)
     documented_command_directories: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
     stale: List[str] = []
-    for path in documented_command_files(root):
+    package_doc_boundaries = package_documentation_boundaries(root)
+    for path in documented_command_files(root, package_doc_boundaries):
         rel = str(path.relative_to(root))
+        default_command_base = documented_command_file_base(root, path, package_doc_boundaries)
         in_fence = False
         fence_context = ""
-        fence_command_base = root
+        fence_command_base = default_command_base
         previous_text = ""
         for line in safe_read_text(path, limit=300_000).splitlines():
             stripped = line.strip()
             if stripped.startswith(("```", "~~~")):
                 in_fence = not in_fence
                 fence_context = previous_text if in_fence else ""
-                fence_command_base = root
+                fence_command_base = default_command_base
                 continue
             if in_fence:
                 if is_fenced_reference_context(fence_context):
@@ -1603,7 +1655,7 @@ def discover_documented_commands(
             for command, context in commands:
                 record_documented_command(
                     root,
-                    root,
+                    default_command_base,
                     documented,
                     stale,
                     documented_command_directories,
@@ -1622,7 +1674,7 @@ def discover_documented_commands(
     }
 
 
-def documented_command_files(root: Path) -> Iterable[Path]:
+def documented_command_files(root: Path, package_doc_boundaries: List[Path]) -> Iterable[Path]:
     root_prefixes = ("README", "CONTRIBUTING", "DEVELOPMENT", "SETUP", "INSTALL")
     root_instruction_docs = {"AGENTS.MD", "CLAUDE.MD", "GEMINI.MD"}
     nested_prefixes = (
@@ -1637,6 +1689,46 @@ def documented_command_files(root: Path) -> Iterable[Path]:
             continue
         if rel.parts[0] == "docs" and upper_name.startswith(nested_prefixes):
             yield path
+            continue
+        if package_documented_command_file(root, path, package_doc_boundaries, nested_prefixes):
+            yield path
+
+
+def package_documentation_boundaries(root: Path) -> List[Path]:
+    boundaries = []
+    for path in iter_files(root):
+        kind_and_ecosystem = inventory_boundary_kind(path)
+        if kind_and_ecosystem is None or is_nested_test_asset_boundary_manifest(root, path):
+            continue
+        kind, _ = kind_and_ecosystem
+        if kind not in PACKAGE_DOCUMENTATION_BOUNDARY_KINDS or path.parent == root:
+            continue
+        boundaries.append(path.parent)
+    return sorted(unique_paths(boundaries), key=lambda item: len(item.relative_to(root).parts), reverse=True)
+
+
+def package_documented_command_file(
+    root: Path,
+    path: Path,
+    package_doc_boundaries: List[Path],
+    nested_prefixes: Tuple[str, ...],
+) -> bool:
+    if not path.is_file() or path.suffix.lower() != ".md":
+        return False
+    if not path.name.upper().startswith(nested_prefixes):
+        return False
+    return documented_command_file_base(root, path, package_doc_boundaries) != root
+
+
+def documented_command_file_base(root: Path, path: Path, package_doc_boundaries: List[Path]) -> Path:
+    resolved_path = path.resolve()
+    for boundary in package_doc_boundaries:
+        try:
+            resolved_path.relative_to(boundary.resolve())
+        except ValueError:
+            continue
+        return boundary
+    return root
 
 
 def public_markdown_files(root: Path) -> Iterable[Path]:

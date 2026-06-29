@@ -2389,6 +2389,28 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("node-workspace-root", boundaries["."]["kind"])
             self.assertEqual("go-package", boundaries["packages/api"]["kind"])
 
+    def test_single_root_mixed_repository_remains_single_repository(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "mixed-root", "scripts": {"test": "node index.js"}}) + "\n"
+            )
+            (root / "pyproject.toml").write_text("[project]\nname = \"mixed-root\"\n")
+            (root / "Dockerfile").write_text("FROM python:3.12-slim\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            inventory = report["checks"]["repository_inventory"]
+
+            self.assertEqual("single-repository", inventory["classification"])
+            self.assertIn(inventory["purpose"], {"mixed", "service"})
+            self.assertEqual({"docker", "node", "python"}, set(inventory["ecosystems"]))
+
     def test_single_root_static_site_remains_single_repository(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2515,6 +2537,35 @@ class AuditRepositoryHealthTests(unittest.TestCase):
 
             self.assertEqual(str(project_dir.resolve()), report["repo"])
             self.assertIn(".github/workflows/service-ci.yml", report["checks"]["validation"]["ci_workflows"])
+
+    def test_nested_standalone_project_hygiene_ignores_parent_worktree_dirt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            project_dir = root / "projects" / "service"
+            project_workflows = project_dir / ".github" / "workflows"
+            project_workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Parent\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (project_dir / "README.md").write_text("# Service\n")
+            (project_dir / "package.json").write_text('{"scripts":{"test":"echo service"}}\n')
+            (project_workflows / "service-ci.yml").write_text("name: service-ci\n")
+            self.commit_all(root)
+            (root / "outside.txt").write_text("outside\n")
+            (project_dir / "inside.txt").write_text("inside\n")
+
+            report = self.audit_report(project_dir)
+            hygiene = report["checks"]["hygiene"]
+            dirty_findings = [
+                finding
+                for finding in report["findings"]
+                if finding["title"] == "worktree has uncommitted changes"
+            ]
+
+            self.assertEqual(str(project_dir.resolve()), report["repo"])
+            self.assertIn("?? inside.txt", hygiene["dirty_entries"])
+            self.assertNotIn("?? ../../outside.txt", hygiene["dirty_entries"])
+            self.assertEqual(["?? inside.txt"], dirty_findings[0]["evidence"])
 
     def test_workflow_direct_tools_count_for_matching_lifecycle_cells(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3404,6 +3455,39 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("scripts/test.sh", matrix["."]["focused_test"]["evidence"])
             self.assertNotIn(".", missing_focused_paths)
 
+    def test_package_only_monorepo_includes_root_shared_lifecycle_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            scripts_dir = root / "scripts"
+            api_dir = root / "packages" / "api"
+            worker_dir = root / "packages" / "worker"
+            scripts_dir.mkdir()
+            api_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (scripts_dir / "validate.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            (worker_dir / "pyproject.toml").write_text("[project]\nname = \"worker\"\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("monorepo", report["checks"]["repository_inventory"]["classification"])
+            self.assertIn(".", matrix)
+            self.assertEqual("repository-root", matrix["."]["kind"])
+            self.assertEqual("root/shared", matrix["."]["scope_type"])
+            self.assertEqual("present", matrix["."]["full_validation"]["status"])
+            self.assertIn("scripts/validate.sh", matrix["."]["full_validation"]["evidence"])
+            self.assertNotIn(".", missing_focused_paths)
+
     def test_workspace_targeted_root_ci_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -4009,6 +4093,36 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("documented", matrix["packages/api"]["focused_test"]["status"])
             self.assertIn(
                 "README.md:go test ./...",
+                matrix["packages/api"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/api", [item["path"] for item in findings])
+
+    def test_package_readme_go_command_counts_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            api_dir = root / "packages" / "api"
+            api_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (api_dir / "README.md").write_text(
+                "# API\n\nRun focused tests with `go test ./...`.\n"
+            )
+            (api_dir / "go.mod").write_text("module example.com/api\n")
+            (api_dir / "api.go").write_text("package api\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("documented", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn(
+                "packages/api/README.md:go test ./...",
                 matrix["packages/api"]["focused_test"]["evidence"],
             )
             self.assertNotIn("packages/api", [item["path"] for item in findings])
