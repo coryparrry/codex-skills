@@ -217,6 +217,14 @@ PACKAGE_MANAGER_TOOL_NO_VALUE_OPTIONS = {
     "npm": {"--foreground-scripts"},
 }
 
+PACKAGE_MANAGER_VALUE_OPTIONS = {
+    "--loglevel",
+}
+
+PACKAGE_MANAGER_INVALID_SCOPED_OPTIONS = {
+    "pnpm": {"--foreground-scripts"},
+}
+
 PACKAGE_MANAGER_INSTALL_VALUE_OPTIONS = {
     "--allow-git",
     "--before",
@@ -1985,7 +1993,7 @@ def package_manager_target_missing(
 ) -> bool:
     parsed = parse_package_manager_command(root, command_base, tokens)
     if parsed is None:
-        return package_manager_command_has_explicit_scope(tokens)
+        return package_manager_parse_failure_is_invalid_scoped_command(tokens)
     if parsed.package_dirs is None:
         return True
     if package_manager_builtin_target_missing(root, command_base, tokens):
@@ -2106,6 +2114,10 @@ def package_manager_builtin_command_args(tokens: List[str]) -> List[str]:
         if is_package_manager_no_value_option(arg, tool):
             index += 1
             continue
+        value_option = package_manager_value_option_value(tool, args, index)
+        if value_option is not None:
+            index = value_option
+            continue
         if arg.startswith("-"):
             return []
         return args[index:]
@@ -2141,6 +2153,10 @@ def npm_ci_lockfile_root(root: Path, command_base: Path, tokens: List[str]) -> O
         arg = args[index]
         if is_package_manager_no_value_option(arg, "npm"):
             index += 1
+            continue
+        value_option = package_manager_value_option_value("npm", args, index)
+        if value_option is not None:
+            index = value_option
             continue
         if arg.startswith("-"):
             return None
@@ -2194,6 +2210,10 @@ def parse_package_manager_command(
         arg = args[index]
         if is_package_manager_no_value_option(arg, tool):
             index += 1
+            continue
+        value_option = package_manager_value_option_value(tool, args, index)
+        if value_option is not None:
+            index = value_option
             continue
         if arg.startswith("-"):
             return None
@@ -2262,6 +2282,10 @@ def package_manager_run_workspace_selection(tool: str, tokens: List[str]) -> Wor
         if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
+        value_option = package_manager_value_option_value(tool, tokens, index)
+        if value_option is not None:
+            index = value_option
+            continue
         if token.startswith("-") or saw_script:
             break
         saw_script = True
@@ -2297,6 +2321,10 @@ def package_manager_post_command_workspace_selection(tool: str, tokens: List[str
             continue
         if is_package_manager_no_value_option(token, tool):
             index += 1
+            continue
+        value_option = package_manager_value_option_value(tool, tokens, index)
+        if value_option is not None:
+            index = value_option
             continue
         break
     return selection
@@ -2347,6 +2375,10 @@ def package_manager_run_command_directory(root: Path, directory: Path, tool: str
         if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
+        value_option = package_manager_value_option_value(tool, tokens, index)
+        if value_option is not None:
+            index = value_option
+            continue
         if token.startswith("-") or saw_script:
             break
         saw_script = True
@@ -2380,6 +2412,10 @@ def package_manager_post_command_directory(root: Path, directory: Path, tool: st
         if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
+        value_option = package_manager_value_option_value(tool, tokens, index)
+        if value_option is not None:
+            index = value_option
+            continue
         break
     return directory
 
@@ -2408,6 +2444,10 @@ def first_package_manager_run_arg(tool: str, tokens: List[str]) -> Optional[str]
             continue
         if is_package_manager_no_value_option(token, tool):
             index += 1
+            continue
+        value_option = package_manager_value_option_value(tool, tokens, index)
+        if value_option is not None:
+            index = value_option
             continue
         if token.startswith("-"):
             return None
@@ -2447,6 +2487,10 @@ def package_manager_run_without_script(command: str) -> bool:
         if is_package_manager_no_value_option(token, tool):
             index += 1
             continue
+        value_option = package_manager_value_option_value(tool, args, index)
+        if value_option is not None:
+            index = value_option
+            continue
         if token.startswith("-"):
             return False
         command = normalize_package_manager_command(tool, token)
@@ -2468,6 +2512,20 @@ def package_manager_workspace_option_value(
     for option in options:
         if arg.startswith(f"{option}="):
             return arg.split("=", 1)[1], index + 1
+    return None
+
+
+def package_manager_value_option_value(
+    tool: str,
+    args: List[str],
+    index: int,
+) -> Optional[int]:
+    arg = args[index]
+    options = PACKAGE_MANAGER_VALUE_OPTIONS
+    if arg in options:
+        return index + 2 if index + 1 < len(args) else len(args)
+    if any(arg.startswith(f"{option}=") for option in options):
+        return index + 1
     return None
 
 
@@ -3606,9 +3664,26 @@ def package_manager_command_has_explicit_scope(tokens: List[str]) -> bool:
         if is_package_manager_no_value_option(arg, tool):
             index += 1
             continue
+        value_option = package_manager_value_option_value(tool, args, index)
+        if value_option is not None:
+            index = value_option
+            continue
         if arg.startswith("-"):
             return package_manager_args_contain_scope_option(tool, args, index + 1)
         return tool == "yarn" and normalize_package_manager_command(tool, arg) == "workspace"
+    return False
+
+
+def package_manager_parse_failure_is_invalid_scoped_command(tokens: List[str]) -> bool:
+    if not package_manager_command_has_explicit_scope(tokens):
+        return False
+    tool = tokens[0]
+    invalid_options = PACKAGE_MANAGER_INVALID_SCOPED_OPTIONS.get(tool, set())
+    for arg in tokens[1:]:
+        if arg == "--":
+            return False
+        if arg in invalid_options or any(arg.startswith(f"{option}=") for option in invalid_options):
+            return True
     return False
 
 
@@ -4134,6 +4209,14 @@ def lifecycle_candidate_matches_path(
     documented_command_directories: DocumentedCommandDirectories,
 ) -> bool:
     if lifecycle_candidate_scope_path(candidate) == path:
+        if path == "." and documented_candidate_has_explicit_package_manager_scope(candidate):
+            return path in documented_candidate_scope_paths(
+                root,
+                candidate,
+                responsibility,
+                documented_command_directories,
+                include_root=True,
+            )
         return True
     if candidate not in documented_candidates:
         return False
@@ -4150,6 +4233,7 @@ def documented_candidate_scope_paths(
     candidate: str,
     responsibility: str,
     documented_command_directories: DocumentedCommandDirectories,
+    include_root: bool = False,
 ) -> List[str]:
     _, _, command = candidate.partition(":")
     if not command:
@@ -4157,9 +4241,23 @@ def documented_candidate_scope_paths(
     scope_paths: List[str] = []
     for directory in documented_command_directories.get(candidate, {}).get(responsibility, ["."]):
         for scope_path in workflow_command_scope_paths(root, directory, command):
-            if scope_path != "." and scope_path not in scope_paths:
+            if (include_root or scope_path != ".") and scope_path not in scope_paths:
                 scope_paths.append(scope_path)
     return scope_paths
+
+
+def documented_candidate_has_explicit_package_manager_scope(candidate: str) -> bool:
+    _, _, command = candidate.partition(":")
+    command = command_without_leading_env_assignments(command)
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    return bool(
+        tokens
+        and tokens[0] in {"npm", "pnpm", "yarn", "bun"}
+        and package_manager_command_has_explicit_scope(tokens)
+    )
 
 
 def lifecycle_candidate_scope_path(candidate: str) -> str:

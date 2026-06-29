@@ -832,6 +832,58 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertNotIn(evidence, matrix["."]["focused_test"]["evidence"])
             self.assertNotIn(evidence, matrix["packages/api"]["focused_test"]["evidence"])
 
+    def test_value_option_scoped_npm_documented_command_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            api_dir = root / "packages" / "api"
+            self.init_repo(root)
+            api_dir.mkdir(parents=True)
+            command = "npm --loglevel warn --workspace api test"
+            evidence = f"README.md:{command}"
+            (root / "README.md").write_text(
+                "# Example\n\n"
+                f"Run API tests with `{command}`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "workspace-root",
+                        "private": True,
+                        "workspaces": ["packages/*"],
+                    }
+                )
+                + "\n"
+            )
+            (api_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "api",
+                        "private": True,
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            stale_evidence = [
+                item
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for item in finding["evidence"]
+            ]
+            documented_tests = report["checks"]["scripts"]["documented_commands"].get("test", [])
+
+            self.assertNotIn(evidence, stale_evidence)
+            self.assertIn(evidence, documented_tests)
+            self.assertEqual("present", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn(evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(evidence, matrix["."]["focused_test"]["evidence"])
+
     def test_post_subcommand_npm_prefix_options_select_package_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
