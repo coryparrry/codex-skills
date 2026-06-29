@@ -56,7 +56,7 @@ GENERATED_PATTERNS = [
 
 NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
 TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
-TEST_ASSET_FIXTURE_DIRS = {"fixtures"}
+TEST_ASSET_FIXTURE_DIRS = {"fixtures", "test-data", "testdata"}
 TEST_ASSET_EXAMPLE_DIRS = {"examples"}
 
 RESPONSIBILITY_PATHS = {
@@ -1418,6 +1418,8 @@ def read_package_scripts(path: Path) -> Dict[str, str]:
 def read_package_script_sources(root: Path) -> Dict[str, List[str]]:
     sources: Dict[str, List[str]] = defaultdict(list)
     for path in iter_files(root, "package.json"):
+        if is_nested_test_asset_boundary_manifest(root, path):
+            continue
         scripts = read_package_scripts(path)
         if not scripts:
             continue
@@ -3308,7 +3310,7 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     if tokens[0] == "make":
         scope_paths = make_command_scope_paths(root, directory or ".", tokens)
         if scope_paths is None:
-            return [directory or "."] if directory in {"", "."} else []
+            return []
         return scope_paths or [directory or "."]
     if tokens[0] not in {"npm", "pnpm", "yarn", "bun"}:
         return [directory or "."]
@@ -3427,7 +3429,7 @@ def make_command_scope_paths(root: Path, directory: str, tokens: List[str]) -> O
         return []
     makefile, targets = parsed
     if parsed_make_command_target_missing(root, makefile, targets, read_make_targets(default_makefile(root))):
-        return None
+        return None if makefile.is_file() else []
     boundary = nearest_inventory_boundary(root, makefile.parent)
     if boundary is None:
         return []

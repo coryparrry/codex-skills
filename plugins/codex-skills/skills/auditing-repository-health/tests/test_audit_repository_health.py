@@ -2649,6 +2649,45 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("packages/worker/package.json:test", matrix["packages/worker"]["focused_test"]["evidence"])
             self.assertIn("packages/worker/package.json:build", matrix["packages/worker"]["build_package"]["evidence"])
 
+    def test_invalid_make_workflow_command_does_not_credit_root_or_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "api"
+            workflows = root / ".github" / "workflows"
+            package_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text('{"scripts": {"lint": "eslint ."}}\n')
+            (package_dir / "go.mod").write_text("module example.com/api\n")
+            (package_dir / "Makefile").write_text("build:\n\tgo build ./...\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: make -C packages/api test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            missing_focused_paths = [
+                item["path"]
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+            invalid_evidence = ".github/workflows/ci.yml:make -C packages/api test"
+
+            self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["."]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
+            self.assertIn("packages/api", missing_focused_paths)
+
     def test_workflow_job_defaults_run_working_directory_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3230,6 +3269,36 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 "skills/auditing-repository-health/tests/fixtures/polyglot-monorepo/packages/worker",
                 missing_focused_paths,
             )
+
+    def test_nested_fixture_package_scripts_do_not_satisfy_repo_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            fixture_package = root / "tests" / "fixtures" / "demo"
+            fixture_package.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("print('hello')\n")
+            (fixture_package / "package.json").write_text(
+                json.dumps({"scripts": {"test": "vitest run", "ci": "vitest run && tsc"}}) + "\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            scripts = report["checks"]["scripts"]
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
+
+            self.assertNotIn("test", scripts["package_script_sources"])
+            self.assertNotIn("ci", scripts["package_script_sources"])
+            self.assertEqual("missing", scripts["responsibilities"]["test"]["status"])
+            self.assertEqual("missing", scripts["responsibilities"]["cibuild"]["status"])
+            self.assertFalse(validation["has_focused_tests"])
+            self.assertFalse(validation["has_full_gate"])
+            self.assertIn("no test command or script", titles)
+            self.assertIn("no CI or full validation entry point", titles)
+            self.assertIn("no reusable closeout gate", titles)
 
     def test_source_plugin_mirror_inventory_classification_wins_over_generic_monorepo(self):
         with tempfile.TemporaryDirectory() as tmp:
