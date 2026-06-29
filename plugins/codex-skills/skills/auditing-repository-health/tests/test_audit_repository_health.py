@@ -3760,6 +3760,7 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 "    runs-on: ubuntu-latest\n"
                 "    steps:\n"
                 "      - run: yarn workspace missing test\n"
+                "      - run: yarn --silent workspace missing test\n"
             )
             self.commit_all(root)
 
@@ -3771,11 +3772,16 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 if item["title"] == "missing focused test coverage"
             ]
             invalid_evidence = ".github/workflows/ci.yml:yarn workspace missing test"
+            invalid_optioned_evidence = ".github/workflows/ci.yml:yarn --silent workspace missing test"
 
             self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
             self.assertNotIn(invalid_evidence, matrix["."]["ci_coverage"]["evidence"])
             self.assertNotIn(invalid_evidence, matrix["packages/api"]["focused_test"]["evidence"])
             self.assertNotIn(invalid_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_optioned_evidence, matrix["."]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_optioned_evidence, matrix["."]["ci_coverage"]["evidence"])
+            self.assertNotIn(invalid_optioned_evidence, matrix["packages/api"]["focused_test"]["evidence"])
+            self.assertNotIn(invalid_optioned_evidence, matrix["packages/api"]["ci_coverage"]["evidence"])
             self.assertEqual("missing", matrix["packages/api"]["focused_test"]["status"])
             self.assertIn("packages/api", missing_focused_paths)
 
