@@ -1892,7 +1892,7 @@ def looks_like_command(command: str) -> bool:
 
 def command_changed_directory(root: Path, command_base: Path, command: str) -> Optional[Path]:
     target = simple_cd_command_target(command)
-    if target is None:
+    if target is None or not target:
         return None
     directory = resolve_repo_path(root, command_base, target)
     if directory is None or not directory.is_dir():
@@ -1905,9 +1905,9 @@ def simple_cd_command_target(command: str) -> Optional[str]:
         tokens = shlex.split(command)
     except ValueError:
         tokens = command.split()
-    if len(tokens) != 2 or tokens[0] != "cd":
+    if not tokens or tokens[0] != "cd":
         return None
-    return tokens[1]
+    return " ".join(tokens[1:])
 
 
 def documented_shell_command_records(
