@@ -3311,11 +3311,12 @@ def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_in
 def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple[str, List[str]]:
     directory = normalize_workflow_directory(default_directory)
     commands: List[str] = []
+    step_key_indent = workflow_step_key_indent(lines)
     index = 0
     while index < len(lines):
         line = lines[index]
         stripped = line.strip()
-        if leading_spaces(line) != 0:
+        if leading_spaces(line) != step_key_indent:
             index += 1
             continue
         if stripped.startswith("working-directory:"):
@@ -3330,7 +3331,7 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
                 index += 1
                 while index < len(lines):
                     block_line = lines[index]
-                    if block_line.strip() and leading_spaces(block_line) == 0:
+                    if block_line.strip() and leading_spaces(block_line) <= step_key_indent:
                         break
                     block_lines.append(block_line)
                     index += 1
@@ -3341,6 +3342,14 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> Tuple
                 commands.append(command)
         index += 1
     return normalize_workflow_directory(directory), commands
+
+
+def workflow_step_key_indent(lines: List[str]) -> int:
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            return leading_spaces(line)
+    return 0
 
 
 def workflow_block_scalar_style(value: str) -> Optional[str]:

@@ -2980,6 +2980,40 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual([], matrix["packages/worker"]["focused_test"]["evidence"])
             self.assertIn("packages/worker", [item["path"] for item in findings])
 
+    def test_indented_top_level_workflow_step_keys_still_count_as_run_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      -   working-directory: packages/worker\n"
+                "          run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pytest",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+
     def test_polyglot_monorepo_reports_scoped_missing_focused_test_finding(self):
         fixture = Path(__file__).resolve().parent / "fixtures" / "polyglot-monorepo"
 
