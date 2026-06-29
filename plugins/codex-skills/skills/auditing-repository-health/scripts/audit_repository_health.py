@@ -1891,16 +1891,23 @@ def looks_like_command(command: str) -> bool:
 
 
 def command_changed_directory(root: Path, command_base: Path, command: str) -> Optional[Path]:
+    target = simple_cd_command_target(command)
+    if target is None:
+        return None
+    directory = resolve_repo_path(root, command_base, target)
+    if directory is None or not directory.is_dir():
+        return None
+    return directory
+
+
+def simple_cd_command_target(command: str) -> Optional[str]:
     try:
         tokens = shlex.split(command)
     except ValueError:
         tokens = command.split()
     if len(tokens) != 2 or tokens[0] != "cd":
         return None
-    directory = resolve_repo_path(root, command_base, tokens[1])
-    if directory is None or not directory.is_dir():
-        return None
-    return directory
+    return tokens[1]
 
 
 def documented_shell_command_records(
@@ -1916,6 +1923,8 @@ def documented_shell_command_records(
         if changed_directory is not None:
             current_base = changed_directory
             continue
+        if simple_cd_command_target(part) is not None:
+            break
         records.append((current_base, part))
     return current_base, records
 
@@ -4181,18 +4190,16 @@ def workflow_shell_command_records(
         if changed_directory is not None:
             current_directory = changed_directory
             continue
+        if simple_cd_command_target(part) is not None:
+            break
         records.append((current_directory, part))
     return current_directory, records
 
 
 def workflow_simple_cd_directory(current_directory: str, command: str) -> Optional[str]:
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
+    target = simple_cd_command_target(command)
+    if target is None:
         return None
-    if len(tokens) != 2 or tokens[0] != "cd":
-        return None
-    target = tokens[1]
     if not target or target == "-" or target.startswith(("/", "~", "$")) or any(char in target for char in "*?["):
         return None
     base = "" if current_directory in {"", "."} else current_directory
