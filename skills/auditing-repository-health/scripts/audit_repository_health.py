@@ -3013,6 +3013,9 @@ def resolve_pnpm_relation_workspaces_for_bases(
     selected: List[Path] = []
     for base_workspace in base_workspaces:
         selected.extend(resolve_pnpm_relation_workspaces(declared, base_workspace, relation_selector))
+    if not relation_selector.include_base:
+        base_resolved = {workspace.resolve() for workspace in base_workspaces}
+        selected = [workspace for workspace in selected if workspace.resolve() not in base_resolved]
     return unique_paths(selected)
 
 

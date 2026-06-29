@@ -4678,6 +4678,56 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
 
+    def test_pnpm_leading_caret_relation_path_glob_excludes_all_matched_bases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            core_dir = root / "packages" / "core"
+            workflows = root / ".github" / "workflows"
+            app_dir.mkdir(parents=True)
+            core_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (core_dir / "package.json").write_text(
+                json.dumps(
+                    {"name": "core", "private": True, "scripts": {"test": "vitest run"}}
+                )
+                + "\n"
+            )
+            (app_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "app",
+                        "private": True,
+                        "dependencies": {"core": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter ...^./packages/** test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            evidence = ".github/workflows/ci.yml:pnpm --filter ...^./packages/** test"
+
+            self.assertNotIn(evidence, matrix["packages/app"]["focused_test"]["evidence"])
+            self.assertNotIn(evidence, matrix["packages/core"]["focused_test"]["evidence"])
+
     def test_pnpm_trailing_relation_path_glob_filter_counts_dependency_package_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
