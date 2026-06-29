@@ -3230,6 +3230,189 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
 
+    def test_pnpm_leading_relation_package_filter_counts_dependent_package_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            app_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (worker_dir / "package.json").write_text(
+                json.dumps(
+                    {"name": "worker", "private": True, "scripts": {"test": "vitest run"}}
+                )
+                + "\n"
+            )
+            (app_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "app",
+                        "private": True,
+                        "dependencies": {"worker": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter ...worker test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/app"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm --filter ...worker test",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm --filter ...worker test",
+                matrix["packages/app"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/worker", [item["path"] for item in findings])
+            self.assertNotIn("packages/app", [item["path"] for item in findings])
+
+    def test_pnpm_trailing_relation_package_filter_counts_dependency_package_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            core_dir = root / "packages" / "core"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            core_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (core_dir / "package.json").write_text(
+                json.dumps(
+                    {"name": "core", "private": True, "scripts": {"test": "vitest run"}}
+                )
+                + "\n"
+            )
+            (worker_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "worker",
+                        "private": True,
+                        "dependencies": {"core": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter worker... test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertEqual("present", matrix["packages/core"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm --filter worker... test",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm --filter worker... test",
+                matrix["packages/core"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn("packages/worker", [item["path"] for item in findings])
+            self.assertNotIn("packages/core", [item["path"] for item in findings])
+
+    def test_pnpm_trailing_caret_relation_package_filter_excludes_base_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            core_dir = root / "packages" / "core"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            core_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+            )
+            (root / "pnpm-workspace.yaml").write_text('packages:\n  - "packages/*"\n')
+            (core_dir / "package.json").write_text(
+                json.dumps(
+                    {"name": "core", "private": True, "scripts": {"test": "vitest run"}}
+                )
+                + "\n"
+            )
+            (worker_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "worker",
+                        "private": True,
+                        "dependencies": {"core": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pnpm --filter worker^... test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertIn(
+                ".github/workflows/ci.yml:pnpm --filter worker^... test",
+                matrix["packages/core"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn(
+                ".github/workflows/ci.yml:pnpm --filter worker^... test",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+
 
     def test_workflow_folded_run_block_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:

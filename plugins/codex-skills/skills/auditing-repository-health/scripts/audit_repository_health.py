@@ -250,6 +250,13 @@ PACKAGE_MANAGER_INSTALL_NO_VALUE_OPTIONS = {
     "--strict-peer-deps",
 }
 
+PACKAGE_DEPENDENCY_FIELDS = (
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+)
+
 CUSTOM_COMMAND_WORDS = {
     "bootstrap": {"bootstrap", "install"},
     "setup": {"setup", "doctor"},
@@ -274,6 +281,13 @@ class WorkspaceSelection:
 
     def enabled(self) -> bool:
         return bool(self.names) or self.all_workspaces
+
+
+@dataclass(frozen=True)
+class PnpmRelationSelector:
+    base: str
+    direction: str
+    include_base: bool
 
 
 @dataclass
@@ -2206,7 +2220,7 @@ def resolve_package_workspaces(
     if selection.all_workspaces:
         selected.extend(declared)
     for workspace in selection.names:
-        resolved = resolve_declared_package_workspaces(package_root, declared, workspace)
+        resolved = resolve_declared_package_workspaces(package_root, declared, workspace, tool)
         if resolved is None:
             return None
         selected.extend(resolved)
@@ -2367,9 +2381,11 @@ def resolve_declared_package_workspaces(
     package_root: Path,
     declared: List[Path],
     workspace: str,
+    tool: str,
 ) -> Optional[List[Path]]:
     normalized = workspace.strip().rstrip("/")
-    selector_base = normalize_pnpm_selector_base(normalized)
+    relation_selector = parse_pnpm_relation_selector(normalized) if tool == "pnpm" else None
+    selector_base = relation_selector.base if relation_selector is not None else normalize_pnpm_selector_base(normalized)
     exact_selector = selector_base or normalized
     normalized_without_dot = exact_selector[2:] if exact_selector.startswith("./") else exact_selector
     for workspace_dir in declared:
@@ -2377,6 +2393,10 @@ def resolve_declared_package_workspaces(
         if normalized_without_dot == rel or exact_selector == f"./{rel}":
             return [workspace_dir]
         if read_package_name(workspace_dir / "package.json") == exact_selector.strip():
+            if relation_selector is not None:
+                return resolve_pnpm_relation_workspaces(declared, workspace_dir, relation_selector)
+            if tool == "pnpm" and has_pnpm_relation_adornment(normalized):
+                return None
             return [workspace_dir]
     filter_selector = normalize_pnpm_filter_selector(exact_selector)
     if filter_selector is None:
@@ -2389,10 +2409,121 @@ def resolve_declared_package_workspaces(
     return unique_paths(matches) or None
 
 
+def parse_pnpm_relation_selector(selector: str) -> Optional[PnpmRelationSelector]:
+    stripped = selector.strip().rstrip("/")
+    if not stripped:
+        return None
+    leading = pnpm_leading_relation(stripped)
+    trailing = pnpm_trailing_relation(stripped)
+    if leading is not None and trailing is not None:
+        return None
+    if leading is not None:
+        base, include_base = leading
+        return PnpmRelationSelector(base.rstrip("/"), "dependents", include_base)
+    if trailing is not None:
+        base, include_base = trailing
+        return PnpmRelationSelector(base.rstrip("/"), "dependencies", include_base)
+    return None
+
+
+def pnpm_leading_relation(selector: str) -> Optional[Tuple[str, bool]]:
+    for prefix, include_base in (("...^", False), ("...", True)):
+        if selector.startswith(prefix) and len(selector) > len(prefix):
+            return selector[len(prefix):], include_base
+    return None
+
+
+def pnpm_trailing_relation(selector: str) -> Optional[Tuple[str, bool]]:
+    for suffix, include_base in (("^...", False), ("...", True)):
+        if selector.endswith(suffix) and len(selector) > len(suffix):
+            return selector[: -len(suffix)], include_base
+    return None
+
+
+def has_pnpm_relation_adornment(selector: str) -> bool:
+    stripped = selector.strip().rstrip("/")
+    return pnpm_leading_relation(stripped) is not None or pnpm_trailing_relation(stripped) is not None
+
+
+def resolve_pnpm_relation_workspaces(
+    declared: List[Path],
+    base_workspace: Path,
+    relation_selector: PnpmRelationSelector,
+) -> List[Path]:
+    graph = pnpm_workspace_dependency_graph(declared)
+    if relation_selector.direction == "dependents":
+        graph = reverse_workspace_dependency_graph(graph)
+    related = transitive_related_workspaces(graph, base_workspace)
+    selected = ([base_workspace] if relation_selector.include_base else []) + related
+    return unique_paths(selected)
+
+
+def pnpm_workspace_dependency_graph(declared: List[Path]) -> Dict[Path, List[Path]]:
+    package_names = workspace_package_name_map(declared)
+    graph: Dict[Path, List[Path]] = {workspace_dir: [] for workspace_dir in declared}
+    for workspace_dir in declared:
+        for dependency_name in read_package_dependency_names(workspace_dir / "package.json"):
+            dependency_dir = package_names.get(dependency_name)
+            if dependency_dir is not None and dependency_dir not in graph[workspace_dir]:
+                graph[workspace_dir].append(dependency_dir)
+    return graph
+
+
+def workspace_package_name_map(declared: List[Path]) -> Dict[str, Path]:
+    names: Dict[str, Path] = {}
+    for workspace_dir in declared:
+        name = read_package_name(workspace_dir / "package.json")
+        if name:
+            names[name] = workspace_dir
+    return names
+
+
+def read_package_dependency_names(path: Path) -> List[str]:
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    names: List[str] = []
+    for field in PACKAGE_DEPENDENCY_FIELDS:
+        dependencies = data.get(field)
+        if not isinstance(dependencies, dict):
+            continue
+        names.extend(name for name in dependencies if isinstance(name, str))
+    return names
+
+
+def reverse_workspace_dependency_graph(graph: Dict[Path, List[Path]]) -> Dict[Path, List[Path]]:
+    reverse: Dict[Path, List[Path]] = {workspace_dir: [] for workspace_dir in graph}
+    for workspace_dir, dependencies in graph.items():
+        for dependency_dir in dependencies:
+            reverse.setdefault(dependency_dir, []).append(workspace_dir)
+    return reverse
+
+
+def transitive_related_workspaces(graph: Dict[Path, List[Path]], base_workspace: Path) -> List[Path]:
+    related: List[Path] = []
+    seen = {base_workspace.resolve()}
+    queue = list(graph.get(base_workspace, []))
+    while queue:
+        workspace_dir = queue.pop(0)
+        resolved = workspace_dir.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        related.append(workspace_dir)
+        queue.extend(graph.get(workspace_dir, []))
+    return related
+
+
 def normalize_pnpm_selector_base(selector: str) -> Optional[str]:
     stripped = selector.strip().rstrip("/")
     if not stripped:
         return None
+    relation_selector = parse_pnpm_relation_selector(stripped)
+    if relation_selector is not None:
+        return relation_selector.base
     for prefix in ("...^", "...", "^"):
         if stripped.startswith(prefix) and len(stripped) > len(prefix):
             stripped = stripped[len(prefix):]
