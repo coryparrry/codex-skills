@@ -3762,7 +3762,7 @@ def go_test_package_path(root: Path, command_base: Path, arg: str) -> Optional[P
     resolved = resolve_repo_path(root, command_base, package_arg)
     if resolved is None or not resolved.is_dir():
         return None
-    return resolved
+    return nearest_inventory_boundary(root, resolved)
 
 
 def go_test_package_arg_looks_like_path(arg: str) -> bool:
@@ -4270,7 +4270,28 @@ def folded_workflow_paragraph_commands(
 
 
 def workflow_scalar_value(value: str) -> str:
-    return value.strip().strip("\"'")
+    return strip_unquoted_yaml_comment(value).strip().strip("\"'")
+
+
+def strip_unquoted_yaml_comment(value: str) -> str:
+    quote: Optional[str] = None
+    escaped = False
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if quote == '"' and char == "\\":
+            escaped = True
+            continue
+        if char in {"'", '"'}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            continue
+        if char == "#" and quote is None and (index == 0 or value[index - 1].isspace()):
+            return value[:index]
+    return value
 
 
 def normalize_workflow_directory(value: str) -> str:
