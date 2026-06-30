@@ -3725,7 +3725,7 @@ def directory_fingerprint(path: Path) -> Dict[str, str]:
     fingerprint: Dict[str, str] = {}
     for file_path in sorted(iter_files(path)):
         rel = str(file_path.relative_to(path))
-        if rel.endswith(".pyc") or rel == ".DS_Store":
+        if rel.endswith(".pyc") or file_path.name == ".DS_Store":
             continue
         fingerprint[rel] = safe_read_text(file_path, limit=1_000_000)
     return fingerprint

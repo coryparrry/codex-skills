@@ -2516,6 +2516,35 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual(["demo-skill"], packaging["drifted_skill_mirrors"])
             self.assertEqual([], packaging["missing_skill_mirrors"])
 
+    def test_ignores_cache_files_when_checking_skill_plugin_mirror_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            source_skill = root / "skills" / "demo-skill"
+            mirror_skill = root / "plugins" / "codex-skills" / "skills" / "demo-skill"
+            for skill in (source_skill, mirror_skill):
+                (skill / "agents").mkdir(parents=True)
+                (skill / "SKILL.md").write_text("---\nname: demo-skill\ndescription: Use when testing\n---\n")
+                (skill / "agents" / "openai.yaml").write_text("display_name: Demo\n")
+            (source_skill / ".pytest_cache").mkdir()
+            (source_skill / ".pytest_cache" / "README.md").write_text("cache\n")
+            (source_skill / "references").mkdir()
+            (source_skill / "references" / ".DS_Store").write_text("cache\n")
+            (mirror_skill / "__pycache__").mkdir()
+            (mirror_skill / "__pycache__" / "audit.cpython-312.pyc").write_bytes(b"cache")
+            (mirror_skill / ".DS_Store").write_text("cache\n")
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n.DS_Store\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("skill plugin mirror drift", titles)
+            packaging = report["checks"]["packaging"]
+            self.assertEqual([], packaging["drifted_skill_mirrors"])
+
     def test_detects_stale_plugin_only_skill_mirror(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
