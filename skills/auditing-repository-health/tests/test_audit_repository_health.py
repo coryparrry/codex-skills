@@ -4010,6 +4010,32 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("not_applicable", responsibilities["bootstrap"]["status"])
             self.assertEqual("not_applicable", responsibilities["setup"]["status"])
 
+    def test_nested_fixture_code_does_not_make_test_responsibilities_applicable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            fixture_package = root / "tests" / "fixtures" / "demo"
+            fixture_package.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (fixture_package / "app.py").write_text("print('fixture')\n")
+            (fixture_package / "test_app.py").write_text("def test_fixture():\n    assert True\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            validation = report["checks"]["validation"]
+            self.assertNotIn("no test command or script", titles)
+            self.assertNotIn("no CI or full validation entry point", titles)
+            self.assertNotIn("no reusable closeout gate", titles)
+            self.assertEqual("not_applicable", responsibilities["test"]["status"])
+            self.assertEqual("not_applicable", responsibilities["cibuild"]["status"])
+            self.assertEqual([], validation["python_tests"])
+            self.assertFalse(validation["has_focused_tests"])
+            self.assertFalse(validation["has_full_gate"])
+
     def test_source_plugin_mirror_inventory_classification_wins_over_generic_monorepo(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -6016,11 +6042,40 @@ class AuditRepositoryHealthTests(unittest.TestCase):
 
             report = self.audit_report(root)
             matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
 
             self.assertEqual("present", matrix["."]["setup"]["status"])
             self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
             self.assertIn(".github/workflows/ci.yml:npm ci", matrix["."]["setup"]["evidence"])
             self.assertNotIn(".github/workflows/ci.yml:npm ci", matrix["."]["ci_coverage"]["evidence"])
+            self.assertFalse(validation["has_full_gate"])
+            self.assertIn("no reusable closeout gate", titles)
+
+    def test_reusable_workflow_job_counts_as_full_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  ci:\n"
+                "    uses: org/reusable/.github/workflows/ci.yml@v1\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertTrue(validation["has_full_gate"])
+            self.assertNotIn("no reusable closeout gate", titles)
 
     def test_workflow_npm_install_ci_test_counts_as_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -6429,6 +6484,52 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 ".github/workflows/ci.yml:pytest packages/worker/tests",
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
+            self.assertNotIn("packages/worker", [item["path"] for item in findings])
+
+    def test_python_module_pytest_explicit_package_path_counts_for_package_focused_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            tests_dir = package_dir / "tests"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            tests_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (tests_dir / "test_worker.py").write_text("def test_worker():\n    assert True\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: python -m pytest packages/worker/tests\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            findings = [
+                item
+                for item in report["findings"]
+                if item["title"] == "missing focused test coverage"
+            ]
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:python -m pytest packages/worker/tests",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+            if "." in matrix:
+                self.assertNotIn(
+                    ".github/workflows/ci.yml:python -m pytest packages/worker/tests",
+                    matrix["."]["focused_test"]["evidence"],
+                )
             self.assertNotIn("packages/worker", [item["path"] for item in findings])
 
     def test_missing_pytest_workflow_path_does_not_credit_root_scope(self):

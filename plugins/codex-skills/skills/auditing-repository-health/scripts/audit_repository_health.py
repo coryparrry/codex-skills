@@ -953,7 +953,11 @@ class Audit:
 
     def check_validation(self, root: Path, scripts_check: Dict[str, Any]) -> Dict[str, Any]:
         workflows_dir = root / ".github" / "workflows"
-        python_tests = sorted(str(path.relative_to(root)) for path in iter_files(root, "test_*.py"))
+        python_tests = sorted(
+            str(path.relative_to(root))
+            for path in iter_files(root, "test_*.py")
+            if not is_nested_test_asset_boundary_manifest(root, path)
+        )
         shell_scripts = []
         if (root / "scripts").is_dir():
             shell_scripts = sorted(str(path.relative_to(root)) for path in (root / "scripts").glob("*.sh"))
@@ -966,8 +970,10 @@ class Audit:
             )
         cibuild = scripts_check["responsibilities"]["cibuild"]
         validation_candidates = cibuild["candidates"]
+        workflow_commands = workflow_command_evidence(root)
+        workflow_ci_evidence = workflow_validation_evidence(root, workflow_commands)
 
-        if cibuild["status"] == "missing" and not workflows:
+        if cibuild["status"] == "missing" and not workflow_ci_evidence:
             self.add_finding(
                 "P2",
                 "no reusable closeout gate",
@@ -982,7 +988,7 @@ class Audit:
             "ci_workflows": workflows,
             "validation_candidates": validation_candidates,
             "has_focused_tests": bool(python_tests or scripts_check["responsibilities"]["test"]["candidates"]),
-            "has_full_gate": cibuild["status"] in {"present", "documented"} or bool(workflows),
+            "has_full_gate": cibuild["status"] in {"present", "documented"} or bool(workflow_ci_evidence),
         }
 
     def check_lifecycle_gate_matrix(
@@ -3623,11 +3629,19 @@ def has_dependency_surface(root: Path) -> bool:
 
 
 def has_code_surface(root: Path) -> bool:
-    return any(path.suffix in CODE_EXTENSIONS for path in iter_files(root))
+    return any(
+        path.suffix in CODE_EXTENSIONS
+        and not is_nested_test_asset_boundary_manifest(root, path)
+        for path in iter_files(root)
+    )
 
 
 def has_test_surface(root: Path) -> bool:
-    return any(iter_files(root, "test_*.py")) or any(iter_files(root, "*_test.py"))
+    return any(
+        not is_nested_test_asset_boundary_manifest(root, path)
+        for pattern in ("test_*.py", "*_test.py")
+        for path in iter_files(root, pattern)
+    )
 
 
 def has_codex_packaging_surface(root: Path) -> bool:
@@ -3801,6 +3815,42 @@ def workflow_command_evidence(root: Path) -> Dict[str, List[str]]:
     return dict(evidence)
 
 
+def workflow_ci_coverage_evidence(workflow_commands: Dict[str, List[str]]) -> List[str]:
+    return sorted(
+        {
+            item
+            for items in workflow_commands.values()
+            for item in items
+            if workflow_command_counts_as_ci_coverage(item.partition(":")[2])
+        }
+    )
+
+
+def workflow_validation_evidence(root: Path, workflow_commands: Dict[str, List[str]]) -> List[str]:
+    return sorted(
+        set(workflow_ci_coverage_evidence(workflow_commands))
+        | set(reusable_workflow_job_evidence(root))
+    )
+
+
+def reusable_workflow_job_evidence(root: Path) -> List[str]:
+    evidence: List[str] = []
+    for workflow in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        rel_workflow = relative_path(root, workflow)
+        try:
+            text = workflow.read_text(errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("uses:"):
+                continue
+            target = workflow_scalar_value(stripped.split(":", 1)[1])
+            if ".github/workflows/" in target:
+                evidence.append(f"{rel_workflow}:uses {target}")
+    return evidence
+
+
 def workflow_command_scope_paths(root: Path, directory: str, command: str) -> List[str]:
     chain_parts = split_simple_shell_chain(command.strip())
     if len(chain_parts) > 1:
@@ -3824,11 +3874,12 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
         if scope_paths:
             return scope_paths
         return [] if go_test_has_explicit_package_path_arg(tokens) else [directory]
-    if tokens[0] in DIRECT_TEST_PATH_TOOLS:
-        scope_paths = direct_test_tool_scope_paths(root, directory, tokens)
+    direct_test_tokens = direct_test_path_tool_tokens(tokens)
+    if direct_test_tokens is not None:
+        scope_paths = direct_test_tool_scope_paths(root, directory, direct_test_tokens)
         if scope_paths:
             return scope_paths
-        return [] if direct_test_tool_has_explicit_path_arg(tokens[0], tokens) else [directory]
+        return [] if direct_test_tool_has_explicit_path_arg(direct_test_tokens[0], direct_test_tokens) else [directory]
     if tokens[0] == "make":
         scope_paths = make_command_scope_paths(root, directory, tokens)
         if scope_paths is None:
@@ -3851,6 +3902,14 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
 
 def workflow_command_base(root: Path, directory: str) -> Path:
     return root if directory in {"", "."} else (root / directory).resolve()
+
+
+def direct_test_path_tool_tokens(tokens: List[str]) -> Optional[List[str]]:
+    if tokens[0] in DIRECT_TEST_PATH_TOOLS:
+        return tokens
+    if len(tokens) > 2 and tokens[0] in {"python", "python3"} and tokens[1] == "-m" and tokens[2] in DIRECT_TEST_PATH_TOOLS:
+        return tokens[2:]
+    return None
 
 
 def go_test_scope_paths(root: Path, directory: str, tokens: List[str]) -> List[str]:
