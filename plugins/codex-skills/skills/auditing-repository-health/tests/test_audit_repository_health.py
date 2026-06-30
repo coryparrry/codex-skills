@@ -570,6 +570,26 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", responsibilities["test"]["status"])
             self.assertEqual("missing", responsibilities["cibuild"]["status"])
 
+    def test_conventional_script_directories_do_not_satisfy_script_responsibilities(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = root / "scripts"
+            self.init_repo(root)
+            scripts.mkdir()
+            (scripts / "test").mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertIn("no test command or script", titles)
+            self.assertEqual("missing", responsibilities["test"]["status"])
+            self.assertNotIn("scripts/test", responsibilities["test"]["candidates"])
+
     def test_nested_dependency_manifests_make_setup_applicable(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3971,6 +3991,25 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("no CI or full validation entry point", titles)
             self.assertIn("no reusable closeout gate", titles)
 
+    def test_nested_fixture_manifests_do_not_make_setup_applicable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            fixture_package = root / "tests" / "fixtures" / "demo"
+            fixture_package.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (fixture_package / "package.json").write_text(json.dumps({"scripts": {"test": "vitest run"}}) + "\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertNotIn("no setup or bootstrap script", titles)
+            self.assertEqual("not_applicable", responsibilities["bootstrap"]["status"])
+            self.assertEqual("not_applicable", responsibilities["setup"]["status"])
+
     def test_source_plugin_mirror_inventory_classification_wins_over_generic_monorepo(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -5893,6 +5932,37 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
 
+    def test_workflow_job_key_with_inline_comment_counts_for_package_lifecycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            package_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (package_dir / "pyproject.toml").write_text("[project]\nname = 'worker'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test: # run package tests\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - working-directory: packages/worker\n"
+                "        run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertEqual("present", matrix["packages/worker"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pytest",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+
     def test_workflow_commented_scalar_working_directory_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -5923,6 +5993,60 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 ".github/workflows/ci.yml:pytest",
                 matrix["packages/worker"]["focused_test"]["evidence"],
             )
+
+    def test_workflow_npm_ci_counts_as_setup_not_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  install:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: npm ci\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertEqual("present", matrix["."]["setup"]["status"])
+            self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
+            self.assertIn(".github/workflows/ci.yml:npm ci", matrix["."]["setup"]["evidence"])
+            self.assertNotIn(".github/workflows/ci.yml:npm ci", matrix["."]["ci_coverage"]["evidence"])
+
+    def test_workflow_npm_install_ci_test_counts_as_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: npm install-ci-test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+
+            self.assertEqual("present", matrix["."]["ci_coverage"]["status"])
+            self.assertIn(".github/workflows/ci.yml:npm install-ci-test", matrix["."]["ci_coverage"]["evidence"])
 
     def test_workflow_make_directory_counts_for_package_lifecycle(self):
         with tempfile.TemporaryDirectory() as tmp:

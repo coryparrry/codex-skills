@@ -887,7 +887,7 @@ class Audit:
             )
 
         for responsibility, candidates in RESPONSIBILITY_PATHS.items():
-            found = [path for path in candidates if (root / path).exists()]
+            found = [path for path in candidates if conventional_command_path_exists(root / path)]
             found.extend(custom_commands[responsibility])
             found.extend(
                 source
@@ -1624,6 +1624,10 @@ def is_command_file(path: Path) -> bool:
     return suffixes[-1] in COMMAND_FILE_EXTENSIONS
 
 
+def conventional_command_path_exists(path: Path) -> bool:
+    return path.is_file() and is_command_file(path)
+
+
 def discover_documented_commands(
     root: Path,
     package_scripts: Dict[str, str],
@@ -2120,7 +2124,7 @@ def documented_go_test_arg_looks_like_local_path(arg: str) -> bool:
 
 
 def documented_local_command_target_exists(path: Path, requires_executable: bool) -> bool:
-    if not path.exists() or not is_command_file(path):
+    if not path.is_file() or not is_command_file(path):
         return False
     if requires_executable and not os.access(path, os.X_OK):
         return False
@@ -3611,7 +3615,11 @@ def infer_responsibility_needs(
 
 
 def has_dependency_surface(root: Path) -> bool:
-    return any(path.name in DEPENDENCY_MANIFESTS for path in iter_files(root))
+    return any(
+        path.name in DEPENDENCY_MANIFESTS
+        and not is_nested_test_asset_boundary_manifest(root, path)
+        for path in iter_files(root)
+    )
 
 
 def has_code_surface(root: Path) -> bool:
@@ -4161,7 +4169,8 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
             current_step_entry_indent = None
             index += 1
             continue
-        if jobs_indent is not None and stripped.endswith(":") and not stripped.startswith("- ") and indent > jobs_indent:
+        job_key = strip_unquoted_yaml_comment(stripped).strip()
+        if jobs_indent is not None and job_key.endswith(":") and not job_key.startswith("- ") and indent > jobs_indent:
             if job_entry_indent is None:
                 job_entry_indent = indent
             if indent == job_entry_indent:
@@ -4478,6 +4487,9 @@ def workflow_command_responsibilities(command: str) -> List[str]:
             return classify_workflow_name(script)
         builtin_command = package_manager_builtin_command(tokens)
         if builtin_command:
+            builtin_responsibilities = package_manager_builtin_workflow_responsibilities(tool, builtin_command)
+            if builtin_responsibilities:
+                return builtin_responsibilities
             return classify_workflow_name(builtin_command)
     if tool in {"make", "just"}:
         if tool == "make":
@@ -4496,6 +4508,14 @@ def workflow_command_responsibilities(command: str) -> List[str]:
     if tool in {"python", "python3"} and len(tokens) > 2 and tokens[1] == "-m":
         return classify_workflow_name(tokens[2])
     return classify_workflow_name(tool)
+
+
+def package_manager_builtin_workflow_responsibilities(tool: str, command: str) -> List[str]:
+    if tool == "npm" and command in {"ci", "install"}:
+        return ["bootstrap"]
+    if command in {"install", "add"}:
+        return ["bootstrap"]
+    return []
 
 
 def make_command_targets_for_responsibility(args: List[str]) -> List[str]:
@@ -4812,11 +4832,17 @@ def ci_coverage_cell(
         item
         for item in workflow_commands.get(path, [])
         if workflow_command_matches_boundary(item.partition(":")[2], boundary)
+        and workflow_command_counts_as_ci_coverage(item.partition(":")[2])
     ]
     return {
         "status": "present" if evidence else "missing",
         "evidence": sorted(set(evidence)),
     }
+
+
+def workflow_command_counts_as_ci_coverage(command: str) -> bool:
+    responsibilities = set(workflow_command_responsibilities(command))
+    return not responsibilities or bool(responsibilities - {"bootstrap", "setup", "update"})
 
 
 def render_markdown(report: Dict[str, Any]) -> str:
