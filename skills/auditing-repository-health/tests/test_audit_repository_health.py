@@ -4420,7 +4420,7 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             (root / "README.md").write_text("# Example\n")
             (root / ".gitignore").write_text("__pycache__/\n")
             (root / "package.json").write_text(
-                json.dumps({"name": "workspace-root", "private": True}) + "\n"
+                json.dumps({"name": "workspace-root", "private": True, "scripts": {"test": "vitest run"}}) + "\n"
             )
             (workflows / "ci.yml").write_text(
                 "name: ci\n"
@@ -5629,6 +5629,56 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 self.assertNotIn(invalid_evidence, matrix["."]["focused_test"]["evidence"])
             self.assertNotIn(invalid_evidence, matrix["packages/worker"]["focused_test"]["evidence"])
 
+    def test_documented_pytest_bare_missing_path_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nRun tests with `pytest tests`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("VALUE = 1\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+            documented_tests = report["checks"]["scripts"]["documented_commands"].get("test", [])
+
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("README.md:pytest tests", stale_evidence)
+            self.assertNotIn("README.md:pytest tests", documented_tests)
+
+    def test_documented_pytest_coverage_option_value_is_not_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nRun tests with `pytest --cov my_package`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "src").mkdir()
+            (root / "src" / "my_package").mkdir()
+            (root / "src" / "my_package" / "__init__.py").write_text("\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            stale_evidence = [
+                evidence
+                for finding in report["findings"]
+                if finding["title"] == "documented command target missing"
+                for evidence in finding["evidence"]
+            ]
+            self.assertNotIn("README.md:pytest --cov my_package", stale_evidence)
+
     def test_documented_pytest_pyargs_module_is_not_stale(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -6076,6 +6126,86 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertTrue(validation["has_full_gate"])
             self.assertNotIn("no reusable closeout gate", titles)
+
+    def test_unrecognized_workflow_command_does_not_count_as_full_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  placeholder:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: echo hello\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertFalse(validation["has_full_gate"])
+            self.assertIn("no reusable closeout gate", titles)
+
+    def test_standard_validation_tools_count_as_workflow_ci_coverage(self):
+        module = load_audit_module()
+
+        for command in (
+            "swift test",
+            "uv run pytest",
+            "bundle exec rspec",
+            "rake test",
+            "./gradlew test",
+            "mvn test",
+            "mvn -f service/pom.xml test",
+            "mvn --file pom.xml verify",
+            "mvn clean test",
+            "dotnet test",
+            "npx vitest run",
+            "npx --yes vitest run",
+            "npx -y vitest run",
+            "pnpm exec vitest",
+            "npm exec -- vitest run",
+            "pnpm exec -- vitest",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(module.workflow_command_counts_as_ci_coverage(command))
+
+        self.assertNotIn("test", module.workflow_command_responsibilities("./gradlew build -x test"))
+
+    def test_missing_package_manager_script_does_not_count_as_full_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: npm test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertFalse(validation["has_full_gate"])
+            self.assertIn("no reusable closeout gate", titles)
 
     def test_workflow_npm_install_ci_test_counts_as_validation(self):
         with tempfile.TemporaryDirectory() as tmp:

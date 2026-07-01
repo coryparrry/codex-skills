@@ -218,6 +218,7 @@ PACKAGE_MANAGER_TOOL_NO_VALUE_OPTIONS = {
 }
 
 PACKAGE_MANAGER_VALUE_OPTIONS = {
+    "--cache-folder",
     "--loglevel",
 }
 
@@ -314,6 +315,9 @@ DIRECT_TEST_VALUE_OPTIONS = {
         "-o",
         "--basetemp",
         "--confcutdir",
+        "--cov",
+        "--cov-config",
+        "--cov-report",
         "--deselect",
         "--ignore",
         "--ignore-glob",
@@ -2122,7 +2126,7 @@ def documented_direct_test_has_missing_local_path_arg(root: Path, directory: str
 
 
 def documented_test_arg_looks_like_local_path(arg: str) -> bool:
-    return arg in {".", ".."} or arg.startswith(("./", "../", "/")) or "/" in arg
+    return bool(arg)
 
 
 def documented_go_test_arg_looks_like_local_path(arg: str) -> bool:
@@ -4502,7 +4506,9 @@ def classify_workflow_name(name: str) -> List[str]:
     matches = set(classify_command_name(name))
     direct_matches = {
         "pytest": "test",
+        "rspec": "test",
         "tox": "test",
+        "vitest": "test",
         "ruff": "lint",
         "mypy": "typecheck",
         "pyright": "typecheck",
@@ -4537,6 +4543,7 @@ def workflow_command_responsibilities(command: str) -> List[str]:
         return []
     tokens = normalize_pip_command_tokens(tokens)
     tool = tokens[0]
+    executable = Path(tool).name
     if tool in SHELL_PREDICATE_COMMANDS:
         return []
     if tool in {"npm", "pnpm", "yarn", "bun"}:
@@ -4549,7 +4556,17 @@ def workflow_command_responsibilities(command: str) -> List[str]:
             builtin_responsibilities = package_manager_builtin_workflow_responsibilities(tool, builtin_command)
             if builtin_responsibilities:
                 return builtin_responsibilities
+            if builtin_command in {"exec", "dlx"} and len(command_args) > 1:
+                delegated_args = package_manager_exec_command_args(command_args[1:])
+                if delegated_args:
+                    return workflow_command_responsibilities(shlex.join(delegated_args))
+                return []
             return classify_workflow_name(builtin_command)
+    if executable == "npx" and len(tokens) > 1:
+        command_args = npx_command_args(tokens[1:])
+        if command_args:
+            return workflow_command_responsibilities(shlex.join(command_args))
+        return []
     if tool in {"make", "just"}:
         if tool == "make":
             matches = set()
@@ -4562,11 +4579,130 @@ def workflow_command_responsibilities(command: str) -> List[str]:
             return classify_workflow_name(target)
     if tool in {"go", "cargo"} and len(tokens) > 1:
         return classify_workflow_name(tokens[1])
-    if tool in {"pytest", "tox", "mypy", "pyright", "ruff"}:
-        return classify_workflow_name(tool)
-    if tool in {"python", "python3"} and len(tokens) > 2 and tokens[1] == "-m":
+    if tool == "swift" and len(tokens) > 1:
+        return classify_workflow_name(tokens[1])
+    if tool == "uv" and len(tokens) > 2 and tokens[1] == "run":
+        return workflow_command_responsibilities(shlex.join(tokens[2:]))
+    if tool == "bundle" and len(tokens) > 2 and tokens[1] == "exec":
+        return workflow_command_responsibilities(shlex.join(tokens[2:]))
+    if tool == "rake" and len(tokens) > 1:
+        return classify_workflow_name(tokens[1])
+    if executable in {"gradle", "gradlew"}:
+        matches = set()
+        for target in gradle_command_targets_for_responsibility(tokens[1:]):
+            matches.update(classify_workflow_name(target))
+        return sorted(matches)
+    if executable in {"mvn", "mvnw"}:
+        matches = set()
+        for goal in maven_command_goals_for_responsibility(tokens[1:]):
+            matches.update(classify_workflow_name(goal))
+        return sorted(matches)
+    if executable == "dotnet" and len(tokens) > 1:
+        return classify_workflow_name(tokens[1])
+    if tool in {"docker", "podman", "buildah"} and len(tokens) > 1 and tokens[1] == "build":
+        return ["build"]
+    if executable in {"pytest", "tox", "mypy", "pyright", "ruff", "rspec", "vitest"}:
+        return classify_workflow_name(executable)
+    if executable in {"python", "python3"} and len(tokens) > 2 and tokens[1] == "-m":
         return classify_workflow_name(tokens[2])
-    return classify_workflow_name(tool)
+    return classify_workflow_name(executable)
+
+
+def npx_command_args(args: List[str]) -> List[str]:
+    value_options = {"--package", "-p", "--cache", "--call", "-c", "--userconfig", "--node-options"}
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            return args[index + 1:]
+        if arg in value_options:
+            index += 2
+            continue
+        if any(arg.startswith(f"{option}=") for option in value_options if option.startswith("--")):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        return args[index:]
+    return []
+
+
+def package_manager_exec_command_args(args: List[str]) -> List[str]:
+    value_options = {"--package", "-p", "--shell-mode", "-c"}
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            return args[index + 1:]
+        if arg in value_options:
+            index += 2
+            continue
+        if any(arg.startswith(f"{option}=") for option in value_options if option.startswith("--")):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        return args[index:]
+    return []
+
+
+def gradle_command_targets_for_responsibility(args: List[str]) -> List[str]:
+    targets: List[str] = []
+    excluded_targets: set[str] = set()
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in {"-x", "--exclude-task"}:
+            if index + 1 < len(args):
+                excluded_targets.add(args[index + 1].lstrip(":"))
+            index += 2
+            continue
+        if arg.startswith("--exclude-task="):
+            excluded_targets.add(arg.split("=", 1)[1].lstrip(":"))
+            index += 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        targets.append(arg.lstrip(":"))
+        index += 1
+    return [target for target in targets if target not in excluded_targets]
+
+
+def maven_command_goals_for_responsibility(args: List[str]) -> List[str]:
+    value_options = {
+        "-f",
+        "--file",
+        "-s",
+        "--settings",
+        "-gs",
+        "--global-settings",
+        "-pl",
+        "--projects",
+        "-P",
+        "--activate-profiles",
+    }
+    goals: List[str] = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--":
+            index += 1
+            continue
+        if arg in value_options:
+            index += 2
+            continue
+        if any(arg.startswith(f"{option}=") for option in value_options if option.startswith("--")):
+            index += 1
+            continue
+        if arg.startswith("-"):
+            index += 1
+            continue
+        goals.append(arg)
+        index += 1
+    return goals
 
 
 def package_manager_builtin_workflow_responsibilities(tool: str, command: str) -> List[str]:
@@ -4901,7 +5037,7 @@ def ci_coverage_cell(
 
 def workflow_command_counts_as_ci_coverage(command: str) -> bool:
     responsibilities = set(workflow_command_responsibilities(command))
-    return not responsibilities or bool(responsibilities - {"bootstrap", "setup", "update"})
+    return bool(responsibilities - {"bootstrap", "setup", "update"})
 
 
 def render_markdown(report: Dict[str, Any]) -> str:
