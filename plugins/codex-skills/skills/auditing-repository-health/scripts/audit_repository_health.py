@@ -3994,9 +3994,14 @@ def direct_test_tool_scope_paths(root: Path, directory: str, tokens: List[str]) 
     package_dirs: List[Path] = []
     args = tokens[1:]
     index = 0
+    pyargs_mode = False
     while index < len(args):
         arg = args[index]
         if arg == "--":
+            index += 1
+            continue
+        if tokens[0] == "pytest" and arg == "--pyargs":
+            pyargs_mode = True
             index += 1
             continue
         if direct_test_tool_option_with_inline_value(tokens[0], arg):
@@ -4008,9 +4013,10 @@ def direct_test_tool_scope_paths(root: Path, directory: str, tokens: List[str]) 
         if arg.startswith("-"):
             index += 1
             continue
-        package_dir = direct_test_tool_package_path(root, command_base, arg)
-        if package_dir is not None:
-            package_dirs.append(package_dir)
+        if not pyargs_mode:
+            package_dir = direct_test_tool_package_path(root, command_base, arg)
+            if package_dir is not None:
+                package_dirs.append(package_dir)
         index += 1
     return package_dirs_to_scope_paths(root, unique_paths(package_dirs))
 
@@ -4018,9 +4024,14 @@ def direct_test_tool_scope_paths(root: Path, directory: str, tokens: List[str]) 
 def direct_test_tool_has_explicit_path_arg(tool: str, tokens: List[str]) -> bool:
     args = tokens[1:]
     index = 0
+    pyargs_mode = False
     while index < len(args):
         arg = args[index]
         if arg == "--":
+            index += 1
+            continue
+        if tool == "pytest" and arg == "--pyargs":
+            pyargs_mode = True
             index += 1
             continue
         if direct_test_tool_option_with_inline_value(tool, arg):
@@ -4030,6 +4041,9 @@ def direct_test_tool_has_explicit_path_arg(tool: str, tokens: List[str]) -> bool
             index += 2 if index + 1 < len(args) else 1
             continue
         if arg.startswith("-"):
+            index += 1
+            continue
+        if pyargs_mode:
             index += 1
             continue
         return True

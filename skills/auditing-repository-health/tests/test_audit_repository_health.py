@@ -6527,6 +6527,25 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 module.workflow_command_responsibilities("test -f pyproject.toml && pytest"),
             )
 
+    def test_workflow_pytest_pyargs_module_keeps_directory_scope_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_dir = root / "packages" / "worker"
+            package_dir.mkdir(parents=True)
+            (package_dir / "pyproject.toml").write_text(
+                "[project]\nname = 'worker'\nversion = '0.1.0'\n"
+            )
+
+            module = load_audit_module()
+            self.assertEqual(
+                ["packages/worker"],
+                module.workflow_command_scope_paths(
+                    root,
+                    "packages/worker",
+                    "pytest --pyargs worker",
+                ),
+            )
+
     def test_root_go_test_explicit_package_paths_count_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
