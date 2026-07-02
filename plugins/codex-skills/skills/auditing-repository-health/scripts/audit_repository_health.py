@@ -2216,6 +2216,8 @@ def package_manager_target_missing(
         return True
     if package_manager_install_manifest_missing(tokens, parsed):
         return True
+    if package_manager_delegated_test_target_missing(root, tokens, parsed):
+        return True
     if parsed.script is None:
         return False
     found_script = False
@@ -2226,6 +2228,33 @@ def package_manager_target_missing(
         elif not parsed.if_present and not parsed.allow_missing_scripts:
             return True
     return not found_script
+
+
+def package_manager_delegated_test_target_missing(
+    root: Path,
+    tokens: List[str],
+    parsed: PackageManagerCommand,
+) -> bool:
+    delegated_tokens = package_manager_delegated_command_tokens(tokens)
+    if delegated_tokens is None:
+        return False
+    # exec/dlx forward to another tool; validate path-sensitive test args against the forwarded command.
+    command = shlex.join(delegated_tokens)
+    return any(
+        documented_direct_test_target_missing(root, package_dir, command)
+        for package_dir in parsed.package_dirs or []
+    )
+
+
+def package_manager_delegated_command_tokens(tokens: List[str]) -> Optional[List[str]]:
+    command_args = package_manager_builtin_command_args(tokens)
+    if len(command_args) < 2:
+        return None
+    command = normalize_package_manager_command(tokens[0], command_args[0])
+    if command not in {"exec", "dlx"}:
+        return None
+    delegated_tokens = package_manager_exec_command_args(command_args[1:])
+    return delegated_tokens or None
 
 
 def package_manager_builtin_target_missing(root: Path, command_base: Path, tokens: List[str]) -> bool:
@@ -3662,12 +3691,13 @@ def local_command_target(command: str) -> Optional[str]:
         return tokens[0]
     if tokens[0] not in INTERPRETER_COMMANDS:
         return None
+    interpreter = tokens[0]
     skip_next = False
     for token in tokens[1:]:
         if skip_next:
             skip_next = False
             continue
-        if token in {"-m", "-c", "-e"}:
+        if interpreter_option_consumes_next(interpreter, token):
             skip_next = True
             continue
         if token.startswith("-"):
@@ -3676,6 +3706,17 @@ def local_command_target(command: str) -> Optional[str]:
             return token
         return None
     return None
+
+
+def interpreter_option_consumes_next(interpreter: str, token: str) -> bool:
+    if token in {"-m", "-c", "-e"}:
+        return True
+    if interpreter not in {"bash", "sh"}:
+        return False
+    if token in {"-o", "+o", "-O", "+O"}:
+        return True
+    # Bash accepts clustered shell flags such as `-eo pipefail`; `o`/`O` still consumes the next word.
+    return bool(re.fullmatch(r"[-+][A-Za-z]*[oO][A-Za-z]*", token))
 
 
 def direct_local_command_target(command: str) -> Optional[str]:
@@ -3995,14 +4036,57 @@ def reusable_workflow_job_evidence(root: Path) -> List[str]:
             text = workflow.read_text(errors="replace")
         except OSError:
             continue
-        for line in text.splitlines():
-            stripped = line.strip()
-            if not stripped.startswith("uses:"):
-                continue
-            target = workflow_scalar_value(stripped.split(":", 1)[1])
-            if ".github/workflows/" in target:
-                evidence.append(f"{rel_workflow}:uses {target}")
+        for target in reusable_workflow_job_targets(text.splitlines()):
+            evidence.append(f"{rel_workflow}:uses {target}")
     return evidence
+
+
+def reusable_workflow_job_targets(lines: List[str]) -> List[str]:
+    targets: List[str] = []
+    jobs_indent: Optional[int] = None
+    job_entry_indent: Optional[int] = None
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if jobs_indent is not None and stripped and indent <= jobs_indent and not stripped.startswith("#") and not stripped.startswith("jobs:"):
+            jobs_indent = None
+            job_entry_indent = None
+        if indent == 0 and stripped.startswith("jobs:"):
+            jobs_indent = indent
+            job_entry_indent = None
+            continue
+        job_key = strip_unquoted_yaml_comment(stripped).strip()
+        if jobs_indent is None or not job_key.endswith(":") or job_key.startswith("- ") or indent <= jobs_indent:
+            continue
+        if job_entry_indent is None:
+            job_entry_indent = indent
+        if indent != job_entry_indent or workflow_job_continue_on_error(lines, index, indent):
+            continue
+        target = workflow_job_reusable_workflow_target(lines, index, indent)
+        if target is not None:
+            targets.append(target)
+    return targets
+
+
+def workflow_job_reusable_workflow_target(lines: List[str], start_index: int, job_indent: int) -> Optional[str]:
+    job_key_indent: Optional[int] = None
+    index = start_index + 1
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if stripped and indent <= job_indent and not stripped.startswith("#"):
+            break
+        if not stripped or stripped.startswith("#"):
+            index += 1
+            continue
+        if job_key_indent is None:
+            job_key_indent = indent
+        if indent == job_key_indent and stripped.startswith("uses:"):
+            target = workflow_scalar_value(stripped.split(":", 1)[1])
+            return target if ".github/workflows/" in target else None
+        index += 1
+    return None
 
 
 def workflow_command_scope_paths(root: Path, directory: str, command: str) -> List[str]:
@@ -4022,6 +4106,8 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     if not tokens:
         return [directory]
     if tokens[0] in SHELL_PREDICATE_COMMANDS:
+        return []
+    if workflow_local_command_target_missing(root, directory, command):
         return []
     if tokens[0] == "go":
         scope_paths = go_test_scope_paths(root, directory, tokens)
@@ -4052,6 +4138,18 @@ def workflow_command_scope_paths(root: Path, directory: str, command: str) -> Li
     if parsed.script is not None:
         return scope_paths
     return scope_paths or [directory]
+
+
+def workflow_local_command_target_missing(root: Path, directory: str, command: str) -> bool:
+    target = local_command_target(command)
+    if target is None:
+        return False
+    command_base = workflow_command_base(root, directory)
+    path = resolve_repo_path(root, command_base, target[2:] if target.startswith("./") else target)
+    if path is None:
+        return True
+    direct_target = direct_local_command_target(command)
+    return not documented_local_command_target_exists(path, direct_target == target)
 
 
 def workflow_command_base(root: Path, directory: str) -> Path:
@@ -4362,6 +4460,7 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
     job_entry_indent: Optional[int] = None
     current_job_indent: Optional[int] = None
     current_job_default_directory = "."
+    current_job_continue_on_error = False
     current_steps_indent: Optional[int] = None
     current_step_entry_indent: Optional[int] = None
     index = 0
@@ -4374,6 +4473,7 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
             job_entry_indent = None
             current_job_indent = None
             current_job_default_directory = workflow_default_directory
+            current_job_continue_on_error = False
             current_steps_indent = None
             current_step_entry_indent = None
         if current_steps_indent is not None and stripped and indent <= current_steps_indent and not stripped.startswith("#") and not stripped.startswith("steps:"):
@@ -4394,6 +4494,7 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
             job_entry_indent = None
             current_job_indent = None
             current_job_default_directory = workflow_default_directory
+            current_job_continue_on_error = False
             current_steps_indent = None
             current_step_entry_indent = None
             index += 1
@@ -4405,6 +4506,7 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
             if indent == job_entry_indent:
                 current_job_indent = indent
                 current_job_default_directory = workflow_default_directory
+                current_job_continue_on_error = workflow_job_continue_on_error(lines, index, indent)
                 current_steps_indent = None
                 current_step_entry_indent = None
         if current_job_indent is not None and stripped.startswith("steps:") and indent > current_job_indent:
@@ -4434,10 +4536,33 @@ def workflow_step_run_commands(text: str) -> List[Tuple[str, str]]:
         for offset in range(index + 1, step_end):
             raw = lines[offset]
             relative_lines.append(raw[indent + 2:] if len(raw) >= indent + 2 else "")
+        if current_job_continue_on_error:
+            index = step_end
+            continue
         default_directory = current_job_default_directory if current_job_indent is not None else workflow_default_directory
         commands.extend(parse_workflow_step(relative_lines, default_directory))
         index = step_end
     return commands
+
+
+def workflow_job_continue_on_error(lines: List[str], start_index: int, job_indent: int) -> bool:
+    job_key_indent: Optional[int] = None
+    index = start_index + 1
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if stripped and indent <= job_indent and not stripped.startswith("#"):
+            break
+        if not stripped or stripped.startswith("#"):
+            index += 1
+            continue
+        if job_key_indent is None:
+            job_key_indent = indent
+        if indent == job_key_indent and stripped.startswith("continue-on-error:"):
+            return workflow_continue_on_error_enabled(stripped.split(":", 1)[1])
+        index += 1
+    return False
 
 
 def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_indent: int) -> Optional[str]:
@@ -4513,10 +4638,14 @@ def workflow_step_continue_on_error(lines: List[str]) -> bool:
             continue
         if not stripped.startswith("continue-on-error:"):
             continue
-        value = workflow_scalar_value(stripped.split(":", 1)[1]).lower()
-        # Non-false values can let the step fail without failing the job, so they are not gate evidence.
-        return value not in {"", "false", "0", "no", "off"}
+        return workflow_continue_on_error_enabled(stripped.split(":", 1)[1])
     return False
+
+
+def workflow_continue_on_error_enabled(raw_value: str) -> bool:
+    value = workflow_scalar_value(raw_value).lower()
+    # Non-false values can let a step or job fail without failing the workflow, so they are not gate evidence.
+    return value not in {"", "false", "0", "no", "off"}
 
 
 def workflow_step_directory(lines: List[str], default_directory: str = ".") -> str:

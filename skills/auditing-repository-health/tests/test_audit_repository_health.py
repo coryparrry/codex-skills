@@ -647,6 +647,26 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("documented command target missing", titles)
             self.assertIn("no setup or bootstrap script", titles)
 
+    def test_package_manager_exec_missing_pytest_path_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nRun focused tests with `pnpm exec pytest missing-tests`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertIn("documented command target missing", titles)
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
     def test_python_module_pip_missing_requirements_file_is_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -5038,6 +5058,92 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
             self.assertEqual([], matrix["."]["ci_coverage"]["evidence"])
 
+    def test_job_continue_on_error_workflow_run_does_not_count_as_gate_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    continue-on-error: true\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertFalse(report["checks"]["validation"]["has_full_gate"])
+            self.assertEqual("missing", matrix["."]["focused_test"]["status"])
+            self.assertEqual([], matrix["."]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["."]["ci_coverage"]["evidence"])
+
+    def test_missing_workflow_local_command_does_not_count_as_gate_evidence(self):
+        for create_non_executable_script in (False, True):
+            with self.subTest(create_non_executable_script=create_non_executable_script):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    workflows = root / ".github" / "workflows"
+                    workflows.mkdir(parents=True)
+                    (root / "README.md").write_text("# Example\n")
+                    (root / ".gitignore").write_text("__pycache__/\n")
+                    (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+                    (root / "app.py").write_text("print('hello')\n")
+                    if create_non_executable_script:
+                        scripts = root / "scripts"
+                        scripts.mkdir()
+                        script = scripts / "test.sh"
+                        script.write_text("#!/usr/bin/env bash\npytest\n")
+                        script.chmod(0o644)
+                    (workflows / "ci.yml").write_text(
+                        "name: ci\n"
+                        "jobs:\n"
+                        "  test:\n"
+                        "    runs-on: ubuntu-latest\n"
+                        "    steps:\n"
+                        "      - run: ./scripts/test.sh\n"
+                    )
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+                    matrix = {
+                        row["path"]: row
+                        for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+                    }
+
+                    self.assertFalse(report["checks"]["validation"]["has_full_gate"])
+                    self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
+                    self.assertEqual([], matrix["."]["ci_coverage"]["evidence"])
+
+    def test_workflow_local_command_guard_handles_shell_option_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            root.mkdir(exist_ok=True)
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            module = load_audit_module()
+
+            for command in (
+                "bash -o pipefail ./scripts/test.sh",
+                "bash -eo pipefail ./scripts/test.sh",
+            ):
+                with self.subTest(command=command):
+                    self.assertEqual("./scripts/test.sh", module.local_command_target(command))
+                    self.assertEqual([], module.workflow_command_scope_paths(root, ".", command))
+
     def test_pnpm_path_glob_filter_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -6466,6 +6572,32 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertTrue(validation["has_full_gate"])
             self.assertNotIn("no reusable closeout gate", titles)
+
+    def test_continue_on_error_reusable_workflow_job_does_not_count_as_full_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(json.dumps({"scripts": {}}) + "\n")
+            (root / "index.js").write_text("console.log('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  ci:\n"
+                "    continue-on-error: true\n"
+                "    uses: org/reusable/.github/workflows/ci.yml@v1\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertFalse(validation["has_full_gate"])
+            self.assertIn("no reusable closeout gate", titles)
 
     def test_unrecognized_workflow_command_does_not_count_as_full_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
