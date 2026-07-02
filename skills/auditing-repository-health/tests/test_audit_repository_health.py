@@ -2081,6 +2081,59 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             responsibilities = report["checks"]["scripts"]["responsibilities"]
             self.assertEqual("missing", responsibilities["test"]["status"])
 
+    def test_yarn_workspaces_foreach_requires_workspace_scripts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `yarn workspaces foreach run test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_yarn_workspaces_foreach_direct_script_requires_workspace_scripts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun tests with `yarn workspaces foreach test`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            self.assertIn("no test command or script", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
+    def test_yarn_workspaces_foreach_since_without_ref_requires_workspace_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_npm_fixture(
+                root,
+                "# Example\n\nRun type checks with `yarn workspaces foreach --since run typecheck`.\n",
+                '{"workspaces": ["packages/*"]}\n',
+                {"packages/app": '{"name": "app", "scripts": {"lint": "eslint ."}}\n'},
+            )
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("documented command target missing", titles)
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertEqual("missing", responsibilities["cibuild"]["status"])
+
     def test_yarn_workspace_command_documents_selected_workspace_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3808,6 +3861,54 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertEqual([], matrix["packages/worker"]["lint_format"]["evidence"])
 
+    def test_workflow_run_block_headers_accept_comments_and_modifiers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            commented_dir = root / "packages" / "commented"
+            indented_dir = root / "packages" / "indented"
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            commented_dir.mkdir(parents=True)
+            indented_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (commented_dir / "pyproject.toml").write_text("[project]\nname = 'commented'\nversion = '0.1.0'\n")
+            (indented_dir / "pyproject.toml").write_text("[project]\nname = 'indented'\nversion = '0.1.0'\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - name: commented worker tests\n"
+                "        working-directory: packages/commented\n"
+                "        run: | # package checks\n"
+                "          pytest\n"
+                "      - name: indented worker tests\n"
+                "        working-directory: packages/indented\n"
+                "        run: |2\n"
+                "          pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/commented"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pytest",
+                matrix["packages/commented"]["focused_test"]["evidence"],
+            )
+            self.assertEqual("present", matrix["packages/indented"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:pytest",
+                matrix["packages/indented"]["focused_test"]["evidence"],
+            )
+
     def test_action_inputs_do_not_count_as_top_level_workflow_run_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -4697,6 +4798,245 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertEqual("missing", matrix["packages/no-test"]["focused_test"]["status"])
             self.assertEqual([], matrix["packages/no-test"]["focused_test"]["evidence"])
             self.assertIn("packages/no-test", [item["path"] for item in findings])
+
+    def test_yarn_workspaces_foreach_include_ci_credits_only_selected_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            worker_dir = root / "packages" / "worker"
+            workflows = root / ".github" / "workflows"
+            app_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "root", "private": True, "workspaces": ["packages/*"]}) + "\n"
+            )
+            (app_dir / "package.json").write_text(
+                json.dumps({"name": "app", "private": True, "scripts": {"test": "vitest run"}}) + "\n"
+            )
+            (app_dir / "index.js").write_text("console.log('app')\n")
+            (worker_dir / "package.json").write_text(
+                json.dumps({"name": "worker", "private": True, "scripts": {"test": "vitest run"}}) + "\n"
+            )
+            (worker_dir / "index.js").write_text("console.log('worker')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: yarn workspaces foreach --include app run test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertEqual("present", matrix["packages/app"]["focused_test"]["status"])
+            self.assertIn(
+                ".github/workflows/ci.yml:yarn workspaces foreach --include app run test",
+                matrix["packages/app"]["focused_test"]["evidence"],
+            )
+            self.assertNotIn(
+                ".github/workflows/ci.yml:yarn workspaces foreach --include app run test",
+                matrix["packages/worker"]["focused_test"]["evidence"],
+            )
+            self.assertEqual("missing", matrix["packages/worker"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/worker"]["ci_coverage"]["evidence"])
+
+    def test_yarn_workspaces_foreach_include_ident_glob_ci_credits_matching_workspaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            worker_dir = root / "packages" / "worker"
+            other_dir = root / "packages" / "other"
+            workflows = root / ".github" / "workflows"
+            app_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            other_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "root", "private": True, "workspaces": ["packages/*"]}) + "\n"
+            )
+            for package_dir, name in (
+                (app_dir, "@acme/app"),
+                (worker_dir, "@acme/worker"),
+                (other_dir, "@other/app"),
+            ):
+                (package_dir / "package.json").write_text(
+                    json.dumps({"name": name, "private": True, "scripts": {"test": "vitest run"}}) + "\n"
+                )
+                (package_dir / "index.js").write_text(f"console.log({name!r})\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: yarn workspaces foreach --include '@acme/*' run test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            evidence = ".github/workflows/ci.yml:yarn workspaces foreach --include '@acme/*' run test"
+
+            self.assertIn(evidence, matrix["packages/app"]["ci_coverage"]["evidence"])
+            self.assertIn(evidence, matrix["packages/worker"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/other"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/other"]["ci_coverage"]["evidence"])
+
+    def test_yarn_workspaces_foreach_include_brace_ident_glob_ci_credits_matching_workspaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            worker_dir = root / "packages" / "worker"
+            other_dir = root / "packages" / "other"
+            workflows = root / ".github" / "workflows"
+            app_dir.mkdir(parents=True)
+            worker_dir.mkdir(parents=True)
+            other_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "root", "private": True, "workspaces": ["packages/*"]}) + "\n"
+            )
+            for package_dir, name in (
+                (app_dir, "@acme/app"),
+                (worker_dir, "@acme/worker"),
+                (other_dir, "@other/app"),
+            ):
+                (package_dir / "package.json").write_text(
+                    json.dumps({"name": name, "private": True, "scripts": {"test": "vitest run"}}) + "\n"
+                )
+                (package_dir / "index.js").write_text(f"console.log({name!r})\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: yarn workspaces foreach --include '{@acme/app,@acme/worker}' run test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            evidence = ".github/workflows/ci.yml:yarn workspaces foreach --include '{@acme/app,@acme/worker}' run test"
+
+            self.assertIn(evidence, matrix["packages/app"]["ci_coverage"]["evidence"])
+            self.assertIn(evidence, matrix["packages/worker"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/other"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/other"]["ci_coverage"]["evidence"])
+
+    def test_yarn_workspaces_foreach_from_recursive_ci_credits_dependencies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            app_dir = root / "packages" / "app"
+            shared_dir = root / "packages" / "shared"
+            other_dir = root / "packages" / "other"
+            workflows = root / ".github" / "workflows"
+            app_dir.mkdir(parents=True)
+            shared_dir.mkdir(parents=True)
+            other_dir.mkdir(parents=True)
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "package.json").write_text(
+                json.dumps({"name": "root", "private": True, "workspaces": ["packages/*"]}) + "\n"
+            )
+            (app_dir / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "app",
+                        "private": True,
+                        "dependencies": {"shared": "workspace:*"},
+                        "scripts": {"test": "vitest run"},
+                    }
+                )
+                + "\n"
+            )
+            (shared_dir / "package.json").write_text(
+                json.dumps({"name": "shared", "private": True, "scripts": {"test": "vitest run"}}) + "\n"
+            )
+            (other_dir / "package.json").write_text(
+                json.dumps({"name": "other", "private": True, "scripts": {"test": "vitest run"}}) + "\n"
+            )
+            for package_dir in (app_dir, shared_dir, other_dir):
+                (package_dir / "index.js").write_text("console.log('package')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: yarn workspaces foreach -R --from app run test\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+            evidence = ".github/workflows/ci.yml:yarn workspaces foreach -R --from app run test"
+
+            self.assertIn(evidence, matrix["packages/app"]["ci_coverage"]["evidence"])
+            self.assertIn(evidence, matrix["packages/shared"]["ci_coverage"]["evidence"])
+            self.assertEqual("missing", matrix["packages/other"]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["packages/other"]["ci_coverage"]["evidence"])
+
+    def test_continue_on_error_workflow_run_does_not_count_as_gate_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - name: optional tests\n"
+                "        continue-on-error: true\n"
+                "        run: pytest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {
+                row["path"]: row
+                for row in report["checks"]["lifecycle_gate_matrix"]["rows"]
+            }
+
+            self.assertFalse(report["checks"]["validation"]["has_full_gate"])
+            self.assertEqual("missing", matrix["."]["focused_test"]["status"])
+            self.assertEqual([], matrix["."]["focused_test"]["evidence"])
+            self.assertEqual("missing", matrix["."]["ci_coverage"]["status"])
+            self.assertEqual([], matrix["."]["ci_coverage"]["evidence"])
 
     def test_pnpm_path_glob_filter_counts_for_package_focused_tests(self):
         with tempfile.TemporaryDirectory() as tmp:

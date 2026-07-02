@@ -351,15 +351,17 @@ class WorkspaceSelection:
     all_workspaces: bool = False
     include_root: bool = False
     exclusions: List[str] = field(default_factory=list)
+    recursive_names: List[str] = field(default_factory=list)
 
     def extend(self, other: "WorkspaceSelection") -> None:
         self.names.extend(other.names)
         self.exclusions.extend(other.exclusions)
+        self.recursive_names.extend(other.recursive_names)
         self.all_workspaces = self.all_workspaces or other.all_workspaces
         self.include_root = self.include_root or other.include_root
 
     def enabled(self) -> bool:
-        return bool(self.names) or bool(self.exclusions) or self.all_workspaces
+        return bool(self.names) or bool(self.exclusions) or bool(self.recursive_names) or self.all_workspaces
 
 
 @dataclass(frozen=True)
@@ -2432,13 +2434,17 @@ def parse_package_manager_command(
         if arg.startswith("-"):
             return None
         command_args = args[index:]
+        yarn_foreach_script = yarn_workspaces_foreach_script(command_args) if tool == "yarn" else None
         workspace_selection.extend(package_manager_workspace_selection(tool, command_args))
         command_directory = package_manager_command_directory(root, directory, tool, command_args)
         if command_directory is None:
             return None
         directory = command_directory
-        script = package_manager_script_from_args(tool, command_args)
-        allow_missing_scripts = tool == "pnpm" and workspace_selection.all_workspaces
+        script = yarn_foreach_script or package_manager_script_from_args(tool, command_args)
+        allow_missing_scripts = (
+            (tool == "pnpm" and workspace_selection.all_workspaces)
+            or (tool == "yarn" and yarn_foreach_script is not None)
+        )
         if script == UNSUPPORTED_DIRECT_SCRIPT and tool == "npm":
             return PackageManagerCommand(None, script)
         if workspace_selection.enabled():
@@ -2457,6 +2463,8 @@ def package_manager_workspace_selection(tool: str, args: List[str]) -> Workspace
     command = normalize_package_manager_command(tool, args[0])
     if tool == "yarn" and command == "workspace":
         return yarn_workspace_command_selection(args)
+    if tool == "yarn" and command == "workspaces":
+        return yarn_workspaces_foreach_selection(args)
     if command in {"run", "run-script"}:
         return package_manager_run_workspace_selection(tool, args[1:])
     if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
@@ -2555,7 +2563,7 @@ def package_manager_command_directory(root: Path, directory: Path, tool: str, ar
     if not args:
         return directory
     command = normalize_package_manager_command(tool, args[0])
-    if tool == "yarn" and command == "workspace":
+    if tool == "yarn" and command in {"workspace", "workspaces"}:
         return directory
     if command in {"run", "run-script"}:
         return package_manager_run_command_directory(root, directory, tool, args[1:])
@@ -2806,7 +2814,8 @@ def resolve_package_workspaces(
     selected: List[Path] = []
     inclusions = selection.names
     exclusions = selection.exclusions
-    if selection.all_workspaces and not inclusions:
+    recursive_inclusions = selection.recursive_names
+    if selection.all_workspaces and not inclusions and not recursive_inclusions:
         selected.extend(declared)
     if tool == "pnpm" and exclusions and not inclusions and not selection.all_workspaces:
         selected.extend(declared)
@@ -2815,7 +2824,12 @@ def resolve_package_workspaces(
         if resolved is None:
             return None
         selected.extend(resolved)
-    if tool == "pnpm" and exclusions:
+    for workspace in recursive_inclusions:
+        resolved = resolve_declared_package_workspaces(package_root, declared, workspace, tool)
+        if resolved is None:
+            return None
+        selected.extend(resolve_recursive_dependency_workspaces(declared, resolved))
+    if tool in {"pnpm", "yarn"} and exclusions:
         excluded: List[Path] = []
         for workspace in exclusions:
             resolved = resolve_declared_package_workspaces(package_root, declared, workspace, tool)
@@ -3016,6 +3030,10 @@ def resolve_declared_package_workspaces(
             if tool == "pnpm" and has_pnpm_relation_adornment(normalized):
                 return None
             return [workspace_dir]
+    if tool == "yarn":
+        package_ident_matches = resolve_package_ident_workspaces(declared, exact_selector)
+        if package_ident_matches is not None:
+            return unique_paths(package_ident_matches) or None
     filter_selector = normalize_pnpm_filter_selector(exact_selector)
     if filter_selector is None:
         return None
@@ -3031,6 +3049,44 @@ def resolve_declared_package_workspaces(
             relation_selector,
         ) or None
     return unique_paths(matches) or None
+
+
+def resolve_recursive_dependency_workspaces(
+    declared: List[Path],
+    base_workspaces: List[Path],
+) -> List[Path]:
+    graph = pnpm_workspace_dependency_graph(declared)
+    selected: List[Path] = []
+    for base_workspace in base_workspaces:
+        selected.append(base_workspace)
+        selected.extend(transitive_related_workspaces(graph, base_workspace))
+    return unique_paths(selected)
+
+
+def resolve_package_ident_workspaces(
+    declared: List[Path],
+    selector: str,
+) -> Optional[List[Path]]:
+    normalized = selector.strip().rstrip("/")
+    if not normalized:
+        return None
+    names = [
+        (workspace_dir, name)
+        for workspace_dir in declared
+        if (name := read_package_name(workspace_dir / "package.json"))
+    ]
+    exact_matches = [workspace_dir for workspace_dir, name in names if name == normalized]
+    if exact_matches:
+        return exact_matches
+    if any(char in normalized for char in "*?[{"):
+        glob_matches = [
+            workspace_dir
+            for workspace_dir, name in names
+            if any(fnmatch.fnmatch(name, expanded_selector) for expanded_selector in expand_brace_glob(normalized))
+        ]
+        if glob_matches:
+            return glob_matches
+    return None
 
 
 def resolve_pnpm_package_name_workspaces(
@@ -3331,6 +3387,8 @@ def package_manager_script_from_args(tool: str, args: List[str]) -> Optional[str
         if len(args) < 3:
             return None
         return package_manager_script_from_args(tool, args[2:])
+    if tool == "yarn" and command == "workspaces":
+        return yarn_workspaces_foreach_script(args)
     if command in {"run", "run-script"}:
         return first_package_manager_run_arg(tool, args[1:])
     if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES.get(tool, set()):
@@ -3348,6 +3406,98 @@ def yarn_workspace_command_selection(args: List[str]) -> WorkspaceSelection:
     if len(args) < 2:
         return WorkspaceSelection([])
     return WorkspaceSelection([args[1]])
+
+
+def yarn_workspaces_foreach_selection(args: List[str]) -> WorkspaceSelection:
+    parsed = parse_yarn_workspaces_foreach(args)
+    if parsed is None:
+        return WorkspaceSelection([])
+    selection, _ = parsed
+    return selection
+
+
+def yarn_workspaces_foreach_script(args: List[str]) -> Optional[str]:
+    parsed = parse_yarn_workspaces_foreach(args)
+    if parsed is None:
+        return None
+    _, script = parsed
+    return script
+
+
+def parse_yarn_workspaces_foreach(args: List[str]) -> Optional[Tuple[WorkspaceSelection, str]]:
+    if len(args) < 3 or args[0] != "workspaces" or args[1] != "foreach":
+        return None
+    selection = WorkspaceSelection([])
+    recursive_from_names: List[str] = []
+    recursive = False
+    index = 2
+    while index < len(args):
+        token = args[index]
+        if token == "--":
+            index += 1
+            break
+        if token in {"-R", "--recursive"}:
+            recursive = True
+            index += 1
+            continue
+        if token in {"--from", "--include"}:
+            if index + 1 >= len(args):
+                return None
+            if token == "--from":
+                recursive_from_names.append(args[index + 1])
+            else:
+                add_workspace_selection_name(selection, "yarn", args[index + 1])
+            index += 2
+            continue
+        if token.startswith("--from="):
+            recursive_from_names.append(token.split("=", 1)[1])
+            index += 1
+            continue
+        if token.startswith("--include="):
+            add_workspace_selection_name(selection, "yarn", token.split("=", 1)[1])
+            index += 1
+            continue
+        if token == "--exclude":
+            if index + 1 >= len(args):
+                return None
+            selection.exclusions.append(args[index + 1])
+            index += 2
+            continue
+        if token.startswith("--exclude="):
+            selection.exclusions.append(token.split("=", 1)[1])
+            index += 1
+            continue
+        if token in {"--jobs", "-j"}:
+            index += 2 if index + 1 < len(args) else 1
+            continue
+        if token == "--since":
+            index += 1
+            continue
+        if any(token.startswith(f"{option}=") for option in {"--since", "--jobs"}):
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        break
+    if index >= len(args):
+        return None
+    if args[index] == "run":
+        script = first_package_manager_run_arg("yarn", args[index + 1:])
+    else:
+        command = normalize_package_manager_command("yarn", args[index])
+        script = command if command in PACKAGE_MANAGER_DIRECT_SCRIPT_ALIASES["yarn"] else None
+    if script is None:
+        return None
+    # Yarn foreach skips missing scripts; later script filtering decides which selected workspaces count.
+    if recursive and recursive_from_names:
+        selection.recursive_names.extend(recursive_from_names)
+    else:
+        for workspace in recursive_from_names:
+            add_workspace_selection_name(selection, "yarn", workspace)
+    if not selection.names and not selection.recursive_names:
+        selection.all_workspaces = True
+    return selection, script
 
 
 def normalize_package_manager_command(tool: str, command: str) -> str:
@@ -4101,7 +4251,9 @@ def package_manager_command_has_explicit_scope(tokens: List[str]) -> bool:
             continue
         if arg.startswith("-"):
             return package_manager_args_contain_scope_option(tool, args, index + 1)
-        return tool == "yarn" and normalize_package_manager_command(tool, arg) == "workspace"
+        if tool == "yarn" and normalize_package_manager_command(tool, arg) in {"workspace", "workspaces"}:
+            return True
+        return False
     return False
 
 
@@ -4312,6 +4464,8 @@ def parse_defaults_run_directory(lines: List[str], start_index: int, defaults_in
 def parse_workflow_step(lines: List[str], default_directory: str = ".") -> List[Tuple[str, str]]:
     directory = workflow_step_directory(lines, default_directory)
     commands: List[Tuple[str, str]] = []
+    if workflow_step_continue_on_error(lines):
+        return commands
     step_key_indent = workflow_step_key_indent(lines)
     index = 0
     while index < len(lines):
@@ -4351,6 +4505,20 @@ def parse_workflow_step(lines: List[str], default_directory: str = ".") -> List[
     return commands
 
 
+def workflow_step_continue_on_error(lines: List[str]) -> bool:
+    step_key_indent = workflow_step_key_indent(lines)
+    for line in lines:
+        stripped = line.strip()
+        if leading_spaces(line) != step_key_indent:
+            continue
+        if not stripped.startswith("continue-on-error:"):
+            continue
+        value = workflow_scalar_value(stripped.split(":", 1)[1]).lower()
+        # Non-false values can let the step fail without failing the job, so they are not gate evidence.
+        return value not in {"", "false", "0", "no", "off"}
+    return False
+
+
 def workflow_step_directory(lines: List[str], default_directory: str = ".") -> str:
     directory = normalize_workflow_directory(default_directory)
     step_key_indent = workflow_step_key_indent(lines)
@@ -4372,10 +4540,16 @@ def workflow_step_key_indent(lines: List[str]) -> int:
 
 
 def workflow_block_scalar_style(value: str) -> Optional[str]:
-    header = value.strip()
-    if header in {"|", "|-", "|+"}:
+    header = strip_unquoted_yaml_comment(value).strip()
+    if len(header) < 1:
+        return None
+    indicator = header[0]
+    modifiers = header[1:]
+    if not re.fullmatch(r"(?:[+-]?[1-9]?|[1-9][+-])", modifiers):
+        return None
+    if indicator == "|":
         return "literal"
-    if header in {">", ">-", ">+"}:
+    if indicator == ">":
         return "folded"
     return None
 
