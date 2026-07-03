@@ -7,6 +7,7 @@ Preserve all existing script report sections:
 ## Findings
 ## Repository Shape
 ## Repository Inventory
+## Folder Structure
 ## Lifecycle Gate Matrix
 ## Documentation
 ## Scripts
@@ -40,6 +41,20 @@ List each boundary with:
 - ecosystem
 - manifest evidence
 - whether it is root/shared or package-specific
+
+## Folder Structure
+
+Required for every audit.
+
+Include:
+
+- top-level directories and files
+- hidden tracked roots, including agent/tool state
+- loose root implementation files when package/app boundaries already exist
+- loose root documentation files that should move under `docs/`
+- ungrouped sibling package directories
+
+Do not treat tracked hidden agent/config/evidence state as generated junk based only on a file extension or dot-directory name.
 
 ## Lifecycle Gate Matrix
 

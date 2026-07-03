@@ -61,4 +61,5 @@ Look for:
 - setup, focused test, and full validation responsibilities
 - CI workflows or documented release gates
 - generated-file ignore policy
+- folder structure, root clutter, hidden tracked roots, and file placement
 - release or deployment instructions when artifacts ship

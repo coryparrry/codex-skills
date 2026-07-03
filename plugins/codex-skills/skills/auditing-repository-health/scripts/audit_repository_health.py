@@ -17,6 +17,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python <3.11 fallback.
+    tomllib = None
+
 
 SKIP_DIRS = {
     ".git",
@@ -55,6 +60,9 @@ GENERATED_PATTERNS = [
 ]
 
 NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
+# Keep this allowlist narrow: these paths hold tracked task evidence, so a .log
+# extension alone should not imply deletion for those files.
+TRACKED_EVIDENCE_LOG_PREFIXES = (".superpowers/sdd/",)
 TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
 TEST_ASSET_FIXTURE_DIRS = {"fixtures", "test-data", "testdata"}
 TEST_ASSET_EXAMPLE_DIRS = {"examples"}
@@ -68,6 +76,64 @@ PACKAGE_DOCUMENTATION_BOUNDARY_KINDS = {
     "ruby-package",
     "rust-crate",
     "swift-package",
+}
+PACKAGE_BOUNDARY_KINDS = PACKAGE_DOCUMENTATION_BOUNDARY_KINDS - {"docs-site"}
+STRUCTURED_SOURCE_DIRS = {"app", "apps", "crates", "libs", "modules", "packages", "services", "src", "Sources"}
+ROOT_IMPLEMENTATION_EXTENSIONS = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".go",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".m",
+    ".mm",
+    ".php",
+    ".py",
+    ".rb",
+    ".rs",
+    ".swift",
+    ".ts",
+    ".tsx",
+}
+ROOT_IMPLEMENTATION_ALLOWLIST = {
+    "babel.config.js",
+    "conftest.py",
+    "eslint.config.js",
+    "gulpfile.js",
+    "jest.config.js",
+    "karma.conf.js",
+    "manage.py",
+    "next.config.js",
+    "next.config.mjs",
+    "postcss.config.js",
+    "rollup.config.js",
+    "setup.py",
+    "tailwind.config.js",
+    "vite.config.js",
+    "vite.config.ts",
+    "webpack.config.js",
+}
+ROOT_DOC_ALLOW_PREFIXES = {
+    "agents",
+    "authors",
+    "changelog",
+    "changes",
+    "citation",
+    "claude",
+    "code_of_conduct",
+    "contributing",
+    "gemini",
+    "governance",
+    "license",
+    "maintainers",
+    "notice",
+    "readme",
+    "security",
+    "support",
 }
 
 RESPONSIBILITY_PATHS = {
@@ -598,6 +664,7 @@ class Audit:
         checks: Dict[str, Any] = {}
         checks["repository_shape"] = self.check_repository_shape(root)
         checks["repository_inventory"] = self.check_repository_inventory(root)
+        checks["folder_structure"] = self.check_folder_structure(root, checks["repository_inventory"])
         checks["documentation"] = self.check_documentation(root)
         checks["scripts"] = self.check_scripts(root)
         checks["validation"] = self.check_validation(root, checks["scripts"])
@@ -801,6 +868,57 @@ class Audit:
             "ecosystems": sorted(ecosystems),
             "boundaries": boundaries,
             "suggested_overlays": overlays,
+        }
+
+    def check_folder_structure(self, root: Path, inventory: Dict[str, Any]) -> Dict[str, Any]:
+        tracked_result = self.git(["ls-files", "-z", "--", "."], root)
+        if tracked_result.returncode == 0:
+            tracked_paths = sorted(path for path in tracked_result.stdout.split("\0") if path)
+        else:
+            # Exported source trees should still get structure analysis even when
+            # Git metadata is unavailable.
+            tracked_paths = sorted(relative_path(root, path) for path in iter_files(root))
+        top_level_files = sorted(path for path in tracked_paths if "/" not in path)
+        top_level_dirs = sorted({path.split("/", 1)[0] for path in tracked_paths if "/" in path})
+        hidden_roots = sorted(name for name in {*top_level_dirs, *top_level_files} if name.startswith("."))
+        loose_root_source = sorted(
+            path for path in top_level_files if root_implementation_file_is_loose(path, inventory)
+        )
+        loose_root_docs = sorted(path for path in top_level_files if root_doc_file_is_loose(path))
+        ungrouped_package_dirs = ungrouped_package_directories(root, inventory)
+
+        if loose_root_source:
+            self.add_finding(
+                "P3",
+                "loose root implementation files",
+                loose_root_source[:20],
+                "Executable source mixed into the repo root makes ownership and lifecycle scope harder to read.",
+                "Move implementation files into src/ or the owning package/app directory, or document intentional root entrypoints.",
+            )
+        if len(loose_root_docs) >= 4:
+            self.add_finding(
+                "P3",
+                "loose root documentation files",
+                loose_root_docs[:20],
+                "Root-level docs compete with README and make source-of-truth navigation noisier.",
+                "Keep root docs to entrypoint/meta files and move durable guides, plans, and references under docs/.",
+            )
+        if ungrouped_package_dirs:
+            self.add_finding(
+                "P3",
+                "package directories are not grouped",
+                ungrouped_package_dirs[:20],
+                "Sibling packages at the repository root make the project layout harder to scan as it grows.",
+                "Group sibling apps/packages/services under a conventional container or document the intentional top-level split.",
+            )
+
+        return {
+            "top_level_directories": top_level_dirs,
+            "top_level_files": top_level_files,
+            "hidden_roots": hidden_roots,
+            "loose_root_source_files": loose_root_source,
+            "loose_root_documentation_files": loose_root_docs,
+            "ungrouped_package_directories": ungrouped_package_dirs,
         }
 
     def check_documentation(self, root: Path) -> Dict[str, Any]:
@@ -1428,6 +1546,163 @@ def classify_repository_purpose(boundaries: List[Dict[str, Any]]) -> str:
     if "infra-iac" in kinds:
         return "infra"
     return "mixed"
+
+
+def root_implementation_file_is_loose(path: str, inventory: Dict[str, Any]) -> bool:
+    if "/" in path:
+        return False
+    name = posixpath.basename(path)
+    suffix = Path(name).suffix.lower()
+    if suffix not in ROOT_IMPLEMENTATION_EXTENSIONS:
+        return False
+    if name in ROOT_IMPLEMENTATION_ALLOWLIST or ".config." in name:
+        return False
+    # A lone root script can be legitimate. It becomes suspicious once the repo
+    # already has explicit app/package boundaries where implementation belongs.
+    return any(
+        boundary["path"] != "." and boundary["kind"] in PACKAGE_BOUNDARY_KINDS
+        for boundary in inventory["boundaries"]
+    )
+
+
+def root_doc_file_is_loose(path: str) -> bool:
+    if "/" in path or Path(path).suffix.lower() not in {".adoc", ".md", ".rst"}:
+        return False
+    normalized = re.sub(r"[^a-z0-9]+", "_", Path(path).stem.lower()).strip("_")
+    return normalized not in ROOT_DOC_ALLOW_PREFIXES
+
+
+def ungrouped_package_directories(root: Path, inventory: Dict[str, Any]) -> List[str]:
+    if has_workspace_grouping_file(root):
+        return []
+    package_dirs = sorted(
+        boundary["path"]
+        for boundary in inventory["boundaries"]
+        if boundary["path"] != "."
+        and "/" not in boundary["path"]
+        and boundary["kind"] in PACKAGE_BOUNDARY_KINDS
+        and boundary["path"] not in STRUCTURED_SOURCE_DIRS
+        and not boundary["path"].startswith(".")
+    )
+    return package_dirs if len(package_dirs) >= 2 else []
+
+
+def has_workspace_grouping_file(root: Path) -> bool:
+    # Workspace manifests are enough proof that top-level package placement is
+    # intentional; audits should report the shape, not relitigate every layout.
+    if any(
+        (root / name).is_file()
+        for name in (
+            "pnpm-workspace.yaml",
+            "pnpm-workspace.yml",
+            "turbo.json",
+            "rush.json",
+            "lerna.json",
+            "nx.json",
+        )
+    ):
+        return True
+    if (root / "go.work").is_file():
+        return True
+    if rust_workspace_manifest(root / "Cargo.toml"):
+        return True
+    if gradle_settings_declares_modules(root):
+        return True
+    if python_workspace_manifest(root / "pyproject.toml"):
+        return True
+    package_json = root / "package.json"
+    if not package_json.is_file():
+        return False
+    try:
+        data = json.loads(safe_read_text(package_json, limit=200_000))
+    except json.JSONDecodeError:
+        return False
+    workspaces = data.get("workspaces") if isinstance(data, dict) else None
+    if isinstance(workspaces, list):
+        return bool(workspaces)
+    if isinstance(workspaces, dict):
+        packages = workspaces.get("packages")
+        return isinstance(packages, list) and bool(packages)
+    return False
+
+
+def rust_workspace_manifest(path: Path) -> bool:
+    data = read_toml_file(path)
+    workspace = data.get("workspace") if isinstance(data, dict) else None
+    if not isinstance(workspace, dict):
+        return False
+    members = workspace.get("members")
+    return isinstance(members, list) and bool(members)
+
+
+def python_workspace_manifest(path: Path) -> bool:
+    data = read_toml_file(path)
+    if not isinstance(data, dict):
+        return False
+    tool = data.get("tool")
+    uv = tool.get("uv") if isinstance(tool, dict) else None
+    workspace = uv.get("workspace") if isinstance(uv, dict) else None
+    members = workspace.get("members") if isinstance(workspace, dict) else None
+    return isinstance(members, list) and bool(members)
+
+
+def read_toml_file(path: Path) -> Dict[str, Any]:
+    if not path.is_file():
+        return {}
+    text = safe_read_text(path, limit=300_000)
+    if tomllib is None:
+        return read_workspace_toml_fallback(text)
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return {}
+
+
+def read_workspace_toml_fallback(text: str) -> Dict[str, Any]:
+    # Python 3.10 lacks tomllib. This fallback only preserves the workspace
+    # signal needed to avoid false folder-structure findings.
+    result: Dict[str, Any] = {}
+    section: Tuple[str, ...] = ()
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index].split("#", 1)[0].strip()
+        if line.startswith("[") and line.endswith("]"):
+            section = tuple(part.strip() for part in line.strip("[]").split(".") if part.strip())
+            index += 1
+            continue
+        if section in {("workspace",), ("tool", "uv", "workspace")} and line.startswith("members"):
+            _, _, value = line.partition("=")
+            while "[" in value and "]" not in value and index + 1 < len(lines):
+                index += 1
+                value += "\n" + lines[index].split("#", 1)[0]
+            members = re.findall(r"['\"]([^'\"]+)['\"]", value)
+            if members:
+                set_nested_toml_value(result, section + ("members",), members)
+        index += 1
+    return result
+
+
+def set_nested_toml_value(result: Dict[str, Any], key_path: Tuple[str, ...], value: Any) -> None:
+    current = result
+    for key in key_path[:-1]:
+        next_value = current.setdefault(key, {})
+        if not isinstance(next_value, dict):
+            return
+        current = next_value
+    current[key_path[-1]] = value
+
+
+def gradle_settings_declares_modules(root: Path) -> bool:
+    for name in ("settings.gradle", "settings.gradle.kts"):
+        path = root / name
+        if not path.is_file():
+            continue
+        text = safe_read_text(path, limit=300_000)
+        # Gradle multi-project builds declare included project paths here.
+        if re.search(r"(?m)^\s*include(?:Build)?\s*(?:\(|['\"])", text):
+            return True
+    return False
 
 
 def expects_package_focused_tests(boundary: Dict[str, Any]) -> bool:
@@ -4052,11 +4327,17 @@ def directory_fingerprint(path: Path) -> Dict[str, str]:
 
 def is_generated_path(path: str, root: Optional[Path] = None) -> bool:
     normalized = path.replace(os.sep, "/")
+    if fnmatch.fnmatch(normalized, "*.log") and is_tracked_evidence_hidden_log_path(normalized):
+        return False
     if any(fnmatch.fnmatch(normalized, pattern) for pattern in GENERATED_PATTERNS):
         return True
     if root is None:
         return False
     return is_nested_generated_path(normalized, root)
+
+
+def is_tracked_evidence_hidden_log_path(path: str) -> bool:
+    return any(path.startswith(prefix) for prefix in TRACKED_EVIDENCE_LOG_PREFIXES)
 
 
 def is_nested_generated_path(path: str, root: Path) -> bool:
@@ -5467,6 +5748,7 @@ def render_markdown(report: Dict[str, Any]) -> str:
     lines.extend(render_findings(report["findings"]))
     lines.extend(render_repository_shape(checks["repository_shape"]))
     lines.extend(render_repository_inventory(checks["repository_inventory"]))
+    lines.extend(render_folder_structure(checks["folder_structure"]))
     lines.extend(render_lifecycle_gate_matrix(checks["lifecycle_gate_matrix"]))
     lines.extend(render_documentation(checks["documentation"]))
     lines.extend(render_scripts(checks["scripts"]))
@@ -5537,6 +5819,19 @@ def render_repository_inventory(inventory: Dict[str, Any]) -> List[str]:
         )
     lines.append("")
     return lines
+
+
+def render_folder_structure(structure: Dict[str, Any]) -> List[str]:
+    return [
+        "## Folder Structure",
+        f"- Top-level directories: {format_present(structure['top_level_directories'])}",
+        f"- Top-level files: {format_present(structure['top_level_files'])}",
+        f"- Hidden tracked roots: {format_present(structure['hidden_roots'])}",
+        f"- Loose root source files: {format_present(structure['loose_root_source_files'])}",
+        f"- Loose root documentation files: {format_present(structure['loose_root_documentation_files'])}",
+        f"- Ungrouped package directories: {format_present(structure['ungrouped_package_directories'])}",
+        "",
+    ]
 
 
 def render_lifecycle_gate_matrix(matrix: Dict[str, Any]) -> List[str]:
