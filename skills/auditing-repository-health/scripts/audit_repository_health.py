@@ -2061,8 +2061,9 @@ def documented_direct_test_target_missing(root: Path, command_base: Path, comman
         directory = "."
     if tokens[0] == "go":
         return documented_go_test_has_missing_local_path_arg(root, directory, tokens)
-    if tokens[0] in DIRECT_TEST_PATH_TOOLS:
-        return documented_direct_test_has_missing_local_path_arg(root, directory, tokens)
+    direct_test_tokens = direct_test_path_tool_tokens(tokens)
+    if direct_test_tokens is not None:
+        return documented_direct_test_has_missing_local_path_arg(root, directory, direct_test_tokens)
     return False
 
 
@@ -2183,6 +2184,7 @@ def pip_install_target_missing(root: Path, command_base: Path, tokens: List[str]
     while index < len(args):
         arg = args[index]
         requirement: Optional[str] = None
+        local_project: Optional[str] = None
         if arg in {"-r", "--requirement"}:
             if index + 1 >= len(args):
                 return True
@@ -2191,14 +2193,114 @@ def pip_install_target_missing(root: Path, command_base: Path, tokens: List[str]
         elif arg.startswith("--requirement="):
             requirement = arg.split("=", 1)[1]
             index += 1
+        elif arg in {"-e", "--editable"}:
+            if index + 1 >= len(args):
+                return True
+            local_project = args[index + 1]
+            index += 2
+        elif arg.startswith("--editable="):
+            local_project = arg.split("=", 1)[1]
+            index += 1
+        elif arg in PIP_INSTALL_VALUE_OPTIONS:
+            index += 2 if index + 1 < len(args) else len(args)
+        elif any(arg.startswith(f"{option}=") for option in PIP_INSTALL_VALUE_OPTIONS if option.startswith("--")):
+            index += 1
+        elif arg.startswith("-"):
+            index += 1
         else:
+            local_project = arg if pip_install_arg_looks_like_local_path(arg) else None
             index += 1
         if requirement is None:
+            if local_project is None:
+                continue
+            if pip_install_local_project_missing(root, command_base, local_project):
+                return True
             continue
-        path = resolve_repo_path(root, command_base, requirement)
-        if path is None or not path.is_file():
+        requirement_path = resolve_repo_path(root, command_base, requirement)
+        if requirement_path is None or not requirement_path.is_file():
             return True
     return False
+
+
+PIP_INSTALL_VALUE_OPTIONS = {
+    "-c",
+    "--constraint",
+    "--build-constraint",
+    "--requirements-from-script",
+    "-t",
+    "--target",
+    "--platform",
+    "--python-version",
+    "--implementation",
+    "--abi",
+    "--root",
+    "--prefix",
+    "--src",
+    "--upgrade-strategy",
+    "--config-settings",
+    "-C",
+    "--progress-bar",
+    "--root-user-action",
+    "--report",
+    "--group",
+    "--all-releases",
+    "--only-final",
+    "--no-binary",
+    "--only-binary",
+    "-i",
+    "--index-url",
+    "--extra-index-url",
+    "-f",
+    "--find-links",
+    "--uploaded-prior-to",
+    "--python",
+    "--log",
+    "--keyring-provider",
+    "--proxy",
+    "--retries",
+    "--timeout",
+    "--resume-retries",
+    "--exists-action",
+    "--trusted-host",
+    "--cert",
+    "--client-cert",
+    "--cache-dir",
+    "--use-feature",
+    "--use-deprecated",
+}
+
+PYTHON_PROJECT_MANIFESTS = {"pyproject.toml", "setup.py", "setup.cfg"}
+
+
+def pip_install_arg_looks_like_local_path(arg: str) -> bool:
+    target = pip_install_strip_local_extras(arg)
+    return target in {".", ".."} or target.startswith(("./", "../", "/")) or "/" in target
+
+
+def pip_install_local_project_missing(root: Path, command_base: Path, target: str) -> bool:
+    if pip_install_target_is_url(target):
+        return False
+    path = resolve_repo_path(root, command_base, pip_install_strip_local_extras(target))
+    if path is None or not path.exists():
+        return True
+    if path.is_dir():
+        return not any((path / name).exists() for name in PYTHON_PROJECT_MANIFESTS)
+    return False
+
+
+def pip_install_strip_local_extras(target: str) -> str:
+    # Extras are requirement metadata, not part of the local project path.
+    match = re.match(r"^(.+)\[[A-Za-z0-9_.-]+(?:\s*,\s*[A-Za-z0-9_.-]+)*\]$", target)
+    return match.group(1) if match else target
+
+
+def pip_install_target_is_url(target: str) -> bool:
+    # PEP 508 direct references are one shell token like "pkg @ https://...".
+    direct_reference = re.search(r"\s@\s*(.+)$", target)
+    candidate = direct_reference.group(1).strip() if direct_reference else target
+    return bool(re.match(r"^[a-z][a-z0-9+.-]*://", candidate)) or candidate.startswith(
+        ("git+", "hg+", "svn+", "bzr+")
+    )
 
 
 def package_manager_target_missing(
@@ -4825,6 +4927,7 @@ def classify_workflow_name(name: str) -> List[str]:
         "pytest": "test",
         "rspec": "test",
         "tox": "test",
+        "unittest": "test",
         "vitest": "test",
         "ruff": "lint",
         "mypy": "typecheck",

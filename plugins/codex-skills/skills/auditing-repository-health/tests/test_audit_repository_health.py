@@ -667,6 +667,25 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("documented command target missing", titles)
             self.assertEqual("missing", responsibilities["test"]["status"])
 
+    def test_python_module_pytest_missing_path_is_stale_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text(
+                "# Example\n\nRun focused tests with `python -m pytest missing_tests`.\n"
+            )
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (root / "app.py").write_text("print('hello')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            responsibilities = report["checks"]["scripts"]["responsibilities"]
+            self.assertIn("documented command target missing", titles)
+            self.assertEqual("missing", responsibilities["test"]["status"])
+
     def test_python_module_pip_missing_requirements_file_is_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -684,6 +703,150 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             titles = {finding["title"] for finding in report["findings"]}
             self.assertIn("documented command target missing", titles)
             self.assertIn("no setup or bootstrap script", titles)
+
+    def test_pip_install_missing_editable_project_path_is_stale_documentation(self):
+        for command in (
+            "pip install -e missingpkg",
+            "pip install --editable=missingpkg",
+            "python -m pip install -e missingpkg",
+        ):
+            with self.subTest(command=command):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    (root / "README.md").write_text(f"# Example\n\nInstall dependencies with `{command}`.\n")
+                    (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+                    (root / "requirements.txt").write_text("requests\n")
+                    (root / "app.py").write_text("print('hello')\n")
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+
+                    titles = {finding["title"] for finding in report["findings"]}
+                    responsibilities = report["checks"]["scripts"]["responsibilities"]
+                    self.assertIn("documented command target missing", titles)
+                    self.assertEqual("missing", responsibilities["setup"]["status"])
+
+    def test_pip_install_dot_requires_python_project_manifest(self):
+        for has_project_manifest in (False, True):
+            with self.subTest(has_project_manifest=has_project_manifest):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    (root / "README.md").write_text("# Example\n\nInstall dependencies with `pip install .`.\n")
+                    (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+                    if has_project_manifest:
+                        (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+                    else:
+                        (root / "requirements.txt").write_text("requests\n")
+                    (root / "app.py").write_text("print('hello')\n")
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+
+                    titles = {finding["title"] for finding in report["findings"]}
+                    responsibilities = report["checks"]["scripts"]["responsibilities"]
+                    if has_project_manifest:
+                        self.assertNotIn("documented command target missing", titles)
+                        self.assertEqual("documented", responsibilities["setup"]["status"])
+                    else:
+                        self.assertIn("documented command target missing", titles)
+                        self.assertEqual("missing", responsibilities["setup"]["status"])
+
+    def test_pip_install_local_project_extras_use_project_path(self):
+        for command, project_dir in (
+            ("pip install -e .[dev]", None),
+            ("pip install .[dev]", None),
+            ("pip install -e ./pkg[dev]", "pkg"),
+            ("pip install ./pkg[dev]", "pkg"),
+        ):
+            with self.subTest(command=command):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    (root / "README.md").write_text(f"# Example\n\nInstall dependencies with `{command}`.\n")
+                    (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+                    if project_dir is None:
+                        (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+                    else:
+                        package = root / project_dir
+                        package.mkdir()
+                        (package / "pyproject.toml").write_text("[project]\nname = 'pkg'\nversion = '0.1.0'\n")
+                    (root / "app.py").write_text("print('hello')\n")
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+
+                    titles = {finding["title"] for finding in report["findings"]}
+                    responsibilities = report["checks"]["scripts"]["responsibilities"]
+                    self.assertNotIn("documented command target missing", titles)
+                    self.assertEqual("documented", responsibilities["setup"]["status"])
+
+    def test_pip_install_pep508_direct_url_is_not_local_project_target(self):
+        for command in (
+            'pip install "mypkg @ git+https://github.com/org/repo.git"',
+            'pip install "mypkg @ https://example.com/pkg.whl"',
+        ):
+            with self.subTest(command=command):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    (root / "README.md").write_text(f"# Example\n\nInstall dependencies with `{command}`.\n")
+                    (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+                    (root / "app.py").write_text("print('hello')\n")
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+
+                    titles = {finding["title"] for finding in report["findings"]}
+                    responsibilities = report["checks"]["scripts"]["responsibilities"]
+                    self.assertNotIn("documented command target missing", titles)
+                    self.assertEqual("documented", responsibilities["setup"]["status"])
+
+    def test_pip_install_find_links_option_value_is_not_local_project_target(self):
+        for command in (
+            "pip install --find-links ./wheels mypkg",
+            "pip install --find-links=./wheels mypkg",
+            "pip install -f ./wheels mypkg",
+        ):
+            with self.subTest(command=command):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    (root / "README.md").write_text(f"# Example\n\nInstall dependencies with `{command}`.\n")
+                    (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+                    (root / "wheels").mkdir()
+                    (root / "app.py").write_text("print('hello')\n")
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+
+                    titles = {finding["title"] for finding in report["findings"]}
+                    responsibilities = report["checks"]["scripts"]["responsibilities"]
+                    self.assertNotIn("documented command target missing", titles)
+                    self.assertEqual("documented", responsibilities["setup"]["status"])
+
+    def test_pip_install_report_option_value_is_not_local_project_target(self):
+        for command in (
+            "pip install --report build/install-report.json -r requirements.txt",
+            "pip install --report=build/install-report.json -r requirements.txt",
+        ):
+            with self.subTest(command=command):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.init_repo(root)
+                    (root / "README.md").write_text(f"# Example\n\nInstall dependencies with `{command}`.\n")
+                    (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+                    (root / "requirements.txt").write_text("requests\n")
+                    (root / "app.py").write_text("print('hello')\n")
+                    self.commit_all(root)
+
+                    report = self.audit_report(root)
+
+                    titles = {finding["title"] for finding in report["findings"]}
+                    responsibilities = report["checks"]["scripts"]["responsibilities"]
+                    self.assertNotIn("documented command target missing", titles)
+                    self.assertEqual("documented", responsibilities["setup"]["status"])
 
     def test_uv_pip_missing_requirements_file_is_stale_documentation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -6643,6 +6806,7 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             "npx vitest run",
             "npx --yes vitest run",
             "npx -y vitest run",
+            "python -m unittest",
             "pnpm exec vitest",
             "npm exec -- vitest run",
             "pnpm exec -- vitest",
@@ -6651,6 +6815,36 @@ class AuditRepositoryHealthTests(unittest.TestCase):
                 self.assertTrue(module.workflow_command_counts_as_ci_coverage(command))
 
         self.assertNotIn("test", module.workflow_command_responsibilities("./gradlew build -x test"))
+
+    def test_workflow_python_unittest_counts_as_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n")
+            (root / "pyproject.toml").write_text("[project]\nname = 'root'\nversion = '0.1.0'\n")
+            (root / "app.py").write_text("print('hello')\n")
+            (workflows / "ci.yml").write_text(
+                "name: ci\n"
+                "jobs:\n"
+                "  test:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - run: python -m unittest\n"
+            )
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+            matrix = {row["path"]: row for row in report["checks"]["lifecycle_gate_matrix"]["rows"]}
+            validation = report["checks"]["validation"]
+            titles = {finding["title"] for finding in report["findings"]}
+
+            self.assertTrue(validation["has_full_gate"])
+            self.assertEqual("present", matrix["."]["focused_test"]["status"])
+            self.assertEqual("present", matrix["."]["ci_coverage"]["status"])
+            self.assertNotIn("no reusable closeout gate", titles)
 
     def test_missing_package_manager_script_does_not_count_as_full_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
