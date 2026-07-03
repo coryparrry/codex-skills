@@ -36,6 +36,13 @@
       "skills": [
         "git-clean-merged-branch"
       ]
+    },
+    {
+      "title": "Repository Health",
+      "description": "Skills for repository onboarding, validation, hygiene, and packaging readiness.",
+      "skills": [
+        "auditing-repository-health"
+      ]
     }
   ]
 }

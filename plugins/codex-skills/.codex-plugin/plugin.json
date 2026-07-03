@@ -1,7 +1,7 @@
 {
   "name": "codex-skills",
-  "version": "0.6.0",
-  "description": "Codex skills for adversarial review gates, bounded automation loops, beta orchestration, branch cleanup, and PR review triage.",
+  "version": "0.7.0",
+  "description": "Codex skills for adversarial review gates, bounded automation loops, beta orchestration, repository health audits, branch cleanup, and PR review triage.",
   "author": {
     "name": "Cory Parry",
     "url": "https://github.com/coryparrry"
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex Skills",
-    "shortDescription": "Review gates, bounded loops, beta orchestration, branch cleanup, and PR triage skills.",
-    "longDescription": "A Codex skill bundle for adversarial completion review, bounded Codex automation loops, beta multi-worktree orchestration, safe merged-branch cleanup, and practical PR feedback triage.",
+    "shortDescription": "Review gates, bounded loops, repo audits, branch cleanup, and PR triage skills.",
+    "longDescription": "A Codex skill bundle for adversarial completion review, bounded Codex automation loops, beta multi-worktree orchestration, repository health audits, safe merged-branch cleanup, and practical PR feedback triage.",
     "developerName": "Cory Parry",
     "category": "Coding",
     "capabilities": [
@@ -33,10 +33,9 @@
     "privacyPolicyURL": "https://github.com/coryparrry/codex-skills/security/policy",
     "termsOfServiceURL": "https://github.com/coryparrry/codex-skills/blob/main/LICENSE",
     "defaultPrompt": [
-      "Use codex-adversarial-gate to close an implementation slice with archived reviewer and critic evidence.",
-      "Use writing-codex-loops to create a bounded Codex automation loop with state, cadence, validation, and stop conditions.",
-      "Use multi-phase-orchestrator to coordinate related work units through fresh worktree threads.",
-      "Use triage-review-comments to classify PR review feedback."
+      "Use auditing-repository-health before repo work to run the read-only repo health audit.",
+      "Use codex-adversarial-gate for closeout evidence and triage-review-comments for PR feedback.",
+      "Use writing-codex-loops for automations; multi-phase-orchestrator for beta work; git-clean-merged-branch after merges."
     ],
     "screenshots": []
   }

@@ -28,7 +28,7 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adve
 bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"
 ```
 
-The marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`.
+The marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `auditing-repository-health`, `git-clean-merged-branch`, and `triage-review-comments`.
 
 The adversarial gate installer is still required when you need its custom reviewer TOMLs copied into `~/.codex/agents`.
 
@@ -83,6 +83,12 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-
 npx skills add coryparrry/codex-skills --global --agent codex --skill writing-codex-loops
 ```
 
+## Install Audit Repository Health
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill auditing-repository-health
+```
+
 ## Install Triage Review Comments
 
 ```bash
@@ -111,6 +117,7 @@ If installation fails, check that `npx skills add coryparrry/codex-skills --glob
 
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Audit Repository Health](auditing-repository-health.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Writing Codex Loops](writing-codex-loops.md)
 - [Multi-Phase Orchestrator](multi-phase-orchestrator.md)

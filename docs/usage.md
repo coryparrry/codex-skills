@@ -21,6 +21,7 @@ For `codex-adversarial-gate`, also make sure the custom reviewer agent TOMLs are
 | Recover from a skipped completion gate | `codex-adversarial-gate` |
 | Design or create a bounded Codex automation loop | `writing-codex-loops` |
 | Coordinate multiple related work units through fresh worktree threads | `multi-phase-orchestrator` beta |
+| Audit repo readiness before work | `auditing-repository-health` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
@@ -78,6 +79,26 @@ The skill should classify the request before acting:
 5. Immediate repetition in the current turn is an in-thread loop, not an automation.
 
 Every loop should include live observation, progress checks, idempotency, retry limits, success stops, blocked stops, and a concrete escalation question.
+
+## Audit Repository Health
+
+Use `auditing-repository-health` when a repo needs a readiness audit before work starts or when setup, scripts, validation, packaging, generated files, or docs health are unclear.
+
+Ask:
+
+```text
+Use $auditing-repository-health to audit this repository before starting work.
+```
+
+The skill runs a bundled read-only audit script over live repo state, instructions, existing scripts, validation commands, package surfaces, ignore hygiene, repo size/history risk, and docs link health. It reports a readiness verdict, ranked findings, script responsibilities classified as `present`, `documented`, `missing`, or `not_applicable`, commands run, and anything not checked.
+
+For missing standard scripts, ask:
+
+```text
+Use $auditing-repository-health to check whether this repo has the setup, testing, validation, and shipping responsibilities it actually needs.
+```
+
+The skill uses script/bootstrap, setup, update, server, test, cibuild, and console as a reference vocabulary, but it should map to the repo's existing conventions rather than forcing those exact names.
 
 ## Coordinate Multiple Work Units
 
@@ -183,6 +204,7 @@ If review triage has no PR context, load the PR or provide enough review context
 
 - [Installation](installation.md)
 - [Reference](reference.md)
+- [Audit Repository Health](auditing-repository-health.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Writing Codex Loops](writing-codex-loops.md)
 - [Multi-Phase Orchestrator](multi-phase-orchestrator.md)

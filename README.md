@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-Small Codex skills for real workflow pressure: adversarial completion gates, bounded loops, beta multi-worktree orchestration, branch cleanup, and PR review triage.
+Small Codex skills for real workflow pressure: adversarial completion gates, bounded loops, beta multi-worktree orchestration, repository health audits, branch cleanup, and PR review triage.
 
 These skills are meant to stay narrow. Each one handles one recurring failure mode, keeps the main `SKILL.md` readable, and moves heavier process detail into local references, templates, scripts, or user-facing docs.
 
@@ -30,6 +30,7 @@ Then invoke the skill you need:
 ```text
 Use $codex-adversarial-gate to close this implementation slice with archived reviewer and critic evidence.
 Use $writing-codex-loops to create a bounded heartbeat for this PR.
+Use $auditing-repository-health to audit this repo before starting work.
 Use $triage-review-comments to triage the review comments on this PR.
 ```
 
@@ -61,7 +62,13 @@ You can also install through the Codex app by adding this repository as a market
 
 **The fix.** Use [`triage-review-comments`](docs/triage-review-comments.md). It inventories review comments, verifies current-code reachability, rejects false positives, classifies real findings, and recommends prevention checks.
 
-### #5: Merged Branch Cleanup Is Easy To Get Wrong
+### #5: Repos Hide Readiness Problems
+
+**The problem.** A clean branch or one passing test can hide missing setup scripts, undocumented validation gates, source/package drift, generated-file churn, stale docs, or repo-size problems.
+
+**The fix.** Use [`auditing-repository-health`](docs/auditing-repository-health.md). It runs a read-only audit of live Git state, normalized script responsibilities, validation surfaces, packaging/mirror health, generated-file hygiene, docs links, and size/history risks before work starts.
+
+### #6: Merged Branch Cleanup Is Easy To Get Wrong
 
 **The problem.** After a PR merge, local state can stay on a stale branch, default branch updates can be skipped, and unsafe deletion can remove work that was not actually merged.
 
@@ -76,6 +83,7 @@ These skills split by invocation discipline and risk, not by folder name.
 - **[`codex-adversarial-gate`](skills/codex-adversarial-gate/SKILL.md)** - Use when reviewing Codex plans, closing implementation phases or slices, or auditing completion claims.
 - **[`writing-codex-loops`](skills/writing-codex-loops/SKILL.md)** - Use when designing, writing, repairing, or scheduling Codex work loops and automations.
 - **[`triage-review-comments`](skills/triage-review-comments/SKILL.md)** - Use when PR review comments, bot findings, stale threads, or prevention checks need triage.
+- **[`auditing-repository-health`](skills/auditing-repository-health/SKILL.md)** - Use when auditing repo readiness, scripts, validation, hygiene, docs, packaging, or release health.
 - **[`git-clean-merged-branch`](skills/git-clean-merged-branch/SKILL.md)** - Use when a merged GitHub branch should be cleaned up safely; short prompts like `sort git` or `clean merged branch` intentionally route here.
 
 ### Explicit Beta Skill
@@ -100,6 +108,7 @@ These skills split by invocation discipline and risk, not by folder name.
 | Recover from a skipped completion gate | `codex-adversarial-gate` |
 | Design or create a bounded Codex automation loop | `writing-codex-loops` |
 | Coordinate related work units through fresh worktree threads | `multi-phase-orchestrator` beta |
+| Audit repository readiness before work | `auditing-repository-health` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
@@ -131,6 +140,7 @@ These skills split by invocation discipline and risk, not by folder name.
 ├── skills.sh.json
 └── skills/
     ├── codex-adversarial-gate/
+    ├── auditing-repository-health/
     ├── git-clean-merged-branch/
     ├── multi-phase-orchestrator/
     ├── triage-review-comments/
@@ -162,6 +172,7 @@ Install a single skill:
 npx skills add coryparrry/codex-skills --global --agent codex --skill codex-adversarial-gate
 npx skills add coryparrry/codex-skills --global --agent codex --skill writing-codex-loops
 npx skills add coryparrry/codex-skills --global --agent codex --skill multi-phase-orchestrator
+npx skills add coryparrry/codex-skills --global --agent codex --skill auditing-repository-health
 npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
 npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
 ```
@@ -212,10 +223,15 @@ python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/writing-codex-loops
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/auditing-repository-health
+python3 skills/auditing-repository-health/tests/test_audit_repository_health.py
+python3 skills/auditing-repository-health/scripts/audit_repository_health.py --repo . --format json | python3 -m json.tool >/dev/null
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
-  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py \
+  skills/auditing-repository-health/scripts/audit_repository_health.py \
+  skills/auditing-repository-health/tests/test_audit_repository_health.py
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 git diff --check
 ```
@@ -230,6 +246,7 @@ plugin-eval analyze plugins/codex-skills --format markdown
 
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
+- [Audit Repository Health](docs/auditing-repository-health.md)
 - [Codex Adversarial Review Gate](docs/codex-adversarial-gate.md)
 - [Writing Codex Loops](docs/writing-codex-loops.md)
 - [Multi-Phase Orchestrator](docs/multi-phase-orchestrator.md)

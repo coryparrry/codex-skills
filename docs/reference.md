@@ -20,6 +20,7 @@ This reference describes the files, install paths, scripts, custom agents, and v
     git-clean-merged-branch/
     multi-phase-orchestrator/
     triage-review-comments/
+    auditing-repository-health/
     writing-codex-loops/
 ```
 
@@ -42,7 +43,7 @@ The manifest exposes the lightweight copied skill folders under `plugins/codex-s
 | Config path | `skills.sh.json` |
 | Repo page | `https://skills.sh/coryparrry/codex-skills` |
 | Badge | `https://skills.sh/b/coryparrry/codex-skills` |
-| Groups | `Review Gates`, `Automation Loops`, `PR Review`, `Beta Orchestration`, `Git Workflow` |
+| Groups | `Review Gates`, `Automation Loops`, `PR Review`, `Beta Orchestration`, `Git Workflow`, `Repository Health` |
 
 The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service.
 
@@ -73,7 +74,7 @@ It contains one plugin entry:
 
 Use the Codex app to add this repo as a marketplace source, then install **Codex Skills** from that marketplace.
 
-Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"` when those agents are needed.
+Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `auditing-repository-health`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"` when those agents are needed.
 
 ## Skills
 
@@ -82,6 +83,7 @@ Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `mu
 | `codex-adversarial-gate` | Gate plan and implementation closeout with reviewer-plus-critic evidence | `SKILL.md`, `agents/`, `references/`, `scripts/`, `templates/` |
 | `writing-codex-loops` | Design or create bounded Codex work loops and automations | `SKILL.md`, `agents/openai.yaml`, `references/loop-principles.md` |
 | `multi-phase-orchestrator` | Beta orchestration for related work units across fresh worktree threads | `SKILL.md`, `agents/openai.yaml` |
+| `auditing-repository-health` | Run a read-only repo readiness audit for scripts, validation, hygiene, docs, and packaging surfaces | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/clean_merged_branch.sh` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/triage-review-comments.md` |
 
@@ -109,6 +111,8 @@ Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `mu
 | `skills/codex-adversarial-gate/scripts/install.sh` | Copies the adversarial gate skill and custom agents into Codex |
 | `skills/codex-adversarial-gate/scripts/archive_adversarial_review.py` | Archives exact plan, completion, or critic review output |
 | `skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py` | Tests the review archive helper |
+| `skills/auditing-repository-health/scripts/audit_repository_health.py` | Runs the read-only repository health audit with Markdown or JSON output |
+| `skills/auditing-repository-health/tests/test_audit_repository_health.py` | Tests the repository health audit contract |
 | `skills/git-clean-merged-branch/scripts/clean_merged_branch.sh` | Fetches, switches to default branch, pulls, and deletes the starting branch |
 
 ## Codex Adversarial Gate Agents
@@ -184,13 +188,18 @@ bash -n scripts/install.sh
 bash -n skills/codex-adversarial-gate/scripts/install.sh
 bash scripts/test_install.sh
 python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+python3 skills/auditing-repository-health/tests/test_audit_repository_health.py
+python3 skills/auditing-repository-health/scripts/audit_repository_health.py --repo . --format json | python3 -m json.tool >/dev/null
 python3 -m py_compile \
   skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
-  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
+  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py \
+  skills/auditing-repository-health/scripts/audit_repository_health.py \
+  skills/auditing-repository-health/tests/test_audit_repository_health.py
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/writing-codex-loops
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/auditing-repository-health
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 git diff --check
 ```
@@ -205,6 +214,7 @@ plugin-eval analyze plugins/codex-skills --format markdown
 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
+- [Audit Repository Health](auditing-repository-health.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Writing Codex Loops](writing-codex-loops.md)
 - [Multi-Phase Orchestrator](multi-phase-orchestrator.md)
