@@ -2701,6 +2701,232 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             self.assertIn("generated files are tracked", titles)
             self.assertIn(".next/server/app.js", report["checks"]["hygiene"]["tracked_generated"])
 
+    def test_tracked_superpowers_validation_logs_are_not_generated_junk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            validation = root / ".superpowers" / "sdd" / "task-11-validation"
+            self.init_repo(root)
+            validation.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            # Hidden agent state can be tracked intentionally as task evidence.
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (validation / "unit.log").write_text("258 tests OK\n")
+            self.commit_all(root)
+
+            result = self.run_audit(root, "--format", "json")
+            report = json.loads(result.stdout)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("generated files are tracked", titles)
+            self.assertNotIn(
+                ".superpowers/sdd/task-11-validation/unit.log",
+                report["checks"]["hygiene"]["tracked_generated"],
+            )
+            self.assertIn(".superpowers", report["checks"]["folder_structure"]["hidden_roots"])
+
+    def test_tracked_packet_loop_evidence_logs_are_not_generated_junk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = root / ".codex" / "packet-loop" / "evidence" / "packet-1"
+            self.init_repo(root)
+            evidence.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            # Packet-loop logs are durable validation evidence, not build output.
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (evidence / "validation.log").write_text("package tests OK\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("generated files are tracked", titles)
+            self.assertNotIn(
+                ".codex/packet-loop/evidence/packet-1/validation.log",
+                report["checks"]["hygiene"]["tracked_generated"],
+            )
+            self.assertIn(".codex", report["checks"]["folder_structure"]["hidden_roots"])
+
+    def test_tracked_root_log_files_are_still_generated_junk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.init_repo(root)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "server.log").write_text("debug output\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("generated files are tracked", titles)
+            self.assertIn("server.log", report["checks"]["hygiene"]["tracked_generated"])
+
+    def test_tracked_hidden_cache_logs_are_still_generated_junk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache_dir = root / ".cache"
+            self.init_repo(root)
+            cache_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (cache_dir / "build.log").write_text("generated output\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("generated files are tracked", titles)
+            self.assertIn(".cache/build.log", report["checks"]["hygiene"]["tracked_generated"])
+
+    def test_tracked_codex_hidden_logs_are_still_generated_junk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_dir = root / ".codex"
+            self.init_repo(root)
+            codex_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (codex_dir / "build.log").write_text("generated output\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("generated files are tracked", titles)
+            self.assertIn(".codex/build.log", report["checks"]["hygiene"]["tracked_generated"])
+
+    def test_folder_structure_flags_loose_root_source_and_docs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_dir = root / "packages" / "api"
+            self.init_repo(root)
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            # Once packages exist, new implementation should live in a package or src tree.
+            (root / "worker.py").write_text("print('work')\n")
+            (root / "architecture.md").write_text("# Architecture\n")
+            (root / "operations.md").write_text("# Operations\n")
+            (root / "roadmap.md").write_text("# Roadmap\n")
+            (root / "setup-guide.md").write_text("# Setup\n")
+            (package_dir / "package.json").write_text('{"scripts": {"test": "node index.js"}}\n')
+            (package_dir / "index.js").write_text("console.log('api')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            structure = report["checks"]["folder_structure"]
+            self.assertIn("loose root implementation files", titles)
+            self.assertIn("loose root documentation files", titles)
+            self.assertEqual(["worker.py"], structure["loose_root_source_files"])
+            self.assertIn("architecture.md", structure["loose_root_documentation_files"])
+
+    def test_folder_structure_flags_ungrouped_package_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            api_dir = root / "api"
+            web_dir = root / "web"
+            self.init_repo(root)
+            api_dir.mkdir()
+            web_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            # Sibling packages without a workspace manifest tend to age into root clutter.
+            (api_dir / "package.json").write_text('{"scripts": {"test": "node index.js"}}\n')
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            (web_dir / "package.json").write_text('{"scripts": {"test": "node index.js"}}\n')
+            (web_dir / "index.js").write_text("console.log('web')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("package directories are not grouped", titles)
+            self.assertEqual(["api", "web"], report["checks"]["folder_structure"]["ungrouped_package_directories"])
+
+    def test_folder_structure_accepts_package_json_workspace_grouping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            api_dir = root / "api"
+            web_dir = root / "web"
+            self.init_repo(root)
+            api_dir.mkdir()
+            web_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            # npm and Yarn commonly declare workspaces directly in package.json.
+            (root / "package.json").write_text(json.dumps({"workspaces": ["api", "web"]}) + "\n")
+            (api_dir / "package.json").write_text('{"scripts": {"test": "node index.js"}}\n')
+            (api_dir / "index.js").write_text("console.log('api')\n")
+            (web_dir / "package.json").write_text('{"scripts": {"test": "node index.js"}}\n')
+            (web_dir / "index.js").write_text("console.log('web')\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("package directories are not grouped", titles)
+            self.assertEqual([], report["checks"]["folder_structure"]["ungrouped_package_directories"])
+
+    def test_folder_structure_accepts_rust_workspace_grouping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            api_dir = root / "api"
+            web_dir = root / "web"
+            self.init_repo(root)
+            api_dir.mkdir()
+            web_dir.mkdir()
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            # Cargo workspaces often keep member crates as root-level siblings.
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = ["api", "web"]\n')
+            (api_dir / "Cargo.toml").write_text("[package]\nname = \"api\"\nversion = \"0.1.0\"\n")
+            (api_dir / "src").mkdir()
+            (api_dir / "src" / "lib.rs").write_text("pub fn api() {}\n")
+            (web_dir / "Cargo.toml").write_text("[package]\nname = \"web\"\nversion = \"0.1.0\"\n")
+            (web_dir / "src").mkdir()
+            (web_dir / "src" / "lib.rs").write_text("pub fn web() {}\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("package directories are not grouped", titles)
+            self.assertEqual([], report["checks"]["folder_structure"]["ungrouped_package_directories"])
+
+    def test_folder_structure_uses_filesystem_for_non_git_exports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_dir = root / "packages" / "api"
+            package_dir.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (root / "worker.py").write_text("print('work')\n")
+            (package_dir / "package.json").write_text('{"scripts": {"test": "node index.js"}}\n')
+            (package_dir / "index.js").write_text("console.log('api')\n")
+
+            report = self.audit_report(root)
+
+            structure = report["checks"]["folder_structure"]
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertIn("packages", structure["top_level_directories"])
+            self.assertEqual(["worker.py"], structure["loose_root_source_files"])
+            self.assertIn("loose root implementation files", titles)
+
+    def test_workspace_toml_fallback_preserves_member_detection_without_tomllib(self):
+        module = load_audit_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cargo = root / "Cargo.toml"
+            pyproject = root / "pyproject.toml"
+            cargo.write_text("[workspace]\nmembers = [\n  \"api\",\n  \"web\",\n]\n")
+            pyproject.write_text("[tool.uv.workspace]\nmembers = [\"packages/*\"]\n")
+
+            with mock.patch.object(module, "tomllib", None):
+                self.assertTrue(module.rust_workspace_manifest(cargo))
+                self.assertTrue(module.python_workspace_manifest(pyproject))
+
     def test_source_directories_named_build_or_coverage_are_not_generated_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

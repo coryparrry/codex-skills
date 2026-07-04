@@ -17,10 +17,11 @@ Run a read-only repository health audit before trusting a repo for repeated work
 4. Read `references/report-contract.md`.
 5. Read `references/repo-foundation-rubric.md` when recommending foundations.
 6. Use `references/ecosystem-index.md` to choose only the relevant ecosystem overlays.
-7. For monorepos and polyrepos, assess root/shared foundations separately from each package, service, app, docs root, or mirror root.
-8. Preserve the existing report sections and add the inventory/classification sections when applicable.
-9. Do not prescribe generic boilerplate, generic repo trees, or Scripts-to-Rule-Them-All filenames unless evidence shows that convention already fits the repo.
-10. Every finding must name the affected path or scope and cite concrete evidence.
+7. Inspect `Folder Structure` before recommending file moves, cleanup, or repo tree changes.
+8. For monorepos and polyrepos, assess root/shared foundations separately from each package, service, app, docs root, or mirror root.
+9. Preserve the existing report sections and add the inventory/classification sections when applicable.
+10. Do not prescribe generic boilerplate, generic repo trees, or Scripts-to-Rule-Them-All filenames unless evidence shows that convention already fits the repo.
+11. Every finding must name the affected path or scope and cite concrete evidence.
 
 If you cannot identify package boundaries, say so explicitly and avoid package-specific recommendations.
 
@@ -53,6 +54,7 @@ Preserve these sections when summarizing:
 ## Findings
 ## Repository Shape
 ## Repository Inventory
+## Folder Structure
 ## Lifecycle Gate Matrix
 ## Documentation
 ## Scripts
