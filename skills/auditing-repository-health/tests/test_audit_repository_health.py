@@ -2724,6 +2724,28 @@ class AuditRepositoryHealthTests(unittest.TestCase):
             )
             self.assertIn(".superpowers", report["checks"]["folder_structure"]["hidden_roots"])
 
+    def test_tracked_packet_loop_evidence_logs_are_not_generated_junk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = root / ".codex" / "packet-loop" / "evidence" / "packet-1"
+            self.init_repo(root)
+            evidence.mkdir(parents=True)
+            (root / "README.md").write_text("# Example\n")
+            # Packet-loop logs are durable validation evidence, not build output.
+            (root / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+            (evidence / "validation.log").write_text("package tests OK\n")
+            self.commit_all(root)
+
+            report = self.audit_report(root)
+
+            titles = {finding["title"] for finding in report["findings"]}
+            self.assertNotIn("generated files are tracked", titles)
+            self.assertNotIn(
+                ".codex/packet-loop/evidence/packet-1/validation.log",
+                report["checks"]["hygiene"]["tracked_generated"],
+            )
+            self.assertIn(".codex", report["checks"]["folder_structure"]["hidden_roots"])
+
     def test_tracked_root_log_files_are_still_generated_junk(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

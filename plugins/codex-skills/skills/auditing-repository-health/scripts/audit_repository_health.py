@@ -62,7 +62,7 @@ GENERATED_PATTERNS = [
 NESTED_GENERATED_DIRS = {"dist", "build", "coverage", ".next"}
 # Keep this allowlist narrow: these paths hold tracked task evidence, so a .log
 # extension alone should not imply deletion for those files.
-TRACKED_EVIDENCE_LOG_PREFIXES = (".superpowers/sdd/",)
+TRACKED_EVIDENCE_LOG_PREFIXES = (".superpowers/sdd/", ".codex/packet-loop/evidence/")
 TEST_ASSET_PARENT_DIRS = {"test", "tests", "spec"}
 TEST_ASSET_FIXTURE_DIRS = {"fixtures", "test-data", "testdata"}
 TEST_ASSET_EXAMPLE_DIRS = {"examples"}
