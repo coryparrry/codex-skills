@@ -64,7 +64,7 @@ Prefer the Codex app marketplace? Add `https://github.com/coryparrry/codex-skill
 
 ## Publishing Notes
 
-`skills.sh.json` controls grouping only after the registry has seen a skill through the `skills` CLI. If a new skill is missing from the public page, run a targeted install after the skill is on the default branch, then allow the skills.sh cache to refresh.
+`skills.sh.json` controls grouping only after the registry has seen a skill through the `skills` CLI. Use the public skills.sh URL slug in this file; it may differ from the Codex skill name. If a new skill is missing from the public page, run a targeted install after the skill is on the default branch, then allow the skills.sh cache to refresh.
 
 When shipped skill behavior changes, keep these surfaces aligned:
 

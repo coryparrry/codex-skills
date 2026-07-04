@@ -45,7 +45,7 @@ The manifest exposes the lightweight copied skill folders under `plugins/codex-s
 | Badge | `https://skills.sh/b/coryparrry/codex-skills` |
 | Groups | `Repository Audits`, `Review Gates`, `Automation Loops`, `PR Review`, `Git Workflow`, `Beta Orchestration` |
 
-The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service.
+The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service. Use the public skills.sh URL slug in this file; for example, the audit skill installs as `auditing-repository-health` but currently resolves on skills.sh as `auditing_repository_health`.
 
 ## Marketplace Entry
 
