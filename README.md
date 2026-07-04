@@ -62,19 +62,6 @@ Prefer the Codex app marketplace? Add `https://github.com/coryparrry/codex-skill
 | Branch cleanup runs on hope. | Fetch, resolve the default branch, prove the branch is merged, then delete safely. |
 | Parallel work merges summaries instead of verified files. | Use the beta orchestrator only when explicit worktree/thread coordination is wanted. |
 
-## Publishing Notes
-
-`skills.sh.json` controls grouping only after the registry has seen a skill through the `skills` CLI. If a new skill is missing from the public page, run a targeted install after the skill is on the default branch, then allow the skills.sh cache to refresh.
-
-When shipped skill behavior changes, keep these surfaces aligned:
-
-| Change | Required follow-through |
-|---|---|
-| Source skill files | Sync the matching folder under `plugins/codex-skills/skills/`. |
-| Skill trigger or display metadata | Update `agents/openai.yaml`, docs, and packaging metadata together. |
-| Public skill list or grouping | Update `README.md`, `skills.sh.json`, marketplace metadata, and plugin metadata together. |
-| Experimental promotion | Move the skill into both shipped skill trees, then add docs and packaging metadata. |
-
 ## Validation
 
 For packaging changes, run the checks that match the touched surface:
