@@ -43,7 +43,7 @@ The manifest exposes the lightweight copied skill folders under `plugins/codex-s
 | Config path | `skills.sh.json` |
 | Repo page | `https://skills.sh/coryparrry/codex-skills` |
 | Badge | `https://skills.sh/b/coryparrry/codex-skills` |
-| Groups | `Review Gates`, `Automation Loops`, `PR Review`, `Beta Orchestration`, `Git Workflow`, `Repository Health` |
+| Groups | `Repository Audits`, `Review Gates`, `Automation Loops`, `PR Review`, `Git Workflow`, `Beta Orchestration` |
 
 The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service.
 
