@@ -3,6 +3,13 @@
   "notGrouped": "bottom",
   "groupings": [
     {
+      "title": "Repository Audits",
+      "description": "Skills for repository onboarding, validation, hygiene, and packaging readiness.",
+      "skills": [
+        "auditing-repository-health"
+      ]
+    },
+    {
       "title": "Review Gates",
       "description": "Skills for adversarial plan and implementation closeout.",
       "skills": [
@@ -24,13 +31,6 @@
       ]
     },
     {
-      "title": "Beta Orchestration",
-      "description": "Beta skills for multi-worktree orchestration.",
-      "skills": [
-        "multi-phase-orchestrator"
-      ]
-    },
-    {
       "title": "Git Workflow",
       "description": "Skills for practical Git workflow cleanup.",
       "skills": [
@@ -38,10 +38,10 @@
       ]
     },
     {
-      "title": "Repository Health",
-      "description": "Skills for repository onboarding, validation, hygiene, and packaging readiness.",
+      "title": "Beta Orchestration",
+      "description": "Beta skills for multi-worktree orchestration.",
       "skills": [
-        "auditing-repository-health"
+        "multi-phase-orchestrator"
       ]
     }
   ]
