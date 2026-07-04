@@ -6,7 +6,7 @@
       "title": "Repository Audits",
       "description": "Skills for repository onboarding, validation, hygiene, and packaging readiness.",
       "skills": [
-        "auditing-repository-health"
+        "auditing_repository_health"
       ]
     },
     {
