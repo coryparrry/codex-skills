@@ -25,7 +25,7 @@
 ## Self-review findings
 
 - The stubs match the task brief exactly and stay within the requested scope.
-- The report path is ignored in this repository; the template files live outside this repository and cannot be committed here.
+- The template files live outside this repository and cannot be committed here.
 
 ## Any issues or concerns
 
@@ -35,4 +35,4 @@
 ## Completion
 
 - Validation passed for all three template files and the report content.
-- Commit status: none. The report path is ignored by `.gitignore`, and the template files live outside this repository, so this task produced no repo-trackable changes to commit here.
+- Commit status: the local template files live outside this repository, so only this SDD evidence report was committed here.
