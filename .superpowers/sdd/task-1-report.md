@@ -39,12 +39,12 @@ $ grep -nE '^- routes created$|^- unresolved uncertainties$|^- files changed$|^-
 195:- validation run
 196:- whether the three-file diff was committed or left ready for review
 
-$ grep -n '/Users/coryparry' "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
+$ grep -n "$HOME" "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
 
 $ python3 - <<'PY'
 from pathlib import Path
 text = Path.home().joinpath('.codex/skills/Knowledge-setup/SKILL.md').read_text()
-assert '/Users/coryparry' not in text
+assert str(Path.home()) not in text
 print('home-path check passed')
 PY
 home-path check passed
