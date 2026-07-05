@@ -26,6 +26,7 @@ Observed:
 ```text
 Use this skill when the user asks to initialize, adopt, set up, refresh, or repair the repo context layer for a repo.
 This is a manual trigger, not a background automation.
+The manual trigger phrase is: `Use $Knowledge-setup in this repo`.
 ```
 
 Workflow check:
@@ -45,10 +46,39 @@ clean before report write
 ## Validation
 
 - Confirmed the skill is manual, not automatic.
-- Confirmed the future trigger wording is stable and exact.
+- Confirmed the future trigger wording is explicit, stable, and exact.
 - Confirmed the repo is on a non-default branch and `origin/main` is the default branch reference.
 - Confirmed this dry-run did not require changing the target repo.
 
+## Fix Evidence
+
+```bash
+grep -nF 'Use $Knowledge-setup in this repo' "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
+```
+
+Result:
+```text
+10:Use this skill when the user asks to initialize, adopt, set up, refresh, or repair the repo context layer for a repo. This is a manual trigger, not a background automation. The manual trigger phrase is: `Use $Knowledge-setup in this repo`.
+```
+
+```bash
+grep -nF 'manual trigger' "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
+```
+
+Result:
+```text
+10:Use this skill when the user asks to initialize, adopt, set up, refresh, or repair the repo context layer for a repo. This is a manual trigger, not a background automation. The manual trigger phrase is: `Use $Knowledge-setup in this repo`.
+```
+
+```bash
+grep -nF "$HOME" "$HOME/.codex/skills/Knowledge-setup/SKILL.md" .superpowers/sdd/task-4-report.md
+```
+
+Result:
+```text
+no matches
+```
+
 ## Conclusion
 
-Task 4 dry-run passes. The skill content matches the expected invocation contract and gives a complete adoption workflow within the three-file context-layer boundary.
+Task 4 dry-run passes. The installed skill now states the manual trigger phrase explicitly and still reads as a manual workflow, not background automation.
