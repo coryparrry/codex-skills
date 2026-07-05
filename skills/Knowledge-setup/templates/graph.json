@@ -1,0 +1,34 @@
+{
+  "schema_version": "0.1",
+  "repo": {
+    "name": "",
+    "kind": "",
+    "description": "",
+    "primary_languages": [],
+    "package_managers": [],
+    "last_reviewed": ""
+  },
+  "agent_contract": {
+    "purpose": "Fast deterministic navigation for coding agents.",
+    "load_order": [".repo/context.md", ".repo/graph.json"],
+    "planning_rule": "Choose a route or node before broad repository search.",
+    "read_rule": "Read graph-listed files first, then inspect adjacent implementation files as needed.",
+    "update_rule": "Update this graph in the same change set when structure, commands, tests, contracts, ownership, entrypoints, generated files, mirrored files, deprecated paths, do-not-edit areas, or important gotchas change.",
+    "no_go": [
+      "Do not add dependencies for this context layer.",
+      "Do not add MCP, database, vector search, background indexers, generated graph tooling, or background services unless explicitly requested.",
+      "Do not treat this graph as a substitute for verifying source files."
+    ]
+  },
+  "commands": {},
+  "routes": {},
+  "nodes": {},
+  "edges": [],
+  "staleness_checks": [
+    "Do command entries match current package, build, or CI files?",
+    "Do node owns paths exist or explicitly state why they are deprecated or missing?",
+    "Do public API and data model nodes match current exported contracts?",
+    "Do tests listed under tested_by exist?",
+    "Are generated, mirrored, deprecated, and do-not-edit paths clearly marked?"
+  ]
+}
