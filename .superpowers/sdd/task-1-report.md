@@ -21,3 +21,36 @@ Created the local skill entrypoint at `~/.codex/skills/Knowledge-setup/SKILL.md`
 
 - The skill content uses `~/.codex/skills/Knowledge-setup`, not a user-specific absolute home path.
 - No extra skill-testing work was added beyond the brief's Task 1 checks.
+
+## Fix Report
+
+### Validation
+
+Commands and outputs:
+
+```bash
+$ grep -n '^## Closeout$' "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
+188:## Closeout
+
+$ grep -nE '^- routes created$|^- unresolved uncertainties$|^- files changed$|^- validation run$|^- whether the three-file diff was committed or left ready for review$' "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
+192:- routes created
+193:- unresolved uncertainties
+194:- files changed
+195:- validation run
+196:- whether the three-file diff was committed or left ready for review
+
+$ grep -n '/Users/coryparry' "$HOME/.codex/skills/Knowledge-setup/SKILL.md"
+
+$ python3 - <<'PY'
+from pathlib import Path
+text = Path.home().joinpath('.codex/skills/Knowledge-setup/SKILL.md').read_text()
+assert '/Users/coryparry' not in text
+print('home-path check passed')
+PY
+home-path check passed
+```
+
+## Commit
+
+- The repo-tracked report update is ready to commit.
+- The local skill file lives outside this repository and cannot be committed here.
