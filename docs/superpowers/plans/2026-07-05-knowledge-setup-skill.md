@@ -67,7 +67,7 @@ Expected: The local skill directory and template directory exist.
 
 - [ ] **Step 3: Write `SKILL.md`**
 
-Use `apply_patch` to create `~/.codex/skills/Knowledge-setup/SKILL.md`:
+Write `SKILL.md` to `"$HOME/.codex/skills/Knowledge-setup/SKILL.md"` after resolving `$HOME`. Do not pass a literal `~/.codex/...` path to `apply_patch`, because patch tools do not expand shell tildes.
 
 ```md
 ---
@@ -283,13 +283,13 @@ Expected: The skill file exists, has valid frontmatter, and contains the full re
 
 - [ ] **Step 1: Write the `AGENTS.md` stub**
 
-Use `apply_patch` to create `~/.codex/skills/Knowledge-setup/templates/AGENTS.md` with the same tiny router content from the skill's `AGENTS.md Content` section.
+Write `AGENTS.md` to `"$HOME/.codex/skills/Knowledge-setup/templates/AGENTS.md"` after resolving `$HOME`, using the same tiny router content from the skill's `AGENTS.md Content` section.
 
 Expected: The stub is usable as-is in a new repo and contains no repo-specific claims.
 
 - [ ] **Step 2: Write the `context.md` stub**
 
-Use `apply_patch` to create `~/.codex/skills/Knowledge-setup/templates/context.md`:
+Write `context.md` to `"$HOME/.codex/skills/Knowledge-setup/templates/context.md"` after resolving `$HOME`:
 
 ```md
 # Repository Context
@@ -311,7 +311,7 @@ Expected: The stub is intentionally thin and makes clear that adoption still nee
 
 - [ ] **Step 3: Write the `graph.json` stub**
 
-Use `apply_patch` to create `~/.codex/skills/Knowledge-setup/templates/graph.json`:
+Write `graph.json` to `"$HOME/.codex/skills/Knowledge-setup/templates/graph.json"` after resolving `$HOME`:
 
 ```json
 {

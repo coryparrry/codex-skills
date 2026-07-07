@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge Setup"
+  short_description: "Create repo context layer files"
+  default_prompt: "Use $Knowledge-setup in this repo."
