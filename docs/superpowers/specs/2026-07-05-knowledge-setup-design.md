@@ -6,7 +6,7 @@ Each repo should carry a small, dependency-free context layer that helps coding 
 
 The design optimizes for simple per-repo adoption:
 
-- one tiny boot file agents auto-read
+- one small router section in the instruction file agents auto-read
 - one human-readable context file for durable repo memory
 - one evidence-backed JSON architecture graph for navigation
 - no scripts, generated indexes, background services, databases, MCPs, vector stores, or new dependencies
@@ -23,7 +23,7 @@ AGENTS.md
 .repo/graph.json
 ```
 
-`AGENTS.md` is a tiny router. It tells agents to read `.repo/context.md` and `.repo/graph.json` before planning, choose the relevant route or node from the graph, and update the context layer when their work changes durable repo knowledge.
+`AGENTS.md` contains the router. For a new file, use the small router template. For an existing file, preserve verified repo-specific instructions in place and add or reconcile the router without silently discarding valid rules.
 
 `.repo/context.md` is human-readable repo memory. It records intent, hard constraints, and dated durable lessons. Agents may append to it automatically, but only for non-obvious facts that should survive future sessions.
 
@@ -38,10 +38,10 @@ The repeatable setup should be a local Codex skill plus starter stubs, not a bac
 Use a manual skill trigger from a target repo after the first real project files exist:
 
 ```text
-Use $Knowledge-setup in this repo
+Use $knowledge-setup in this repo
 ```
 
-The skill inspects live repo evidence, then creates or refreshes exactly `AGENTS.md`, `.repo/context.md`, and `.repo/graph.json`. New repo templates may include thin starter stubs for those three files, but the skill must replace or fill them from live evidence before they are treated as useful.
+The skill inspects live repo evidence, then creates or refreshes exactly `AGENTS.md`, `.repo/context.md`, and `.repo/graph.json`. New repo templates may include thin starter stubs for those three files, but the skill must reconcile or fill them from live evidence before they are treated as useful.
 
 The skill should not run silently on arbitrary folders. Manual invocation prevents accidental mutation of scratch directories, vendor checkouts, generated repos, or incomplete experiments.
 
@@ -111,7 +111,7 @@ Each command entry should use this shape:
 
 `command` is the exact command. `cwd` is repo-relative. `evidence` points to a manifest, CI file, README, Makefile, package file, or observed successful local run.
 
-`routes` maps task types to first inspection targets. Common route keys are:
+`routes` is the primary navigation layer and maps task types to first inspection targets. Common route keys are:
 
 - `understand_repo`
 - `bug_fix`
@@ -127,15 +127,14 @@ Each route entry should use this shape:
 
 ```json
 {
-  "start_nodes": ["area.core"],
   "inspect_first": ["src/", "tests/"],
   "notes": ["Short practical routing note."]
 }
 ```
 
-`start_nodes` references node IDs in `nodes`. `inspect_first` contains repo-relative paths that exist. Task routes that do not apply to the repo are omitted.
+`inspect_first` contains repo-relative paths that exist. `start_nodes` is optional and references node IDs only when the graph contains useful semantic nodes. Task routes that do not apply to the repo are omitted.
 
-`nodes` are stable semantic repo areas, not file paths. Example IDs:
+`nodes` are optional, stable semantic repo areas, not file paths. Add them only when boundaries or repeated navigation needs are clearer than direct route paths. Example IDs:
 
 - `area.ui`
 - `area.core`
@@ -165,7 +164,7 @@ Each node should use only fields that help future routing:
 }
 ```
 
-`edges` connect nodes with evidence-backed relationships. Allowed relationship types include:
+`edges` are optional and connect nodes with evidence-backed relationships only when the relationship helps future navigation. Allowed relationship types include:
 
 - `depends_on`
 - `implements`
@@ -221,11 +220,11 @@ Prefer a smaller accurate graph over a larger speculative graph. Agents should r
 The first adoption pass for a repo is evidence-first:
 
 1. Inspect existing `AGENTS.md`, README files, package/build files, test configuration, CI, docs, generated folders, and obvious source roots.
-2. Preserve only true repo-specific hard constraints from old `AGENTS.md`; move them into `.repo/context.md`.
-3. Replace `AGENTS.md` with the tiny router.
+2. Preserve verified repo-specific instructions from an existing `AGENTS.md`; do not relocate or delete them merely to install the router.
+3. Create `AGENTS.md` from the router template when absent, or merge the router into the existing file when present.
 4. Create `.repo/context.md` with intent, constraints, and initial evolved context.
-5. Create `.repo/graph.json` with real commands, routes, nodes, edges, and staleness questions.
-6. Keep the graph useful, not exhaustive. Aim for roughly 8-30 nodes depending on repo size.
+5. Create `.repo/graph.json` with real commands and routes first. Add nodes, edges, and staleness questions only when they improve navigation.
+6. Keep the graph useful, not exhaustive. A small repo may have empty `nodes` and `edges`, and routes may use only `inspect_first`.
 7. Validate JSON syntax, graph references, route targets, command evidence, path evidence, generated/mirrored markings, and local-path leakage before any commit.
 8. Commit the adoption as a normal repo change when the user or repo workflow expects commits; otherwise leave the three-file diff ready for review.
 9. From then on, agents update context and graph opportunistically with relevant code changes.
@@ -245,22 +244,22 @@ The first adoption pass for a repo is evidence-first:
 
 For adoption, the agent must verify:
 
-- `AGENTS.md` is small and only acts as a router.
+- `AGENTS.md` contains the router and retains verified existing repo-specific instructions.
 - `.repo/context.md` has `Intent`, `Constraints`, and `Evolved Context`.
 - `.repo/graph.json` parses as valid JSON.
 - graph paths are real, unless explicitly marked deprecated or missing.
-- route `start_nodes`, node references, and edge endpoints point to real node IDs.
+- any route `start_nodes`, node references, and edge endpoints point to real node IDs.
 - edge types come from the allowed relationship list.
 - commands in the graph came from live repo files or successful inspection.
-- generated, mirrored, and do-not-edit surfaces are explicitly marked.
+- generated, mirrored, and do-not-edit surfaces are explicitly marked when they exist.
 - old `AGENTS.md` constraints were not silently dropped.
 
 Expected failure handling:
 
-- If a repo is too unclear to map confidently, create fewer nodes and document the uncertainty.
+- If a repo is too unclear to map confidently, omit nodes and document the uncertainty.
 - If a command cannot be verified, mark it unknown or omit it.
 - If docs and source disagree, graph source truth and mention the doc mismatch.
-- If an existing `AGENTS.md` is large or stale, preserve only verified constraints.
+- If an existing `AGENTS.md` is large or stale, preserve verified instructions and remove content only when live evidence proves it obsolete and the task authorizes that change.
 - If a graph update would be noisy or unrelated to the task, skip it.
 
 ## Definition Of Done
