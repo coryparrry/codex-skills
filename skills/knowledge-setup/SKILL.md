@@ -38,6 +38,8 @@ Use the starter files in [`templates/`](templates/) for reusable content and sha
    - Record only commands verified from repository evidence.
    - Make routes the primary navigation layer. Each route starts with existing repo-relative `inspect_first` paths.
    - Add `start_nodes`, nodes, or edges only when semantic boundaries materially improve repeated navigation. Otherwise keep `nodes` empty and `edges` empty.
+   - Node IDs, when used, are stable lowercase dot-separated semantic IDs such as `area.core`, `boundary.public_api`, or `test.unit`; never use raw paths as IDs.
+   - Edges, when used, connect node IDs with one allowed type: `depends_on`, `implements`, `calls`, `called_by`, `tested_by`, `documents`, `generates`, `mirrors`, `replaces`, or `do_not_edit`.
    - Omit unknown commands, inapplicable routes, and speculative relationships.
 6. Validate the three files, then show their final diff. Commit only when the user or repository workflow expects it.
 
