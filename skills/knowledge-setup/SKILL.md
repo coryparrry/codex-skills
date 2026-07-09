@@ -21,6 +21,7 @@ Source files and tests remain authoritative. The context layer only helps future
 
 ```text
 Existing AGENTS.md = verified instructions retained + context-layer router reconciled in place.
+Existing context/graph = verified durable entries retained + current template shape reconciled from live evidence.
 Small graph = verified commands + inspect_first routes + empty nodes/edges when deeper semantics add no value.
 ```
 
@@ -29,12 +30,16 @@ Use the starter files in [`templates/`](templates/) for reusable content and sha
 ## Workflow
 
 1. Confirm the current directory is a Git repository. Report the branch and whether it appears to be the default branch; do not create or switch branches unless required.
-2. Read an existing `AGENTS.md` before other edits. Inspect tracked files, README files, manifests, CI, tests, docs, generated or mirrored surfaces, and high-signal source roots.
+2. Read all existing context-layer files before other edits. Inspect tracked files, README files, manifests, CI, tests, docs, generated or mirrored surfaces, and high-signal source roots.
 3. Reconcile `AGENTS.md`:
    - If absent, start from [`templates/AGENTS.md`](templates/AGENTS.md).
    - If present, retain verified repository-specific instructions and reconcile the context-layer router in place. Remove an instruction only when live evidence proves it obsolete and the task authorizes removal.
-4. Create or refresh `.repo/context.md` using [`templates/context.md`](templates/context.md). Keep the required headings. Record concise intent, verified hard constraints, and dated durable lessons rather than task history.
-5. Create or refresh `.repo/graph.json` using [`templates/graph.json`](templates/graph.json):
+4. Reconcile `.repo/context.md` using [`templates/context.md`](templates/context.md) as its shape:
+   - If absent, start from the template.
+   - If present, retain verified intent, hard constraints, and durable lessons. Remove or rewrite an entry only when live evidence proves it stale or incorrect.
+5. Reconcile `.repo/graph.json` using [`templates/graph.json`](templates/graph.json) as its shape:
+   - If absent, start from the template.
+   - If present, retain commands, routes, nodes, and edges that remain evidence-backed and useful. Remove only stale, invalid, inapplicable, or speculative entries.
    - Record only commands verified from repository evidence.
    - Make routes the primary navigation layer. Each route starts with existing repo-relative `inspect_first` paths.
    - Add `start_nodes`, nodes, or edges only when semantic boundaries materially improve repeated navigation. Otherwise keep `nodes` empty and `edges` empty.
@@ -48,7 +53,7 @@ Use the starter files in [`templates/`](templates/) for reusable content and sha
 - Modify only the three context-layer files unless the user expands scope.
 - Do not add scripts, dependencies, generated indexes, databases, MCPs, vector stores, background services, or committed validation tooling.
 - Treat source, tests, manifests, and CI as truth when documentation disagrees.
-- Do not delete, move, ignore, or rewrite tracked hidden or tool files.
+- Do not delete, move, ignore, or rewrite unrelated tracked hidden or tool files.
 - Do not include local absolute paths in committed files or GitHub-facing text.
 - Prefer a smaller accurate graph over a larger speculative graph.
 
@@ -73,6 +78,7 @@ Also verify:
 - any `start_nodes`, node references, and edge endpoints resolve to real nodes
 - edge types are allowed and evidence paths exist when supplied
 - existing verified `AGENTS.md` instructions remain present
+- existing verified context and graph entries remain unless live evidence justifies their removal
 - none of the three files contains the local home path
 
 ## Closeout
