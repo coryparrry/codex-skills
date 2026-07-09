@@ -60,7 +60,9 @@ Use temporary commands; do not commit them as tooling.
 test -s AGENTS.md
 test -s .repo/context.md
 test -s .repo/graph.json
-grep -nE '^## (Intent|Constraints|Evolved Context)$' .repo/context.md
+for heading in '## Intent' '## Constraints' '## Evolved Context'; do
+  grep -nFx "$heading" .repo/context.md || exit 1
+done
 python3 -m json.tool .repo/graph.json >/dev/null
 ```
 
