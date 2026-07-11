@@ -53,6 +53,30 @@ class ProgressiveGraphContractTests(unittest.TestCase):
         self.assertIn("`match`", text)
         self.assertIn("progressive-read", text)
 
+    def test_release_surfaces_publish_knowledge_setup(self) -> None:
+        skills_config = json.loads((REPO_ROOT / "skills.sh.json").read_text())
+        published_skills = {
+            skill
+            for grouping in skills_config["groupings"]
+            for skill in grouping["skills"]
+        }
+        readme = (REPO_ROOT / "README.md").read_text()
+        plugin = json.loads(
+            (
+                REPO_ROOT
+                / "plugins"
+                / "codex-skills"
+                / ".codex-plugin"
+                / "plugin.json"
+            ).read_text()
+        )
+
+        self.assertIn("knowledge-setup", published_skills)
+        self.assertIn("docs/knowledge-setup.md", readme)
+        self.assertTrue((REPO_ROOT / "docs" / "knowledge-setup.md").is_file())
+        self.assertIn("context", plugin["description"].lower())
+        self.assertIn("knowledge-setup", " ".join(plugin["interface"]["defaultPrompt"]))
+
 
 if __name__ == "__main__":
     unittest.main()

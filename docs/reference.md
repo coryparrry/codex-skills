@@ -18,6 +18,7 @@ This reference describes the files, install paths, scripts, custom agents, and v
   skills/
     codex-adversarial-gate/
     git-clean-merged-branch/
+    knowledge-setup/
     multi-phase-orchestrator/
     triage-review-comments/
     auditing-repository-health/
@@ -43,7 +44,7 @@ The manifest exposes the lightweight copied skill folders under `plugins/codex-s
 | Config path | `skills.sh.json` |
 | Repo page | `https://skills.sh/coryparrry/codex-skills` |
 | Badge | `https://skills.sh/b/coryparrry/codex-skills` |
-| Groups | `Repository Audits`, `Review Gates`, `Automation Loops`, `PR Review`, `Git Workflow`, `Beta Orchestration` |
+| Groups | `Repository Audits`, `Repository Context`, `Review Gates`, `Automation Loops`, `PR Review`, `Git Workflow`, `Beta Orchestration` |
 
 The config controls how the repo page is grouped on skills.sh after the repo is seen by the `skills` CLI telemetry service. Keep group entries aligned with the `SKILL.md` skill names; skills.sh normalizes URL slug variants such as underscores and hyphens when serving detail pages.
 
@@ -74,12 +75,13 @@ It contains one plugin entry:
 
 Use the Codex app to add this repo as a marketplace source, then install **Codex Skills** from that marketplace.
 
-Marketplace install exposes `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `auditing-repository-health`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"` when those agents are needed.
+Marketplace install exposes `knowledge-setup`, `codex-adversarial-gate`, `writing-codex-loops`, `multi-phase-orchestrator` (beta), `auditing-repository-health`, `git-clean-merged-branch`, and `triage-review-comments`. It does not copy custom reviewer TOMLs into `~/.codex/agents`; run `bash "${CODEX_HOME:-$HOME/.codex}/skills/codex-adversarial-gate/scripts/install.sh"` when those agents are needed.
 
 ## Skills
 
 | Skill | Purpose | Main files |
 |---|---|---|
+| `knowledge-setup` | Create or reconcile a progressively loaded three-file repository context layer | `SKILL.md`, `agents/openai.yaml`, `templates/`, `tests/` |
 | `codex-adversarial-gate` | Gate plan and implementation closeout with reviewer-plus-critic evidence | `SKILL.md`, `agents/`, `references/`, `scripts/`, `templates/` |
 | `writing-codex-loops` | Design or create bounded Codex work loops and automations | `SKILL.md`, `agents/openai.yaml`, `references/loop-principles.md` |
 | `multi-phase-orchestrator` | Beta orchestration for related work units across fresh worktree threads | `SKILL.md`, `agents/openai.yaml` |
@@ -200,6 +202,9 @@ python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/writing-codex-loops
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/auditing-repository-health
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/knowledge-setup
+python3 skills/knowledge-setup/tests/test_progressive_graph_contract.py
+python3 scripts/check_skill_mirror.py knowledge-setup
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 git diff --check
 ```
@@ -214,6 +219,7 @@ plugin-eval analyze plugins/codex-skills --format markdown
 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
+- [Knowledge Setup](knowledge-setup.md)
 - [Audit Repository Health](auditing-repository-health.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Writing Codex Loops](writing-codex-loops.md)
