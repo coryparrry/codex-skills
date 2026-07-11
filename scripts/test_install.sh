@@ -24,7 +24,7 @@ assert_installed() {
   # Prove the lowercase skill installs with its complete reusable template surface.
   test -f "$codex_home/skills/knowledge-setup/SKILL.md"
   test -f "$codex_home/skills/knowledge-setup/agents/openai.yaml"
-  test -f "$codex_home/skills/knowledge-setup/templates/AGENTS.md"
+  test -f "$codex_home/skills/knowledge-setup/templates/agents-template.md"
   test -f "$codex_home/skills/knowledge-setup/templates/context.md"
   test -f "$codex_home/skills/knowledge-setup/templates/graph.json"
   test -f "$codex_home/skills/multi-phase-orchestrator/SKILL.md"

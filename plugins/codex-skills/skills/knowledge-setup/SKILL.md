@@ -32,7 +32,7 @@ Use the starter files in [`templates/`](templates/) for reusable content and sha
 1. Confirm the current directory is a Git repository. Report the branch and whether it appears to be the default branch; do not create or switch branches unless required.
 2. Read all existing context-layer files before other edits. Inspect tracked files, README files, manifests, CI, tests, docs, generated or mirrored surfaces, and high-signal source roots.
 3. Reconcile `AGENTS.md`:
-   - If absent, start from [`templates/AGENTS.md`](templates/AGENTS.md).
+   - If absent, start from [`templates/agents-template.md`](templates/agents-template.md) and write it to `AGENTS.md`.
    - If present, retain verified repository-specific instructions and reconcile the context-layer router in place. Remove an instruction only when live evidence proves it obsolete and the task authorizes removal.
 4. Reconcile `.repo/context.md` using [`templates/context.md`](templates/context.md) as its shape:
    - If absent, start from the template.
