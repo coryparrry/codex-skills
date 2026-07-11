@@ -127,12 +127,14 @@ Each route entry should use this shape:
 
 ```json
 {
+  "summary": "Core application behavior and its focused tests.",
+  "match": ["core", "application", "business logic"],
   "inspect_first": ["src/", "tests/"],
   "notes": ["Short practical routing note."]
 }
 ```
 
-`inspect_first` contains repo-relative paths that exist. `start_nodes` is optional and references node IDs only when the graph contains useful semantic nodes. Task routes that do not apply to the repo are omitted.
+`summary` is a concise description agents can use without loading the route body. `match` contains practical task terms for route selection. `inspect_first` contains repo-relative paths that exist. `start_nodes` is optional and references node IDs only when the graph contains useful semantic nodes. Task routes that do not apply to the repo are omitted.
 
 `nodes` are optional, stable semantic repo areas, not file paths. Add them only when boundaries or repeated navigation needs are clearer than direct route paths. Example IDs:
 
@@ -224,7 +226,7 @@ The first adoption pass for a repo is evidence-first:
 3. Create `AGENTS.md` from the router template when absent, or merge the router into the existing file when present.
 4. Create `.repo/context.md` with intent, constraints, and initial evolved context.
 5. Create `.repo/graph.json` with real commands and routes first. Add nodes, edges, and staleness questions only when they improve navigation.
-6. Keep the graph useful, not exhaustive. A small repo may have empty `nodes` and `edges`, and routes may use only `inspect_first`.
+6. Keep the graph useful, not exhaustive. A small repo may have empty `nodes` and `edges`; every route still includes `summary`, `match`, and `inspect_first` so agents can select it from the lightweight catalog.
 7. Validate JSON syntax, graph references, route targets, command evidence, path evidence, generated/mirrored markings, and local-path leakage before any commit.
 8. Commit the adoption as a normal repo change when the user or repo workflow expects commits; otherwise leave the three-file diff ready for review.
 9. From then on, agents update context and graph opportunistically with relevant code changes.
@@ -247,6 +249,7 @@ For adoption, the agent must verify:
 - `AGENTS.md` contains the router and retains verified existing repo-specific instructions.
 - `.repo/context.md` has `Intent`, `Constraints`, and `Evolved Context`.
 - `.repo/graph.json` parses as valid JSON.
+- every route has a concise `summary`, practical `match` terms, and existing `inspect_first` paths.
 - graph paths are real, unless explicitly marked deprecated or missing.
 - any route `start_nodes`, node references, and edge endpoints point to real node IDs.
 - edge types come from the allowed relationship list.
