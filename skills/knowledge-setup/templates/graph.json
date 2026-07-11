@@ -10,9 +10,17 @@
   },
   "agent_contract": {
     "purpose": "Fast deterministic navigation for coding agents.",
-    "load_order": [".repo/context.md", ".repo/graph.json"],
     "planning_rule": "Choose a route before broad repository search.",
-    "read_rule": "Read the route's inspect_first paths first. Follow start_nodes only when useful semantic nodes exist.",
+    "read_policy": {
+      "mode": "progressive",
+      "first": "Read .repo/context.md and query only the graph route catalog.",
+      "then": "Load the selected route, its inspect_first paths, and its start_nodes only.",
+      "full_graph_only_when": [
+        "No route fits.",
+        "The task crosses several routes.",
+        "The graph itself is being audited or updated."
+      ]
+    },
     "update_rule": "Update this graph in the same change set when structure, commands, tests, contracts, ownership, entrypoints, generated files, mirrored files, deprecated paths, do-not-edit areas, or important gotchas change.",
     "no_go": [
       "Do not add dependencies for this context layer.",
@@ -26,6 +34,7 @@
   "edges": [],
   "staleness_checks": [
     "Do command entries match current package, build, or CI files?",
+    "Does every route have a concise summary and practical match terms?",
     "Do route inspect_first paths still exist and lead to the right work?",
     "Do optional nodes and edges still improve navigation?",
     "Are generated, mirrored, deprecated, and do-not-edit paths routed clearly when present?"

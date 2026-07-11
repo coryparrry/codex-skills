@@ -22,7 +22,7 @@ Source files and tests remain authoritative. The context layer only helps future
 ```text
 Existing AGENTS.md = verified instructions retained + context-layer router reconciled in place.
 Existing context/graph = verified durable entries retained + current template shape reconciled from live evidence.
-Small graph = verified commands + inspect_first routes + empty nodes/edges when deeper semantics add no value.
+Small graph = verified commands + progressively readable routes + empty nodes/edges when deeper semantics add no value.
 ```
 
 Use the starter files in [`templates/`](templates/) for reusable content and shape. Do not copy template text into this workflow.
@@ -41,8 +41,9 @@ Use the starter files in [`templates/`](templates/) for reusable content and sha
    - If absent, start from the template.
    - If present, retain commands, routes, nodes, and edges that remain evidence-backed and useful. Remove only stale, invalid, inapplicable, or speculative entries.
    - Record only commands verified from repository evidence.
-   - Make routes the primary navigation layer. Each route starts with existing repo-relative `inspect_first` paths.
+   - Make routes the primary navigation layer. Every route has a concise `summary`, practical `match` terms, and existing repo-relative `inspect_first` paths so agents can choose it without loading the full graph.
    - Add `start_nodes`, nodes, or edges only when semantic boundaries materially improve repeated navigation. Otherwise keep `nodes` empty and `edges` empty.
+   - When nodes are useful, prefer concise `truth`, `owns`, `tests`, `depends_on`, and `edit_policy` fields. Omit fields that add no routing value.
    - Node IDs, when used, are stable lowercase dot-separated semantic IDs such as `area.core`, `boundary.public_api`, or `test.unit`; never use raw paths as IDs.
    - Edges, when used, connect node IDs with one allowed type: `depends_on`, `implements`, `calls`, `called_by`, `tested_by`, `documents`, `generates`, `mirrors`, `replaces`, or `do_not_edit`.
    - Omit unknown commands, inapplicable routes, and speculative relationships.
@@ -74,8 +75,10 @@ python3 -m json.tool .repo/graph.json >/dev/null
 Also verify:
 
 - every command has `command`, `cwd`, and evidence grounded in the repository
+- every route has a concise `summary`, practical `match` terms, and existing `inspect_first` paths
 - every route `inspect_first` path exists
 - any `start_nodes`, node references, and edge endpoints resolve to real nodes
+- the generated `AGENTS.md` preserves the progressive-read sequence and limits full-graph reads to its stated exceptions
 - edge types are allowed and evidence paths exist when supplied
 - existing verified `AGENTS.md` instructions remain present
 - existing verified context and graph entries remain unless live evidence justifies their removal
