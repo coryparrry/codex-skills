@@ -13,8 +13,8 @@
     "planning_rule": "Choose a route before broad repository search.",
     "read_policy": {
       "mode": "progressive",
-      "first": "Read .repo/context.md and query only the graph route catalog.",
-      "then": "Load the selected route, its inspect_first paths, and its start_nodes only.",
+      "first": "Read the context kernel and query only the graph route catalog.",
+      "then": "Load general plus selected route evolved context, then the selected graph route, inspect_first paths, and start_nodes only.",
       "full_graph_only_when": [
         "No route fits.",
         "The task crosses several routes.",

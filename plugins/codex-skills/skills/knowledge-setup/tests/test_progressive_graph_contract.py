@@ -31,11 +31,23 @@ class ProgressiveGraphContractTests(unittest.TestCase):
 
         route_catalog = text.index(".routes | to_entries")
         selected_route = text.index(".routes[$route]")
-        full_graph_boundary = text.index("Read the full graph only when")
+        full_graph_boundary = text.index("Read the full context or graph only when")
 
         self.assertLess(route_catalog, selected_route)
         self.assertLess(selected_route, full_graph_boundary)
         self.assertNotIn("2. Read `.repo/graph.json`.", text)
+        self.assertIn("jq -e --arg route", text)
+        self.assertIn("select($r != null)", text)
+
+    def test_context_template_supports_progressive_route_loading(self) -> None:
+        context = (SOURCE_SKILL / "templates" / "context.md").read_text()
+        agents = (SOURCE_SKILL / "templates" / "agents-template.md").read_text()
+
+        self.assertIn("### Catalog", context)
+        self.assertIn("### Route: general", context)
+        self.assertIn("### Route:", agents)
+        self.assertIn("awk", agents)
+        self.assertNotIn("Read `.repo/context.md` completely", agents)
 
     def test_graph_template_declares_progressive_read_policy(self) -> None:
         graph = json.loads((SOURCE_SKILL / "templates" / "graph.json").read_text())
@@ -52,6 +64,8 @@ class ProgressiveGraphContractTests(unittest.TestCase):
         self.assertIn("`summary`", text)
         self.assertIn("`match`", text)
         self.assertIn("progressive-read", text)
+        self.assertIn("`general`", text)
+        self.assertIn("context route heading", text)
 
     def test_release_surfaces_publish_knowledge_setup(self) -> None:
         skills_config = json.loads((REPO_ROOT / "skills.sh.json").read_text())

@@ -1,6 +1,6 @@
 {
   "name": "codex-skills",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Codex skills for repository context, adversarial review gates, bounded automation loops, beta orchestration, repository health audits, branch cleanup, and PR review triage.",
   "author": {
     "name": "Cory Parry",

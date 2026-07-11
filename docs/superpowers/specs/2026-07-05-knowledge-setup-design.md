@@ -57,13 +57,19 @@ The skill should not run silently on arbitrary folders. Manual invocation preven
 ## Constraints
 
 ## Evolved Context
+
+### Catalog
+
+- `general` — Cross-cutting durable lessons.
+
+### Route: general
 ```
 
 `Intent` describes what the repo is, what it optimizes for, and which design philosophy should guide changes.
 
 `Constraints` contains only non-negotiable repo-specific rules, each with a reason when practical. Old `AGENTS.md` content should be preserved here only when it is truly repo-specific and still valid.
 
-`Evolved Context` is append-only durable memory. Entries should be dated and concise.
+`Evolved Context` is durable memory organized for progressive reads. `Catalog` lists each populated context section with a one-line description. Detailed entries live under `### Route: <route>` headings whose names match `.repo/graph.json`; `general` is reserved for concise cross-cutting lessons. Legacy flat entries are reconciled into the closest route without discarding verified knowledge. Entries should be dated and concise.
 
 Agents should append to `.repo/context.md` when they learn durable, non-obvious facts, such as:
 
@@ -94,7 +100,7 @@ Every repo uses the same top-level schema:
 
 `repo` stores basic metadata: name, kind, languages, package/build systems, and last reviewed date.
 
-`agent_contract` states how agents use the graph: read context first, choose a route before broad search, inspect graph-listed files before wider exploration, and update the graph only when durable structural knowledge changes.
+`agent_contract` states how agents use the layer: read the context kernel and graph route catalog first, choose a route before broad search, load only `general` plus selected-route context and graph nodes, inspect graph-listed files before wider exploration, and update the graph only when durable structural knowledge changes.
 
 `commands` stores verified install, build, test, lint, typecheck, run, release, or smoke commands. Unknown commands are omitted or left empty. Agents must not invent commands.
 
@@ -248,6 +254,7 @@ For adoption, the agent must verify:
 
 - `AGENTS.md` contains the router and retains verified existing repo-specific instructions.
 - `.repo/context.md` has `Intent`, `Constraints`, and `Evolved Context`.
+- the evolved-context catalog matches its populated sections, and every context route heading matches a graph route or `general`.
 - `.repo/graph.json` parses as valid JSON.
 - every route has a concise `summary`, practical `match` terms, and existing `inspect_first` paths.
 - graph paths are real, unless explicitly marked deprecated or missing.

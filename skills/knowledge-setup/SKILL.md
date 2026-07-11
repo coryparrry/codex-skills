@@ -37,6 +37,9 @@ Use the starter files in [`templates/`](templates/) for reusable content and sha
 4. Reconcile `.repo/context.md` using [`templates/context.md`](templates/context.md) as its shape:
    - If absent, start from the template.
    - If present, retain verified intent, hard constraints, and durable lessons. Remove or rewrite an entry only when live evidence proves it stale or incorrect.
+   - Keep `Intent`, `Constraints`, and the `Evolved Context` catalog concise because agents always load this kernel.
+   - Group evolved entries under `### Route: <route>` headings and list each populated section in `### Catalog`. Route names match `.repo/graph.json`; use `general` only for genuinely cross-cutting lessons.
+   - Reconcile legacy flat evolved entries into the closest route section without discarding verified lessons.
 5. Reconcile `.repo/graph.json` using [`templates/graph.json`](templates/graph.json) as its shape:
    - If absent, start from the template.
    - If present, retain commands, routes, nodes, and edges that remain evidence-backed and useful. Remove only stale, invalid, inapplicable, or speculative entries.
@@ -75,6 +78,7 @@ python3 -m json.tool .repo/graph.json >/dev/null
 Also verify:
 
 - every command has `command`, `cwd`, and evidence grounded in the repository
+- every context route heading matches a graph route or the reserved `general` section, and the catalog matches the populated sections
 - every route has a concise `summary`, practical `match` terms, and existing `inspect_first` paths
 - every route `inspect_first` path exists
 - any `start_nodes`, node references, and edge endpoints resolve to real nodes

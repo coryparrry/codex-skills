@@ -111,7 +111,7 @@ Ask:
 Use $knowledge-setup in this repo.
 ```
 
-The skill reconciles `AGENTS.md`, `.repo/context.md`, and `.repo/graph.json` from live source, tests, manifests, CI, and documentation. Future agents read durable context, query the lightweight route catalog, load only the selected route and nodes, and verify the listed source files. Run the same trigger again to refresh or repair drift without replacing verified entries wholesale.
+The skill reconciles `AGENTS.md`, `.repo/context.md`, and `.repo/graph.json` from live source, tests, manifests, CI, and documentation. Future agents read a compact context kernel and route catalog, then load only `general` plus the selected route's evolved context and graph nodes before verifying the listed source files. Run the same trigger again to refresh or repair drift without replacing verified entries wholesale.
 
 ## Coordinate Multiple Work Units
 

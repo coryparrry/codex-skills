@@ -24,18 +24,19 @@ It preserves verified repository-specific instructions and durable context. It r
 
 Future agents:
 
-1. Read `.repo/context.md` for repository intent, constraints, and durable lessons.
+1. Read only the context kernel: repository intent, constraints, and the evolved-context catalog.
 2. Query only the graph route catalog.
 3. Select the route matching the task.
-4. Load only that route and its starting nodes.
-5. Inspect the listed source-truth and test paths.
-6. Verify live implementation before relying on summaries.
+4. Load only `general` plus the selected route's evolved context.
+5. Load only the selected graph route and its starting nodes.
+6. Inspect the listed source-truth and test paths.
+7. Verify live implementation before relying on summaries.
 
-Agents read the full graph only when no route fits, work crosses several routes, or the graph itself is under review.
+Agents read the full context or graph only when no route fits, work crosses several routes, or that context-layer file is under review.
 
 ## Keep It Current
 
-Update `.repo/context.md` when work changes repository intent, a hard constraint, or a durable non-obvious lesson. Update `.repo/graph.json` in the same change set when work changes commands, routes, source-truth locations, ownership, tests, contracts, generated or mirrored surfaces, deprecated paths, or important boundaries.
+Update `.repo/context.md` when work changes repository intent, a hard constraint, or a durable non-obvious lesson. Keep the always-loaded kernel concise, list populated context sections in `Catalog`, place route-specific lessons under matching `### Route: <route>` headings, and reserve `general` for cross-cutting lessons. Update `.repo/graph.json` in the same change set when work changes commands, routes, source-truth locations, ownership, tests, contracts, generated or mirrored surfaces, deprecated paths, or important boundaries.
 
 Run `$knowledge-setup` again for an explicit refresh or repair. The skill reconciles existing entries instead of replacing verified knowledge wholesale.
 

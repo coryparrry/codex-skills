@@ -10,4 +10,10 @@ This repo has not been set up yet. Run `$knowledge-setup` from the repo root aft
 
 ## Evolved Context
 
+### Catalog
+
+- `general` — Cross-cutting durable lessons.
+
+### Route: general
+
 - Initial stub. Replace this entry when `$knowledge-setup` adopts the repo from live evidence.
