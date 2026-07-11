@@ -1,7 +1,7 @@
 {
   "name": "codex-skills",
-  "version": "0.7.0",
-  "description": "Codex skills for adversarial review gates, bounded automation loops, beta orchestration, repository health audits, branch cleanup, and PR review triage.",
+  "version": "0.8.0",
+  "description": "Codex skills for repository context, adversarial review gates, bounded automation loops, beta orchestration, repository health audits, branch cleanup, and PR review triage.",
   "author": {
     "name": "Cory Parry",
     "url": "https://github.com/coryparrry"
@@ -15,13 +15,15 @@
     "automation",
     "orchestration",
     "review",
+    "context",
+    "repository",
     "git"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex Skills",
-    "shortDescription": "Review gates, bounded loops, repo audits, branch cleanup, and PR triage skills.",
-    "longDescription": "A Codex skill bundle for adversarial completion review, bounded Codex automation loops, beta multi-worktree orchestration, repository health audits, safe merged-branch cleanup, and practical PR feedback triage.",
+    "shortDescription": "Repository context, review gates, bounded loops, audits, cleanup, and PR triage.",
+    "longDescription": "A Codex skill bundle for progressive repository context, adversarial completion review, bounded Codex automation loops, beta multi-worktree orchestration, repository health audits, safe merged-branch cleanup, and practical PR feedback triage.",
     "developerName": "Cory Parry",
     "category": "Coding",
     "capabilities": [
@@ -33,7 +35,7 @@
     "privacyPolicyURL": "https://github.com/coryparrry/codex-skills/security/policy",
     "termsOfServiceURL": "https://github.com/coryparrry/codex-skills/blob/main/LICENSE",
     "defaultPrompt": [
-      "Use auditing-repository-health before repo work to run the read-only repo health audit.",
+      "Use knowledge-setup to maintain repository context; use auditing-repository-health for a read-only readiness audit.",
       "Use codex-adversarial-gate for closeout evidence and triage-review-comments for PR feedback.",
       "Use writing-codex-loops for automations; multi-phase-orchestrator for beta work; git-clean-merged-branch after merges."
     ],

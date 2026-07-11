@@ -16,6 +16,7 @@ For `codex-adversarial-gate`, also make sure the custom reviewer agent TOMLs are
 
 | Goal | Skill |
 |---|---|
+| Create, refresh, or repair a repository context layer | `knowledge-setup` |
 | Review a plan before execution | `codex-adversarial-gate` |
 | Close an implementation phase or slice | `codex-adversarial-gate` |
 | Recover from a skipped completion gate | `codex-adversarial-gate` |
@@ -99,6 +100,18 @@ Use $auditing-repository-health to check whether this repo has the setup, testin
 ```
 
 The skill uses script/bootstrap, setup, update, server, test, cibuild, and console as a reference vocabulary, but it should map to the repo's existing conventions rather than forcing those exact names.
+
+## Set Up Repository Context
+
+Use `knowledge-setup` when a repository needs a compact, evidence-backed context layer for repeated agent work.
+
+Ask:
+
+```text
+Use $knowledge-setup in this repo.
+```
+
+The skill reconciles `AGENTS.md`, `.repo/context.md`, and `.repo/graph.json` from live source, tests, manifests, CI, and documentation. Future agents read durable context, query the lightweight route catalog, load only the selected route and nodes, and verify the listed source files. Run the same trigger again to refresh or repair drift without replacing verified entries wholesale.
 
 ## Coordinate Multiple Work Units
 
@@ -196,6 +209,8 @@ If a completion gate was skipped, use `codex-adversarial-gate` to freeze the cur
 
 If a loop request says only "keep going until done", use `writing-codex-loops` to replace it with observable continue, success, blocked, and no-progress predicates.
 
+If agents repeatedly rediscover repository structure or load a large graph, use `knowledge-setup` to reconcile a routes-first context layer. Do not use it as a substitute for live source verification.
+
 If branch cleanup stops on local changes, commit, stash, or discard those changes before rerunning the skill.
 
 If review triage has no PR context, load the PR or provide enough review context before invoking the skill.
@@ -204,6 +219,7 @@ If review triage has no PR context, load the PR or provide enough review context
 
 - [Installation](installation.md)
 - [Reference](reference.md)
+- [Knowledge Setup](knowledge-setup.md)
 - [Audit Repository Health](auditing-repository-health.md)
 - [Codex Adversarial Review Gate](codex-adversarial-gate.md)
 - [Writing Codex Loops](writing-codex-loops.md)

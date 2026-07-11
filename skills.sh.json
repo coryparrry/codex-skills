@@ -10,6 +10,13 @@
       ]
     },
     {
+      "title": "Repository Context",
+      "description": "Skills for evidence-backed repository context and efficient agent navigation.",
+      "skills": [
+        "knowledge-setup"
+      ]
+    },
+    {
       "title": "Review Gates",
       "description": "Skills for adversarial plan and implementation closeout.",
       "skills": [
