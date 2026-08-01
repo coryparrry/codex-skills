@@ -11,9 +11,10 @@
       ]
     },
     {
-      "title": "PR Review",
-      "description": "Skills for PR feedback triage.",
+      "title": "Code Review",
+      "description": "Skills that review Swift code and sort PR feedback.",
       "skills": [
+        "swift-code-review",
         "triage-review-comments"
       ]
     },

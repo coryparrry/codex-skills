@@ -8,6 +8,7 @@ This guide explains when and how to invoke the skills in this repository.
 |---|---|
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
+| Review Swift or Apple-platform changes that affect Swift targets | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
@@ -32,6 +33,22 @@ Use $research-repo-technology to determine which technologies this repository sh
 ```
 
 The skill audits the checkout before searching externally, inspects promising technologies at source level, ranks a short set of repo-specific opportunities, and proposes bounded proofs of concept without implementing them.
+
+## Swift Code Review
+
+Use `swift-code-review` for a Swift or Apple-platform diff, branch, commit, or pull request:
+
+```text
+Use $swift-code-review to review these Swift and SwiftUI changes for concrete correctness and regression risks.
+```
+
+The skill first identifies the compiler, language mode, SDK, deployment target, and dependency versions.
+
+Then it loads only the reference files that apply to the affected invariants.
+
+The skill is read-only. It traces callers, cancellation, teardown, identity, representation, and side effects before it reports a finding.
+
+The skill does not invent style comments. AI authorship does not increase the priority of a finding.
 
 ## Clean Up A Merged Branch
 
@@ -71,3 +88,4 @@ It does not implement fixes automatically. If current PR context is unavailable,
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)
 - [Repository Technology Research](research-repo-technology.md)
+- [Swift Code Review](swift-code-review.md)

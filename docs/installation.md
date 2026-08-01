@@ -18,6 +18,7 @@ The marketplace plugin exposes:
 - `continue-deep-research`
 - `git-clean-merged-branch`
 - `research-repo-technology`
+- `swift-code-review`
 - `triage-review-comments`
 
 ## Install Through skills.sh
@@ -44,6 +45,10 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill continue-d
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill research-repo-technology
+```
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill swift-code-review
 ```
 
 Global Codex skill copies are stored under `${CODEX_HOME:-$HOME/.codex}/skills/`.
@@ -74,3 +79,4 @@ If the marketplace plugin does not appear, verify that `.agents/plugins/marketpl
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)
 - [Repository Technology Research](research-repo-technology.md)
+- [Swift Code Review](swift-code-review.md)

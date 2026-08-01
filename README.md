@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> Four Codex skills for evidence-led research, PR review triage, and safe branch cleanup.
+> Five Codex skills for evidence-led research, Swift code review, PR feedback triage, and safe branch cleanup.
 
 Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
@@ -43,6 +43,7 @@ Replace the skill slug in the command.
 |---|---|---|
 | 🔬 Continue existing research with repository context. | [`continue-deep-research`](docs/continue-deep-research.md) | Preserves prior evidence, shows contradictions, and returns a verified research delta. |
 | 🔭 Research technologies for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Requires repository evidence, primary sources, clear integration points, and qualified proofs of concept. |
+| 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Finds reachable ownership, isolation, identity, lifetime, representation, and side-effect errors. |
 | 🧭 Separate real PR feedback from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Finds stale comments, duplicate findings, unsupported claims, and missing prevention checks. |
 | 🧹 Remove a merged local branch safely. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Protects dirty worktrees and unmerged work. Resolves the current default branch before deletion. |
 
@@ -71,6 +72,7 @@ python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
 python3 scripts/check_skill_mirror.py research-repo-technology
+python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
@@ -85,6 +87,7 @@ git diff --check
 - [Triage Review Comments](docs/triage-review-comments.md)
 - [Continue Deep Research](docs/continue-deep-research.md)
 - [Repository Technology Research](docs/research-repo-technology.md)
+- [Swift Code Review](docs/swift-code-review.md)
 - [Reference](docs/reference.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)

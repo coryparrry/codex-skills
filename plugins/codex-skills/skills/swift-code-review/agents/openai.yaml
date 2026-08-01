@@ -1,0 +1,4 @@
+interface:
+  display_name: "Swift Code Review"
+  short_description: "Review Swift and SwiftUI changes deeply"
+  default_prompt: "Use $swift-code-review to review these Swift or SwiftUI changes for concrete correctness and regression risks."
