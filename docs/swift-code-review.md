@@ -45,12 +45,12 @@ Then it loads only the reference files that apply to the affected invariants.
 | Changed surface | Review focus |
 |---|---|
 | Actors, tasks, callbacks, locks, streams, ARC | Isolation, transfer, cancellation, freshness, reentrancy, and teardown |
-| SwiftUI and AppKit | Source of truth, identity, observation, async lifetime, layout, transactions, accessibility, windows, and bridges |
+| SwiftUI and AppKit | Source of truth, identity, observation, async lifetime, state matrices, parent/child layout budgets, transactions, accessibility, windows, and bridges |
 | Parsers, persistence, unsafe code, and public APIs | Representation, bounds, retries, side effects, migrations, runtime support, security, and resources |
 | Packages, Xcode configuration, macros, and generated code | Build inputs, dependencies, tools, resources, compatibility, and generated behavior |
 | AI-assisted changes | Missing assumptions and proof without treating authorship as a defect |
 
-The skill reads relevant callers, alternate entry points, tests, failure paths, and teardown paths. The displayed diff is not the complete contract.
+The skill reads relevant callers, alternate entry points, tests, failure paths, and teardown paths. It re-snapshots the changed-path inventory when the checkout changes and rechecks adjacent retained, incomplete, empty, failure, and replacement states after follow-up fixes. The displayed diff is not the complete contract.
 
 ## Findings
 

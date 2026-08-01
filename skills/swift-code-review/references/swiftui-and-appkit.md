@@ -8,6 +8,7 @@ Use this reference for SwiftUI state, Observation, identity, lists, navigation, 
 - [Observation and rendering](#observation-and-rendering)
 - [Asynchronous lifetime and navigation](#asynchronous-lifetime-and-navigation)
 - [Layout, modifiers, and transactions](#layout-modifiers-and-transactions)
+- [State matrices and composition budgets](#state-matrices-and-composition-budgets)
 - [Accessibility and adaptation](#accessibility-and-adaptation)
 - [AppKit interoperability](#appkit-interoperability)
 - [Runtime qualification](#runtime-qualification)
@@ -154,6 +155,41 @@ Ask:
 - whether transition temporarily contains both branches;
 - whether placeholder and content share compatible geometry.
 
+## State matrices and composition budgets
+
+When more than one state dimension can change, do not review only the named
+states in isolation. Cross the dimensions that can be independently available:
+
+| Dimension | Example states |
+|---|---|
+| Content | None, retained, fresh |
+| Metadata or list | Unavailable, partial, exact |
+| Freshness | Idle, loading, refreshing, failed |
+| Selection or destination | None, current, removed, replaced |
+
+The matrix need not enumerate impossible combinations, but it must include every
+reachable combination that changes what the user can see or do. In particular,
+verify retained content with an empty or incomplete list, and verify that a
+refresh indicator or incomplete marker remains visible while old content is
+shown. An empty collection or zero count is not automatically equivalent to no
+content or a known-zero result; preserve the distinction in the model and view.
+
+For fixed or bounded parents, calculate the layout budget rather than checking
+each child in isolation:
+
+```text
+offered size
+≥ header + content minimum + footer + padding
+  + safe-area/reserved controls + overlays
+```
+
+Check every loading, retained, partial, empty, failure, and retry branch for
+overflow, clipping, footer reachability, and scroll behavior. A child
+`minHeight` or `fixedSize` can exceed the parent’s total content height even
+when the child is locally valid. Prefer flexible sizing or an explicit scroll
+region when the contract allows it; otherwise prove the parent budget for the
+supported window sizes.
+
 Treat modifier ordering as semantics, especially:
 
 - `.id`;
@@ -232,6 +268,8 @@ Use the exact fresh build and inspect relevant:
 
 - cache-hit and non-cached paths;
 - placeholder, intermediate, success, empty, and failure frames;
+- retained content with incomplete metadata or an empty list;
+- fixed-size parent and minimum-size child combinations, including footer reachability;
 - transition and inherited animation;
 - hit testing and pass-through;
 - insert, delete, reorder, and selection;

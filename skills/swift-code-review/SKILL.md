@@ -36,6 +36,8 @@ If the change is too large to review reliably, partition it by subsystem or risk
 
 First inventory every changed path and classify it by subsystem and risk. Maintain a coverage ledger of reviewed and unreviewed slices. Review coherent slices deeply, then make one integration pass across shared contracts and cross-cutting state. Opening every file is not sufficient for a complete review. Tool or context limits that prevent any slice from being completed make the review partial.
 
+Re-snapshot the inventory before reporting. If a commit, generated file, staged change, uncommitted edit, or validation command changes any in-scope path, pause and re-resolve the base, head, working-tree status, and changed-path inventory. State whether the new snapshot is included or excluded, then re-read every affected slice and repeat the integration pass. Do not combine findings from different snapshots without identifying which snapshot each finding belongs to.
+
 Use one reviewer for a focused change. When subagents are available and the change has independent high-risk surfaces, the primary reviewer may assign at most two non-overlapping, read-only lanes after inventorying the complete diff, identifying shared contracts, and locating cross-cutting boundaries. Recheck every proposed finding against the full change before reporting it; do not create iterative reviewer-versus-reviewer loops.
 
 Report completeness separately from disposition. A partial review may request changes based on a surviving Confirmed or High-confidence blocker in the reviewed scope, but it must never approve the complete change. If no such blocker survives, use `Disposition: not assessed`.
@@ -91,7 +93,7 @@ Use these default review depths:
 | Claimed mechanical rename or formatting | First rule out public, serialized, dynamic, generated, selector-based, persistence, and resource-name dependencies. Then confirm no semantic diff and run the narrowest relevant check. |
 | Local deterministic transformation | Inspect inputs, outputs, boundaries, error semantics, complexity, and tests. |
 | Tests, fixtures, previews, or snapshots | Verify the check exercises intended production behavior, distinguishes defective from corrected behavior, preserves assertion strength, and is deterministic under relevant runtime and concurrency conditions. Route by the production surface tested. |
-| SwiftUI view change | Trace state ownership, identity, observed reads, layout states, modifiers, accessibility, and visible runtime behavior. |
+| SwiftUI view change | Trace state ownership, identity, observed reads, layout states, parent/child size budgets, modifiers, accessibility, and visible runtime behavior. |
 | Async work or callback bridge | Map ownership, isolation, cancellation, freshness, reentrancy, duplicate/late completion, and teardown. |
 | Persistence or external side effect | Establish the applicable atomicity, idempotency, retry, partial-failure, migration, and recovery guarantees. |
 | Public API or package change | Check source/runtime compatibility, isolation, sendability, overload dispatch, availability, and downstream adoption. |
@@ -130,6 +132,10 @@ Inspect these paths when affected by the change or necessary to prove a suspecte
 - cache-hit, synchronous-callback, and oldest-supported-platform behavior when applicable.
 
 Reason through, or exercise where existing tooling permits, competing events such as duplicate input, out-of-order completion, cancellation, reentrancy, deletion, identity replacement, view/window closure, shutdown, malformed input, and partial success.
+
+For stateful UI that combines cached or retained content with refresh, filtering, selection, or incomplete metadata, build a small state matrix before approving. Cross content availability (none, retained, fresh) with metadata/list availability (unavailable, partial, exact), freshness (idle, in flight, failed), and selection/destination (none, current, removed or replaced). Check every reachable combination, especially retained content with an empty or partial list. Do not use an empty collection, zero count, or hidden branch as a proxy for absent content or known-zero state unless the contract explicitly makes that meaning safe.
+
+For fixed or bounded SwiftUI/AppKit containers, calculate the parent/child layout budget in each visible state: headers, content minimums, footers, padding, safe-area or reserved controls, overlays, and scroll regions must fit within the offered height and width. A child `minHeight` can exceed the parent's total content height even when each view looks locally reasonable; verify footer reachability, clipping, overflow, and flexible versus fixed sizing rather than checking only the final fresh-content frame.
 
 ## 5. Verify findings
 
@@ -243,6 +249,8 @@ Stop when:
 - relevant validation has run or its absence is explicit;
 - remaining uncertainty is recorded;
 - further checklist expansion would be generic rather than change-specific.
+
+When reviewing a follow-up patch or a checkout that contains a prior fix, re-prove the original invariant and inspect its adjacent retained, incomplete, empty, failure, cancellation, and replacement states. Treat a fix that restores one path as new behavior that can regress a neighboring path; do not close the earlier finding solely because the original line or interaction now appears corrected.
 
 If a Confirmed design or contract blocker makes the remainder not meaningfully reviewable, inspect enough to identify independent risks, list the affected remainder as unreviewed, and return a partial request-changes result.
 
