@@ -17,6 +17,12 @@ Use $continue-deep-research to continue this Deep Research report against the li
 
 Provide the existing report, notes, links, local paths, or task IDs and state the decision the research should support when it is not already clear.
 
+## Parent Model Requirement
+
+Start the root task with `gpt-5.6-luna` at maximum reasoning. The skill checks the parent model before inspecting the supplied research and stops with restart guidance when the requirement cannot be verified.
+
+Luna Max research subagents cannot compensate for a different parent model because the parent owns intake, contradiction resolution, synthesis, and final citations.
+
 ## What It Returns
 
 The skill leads with the current answer, recovers the prior baseline, and reports only material changes under the relevant categories: retained, confirmed, corrected, new, contradicted, and unresolved. It maps evidence to claims and separates verified facts from inference.

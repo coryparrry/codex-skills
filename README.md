@@ -33,6 +33,8 @@ Prefer the Codex app marketplace? Add `https://github.com/coryparrry/codex-skill
 | PR comments need separating from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Stale review threads, duplicate findings, unverified claims, and missing prevention checks. |
 | A merged branch needs local cleanup. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Unsafe deletion, stale default branches, and mistaken cleanup of unmerged work. |
 
+Both research skills require the root parent task to run on Luna Max. Spawning Luna Max research lanes from another parent model is not a supported substitute.
+
 ## What Is Shipped
 
 | Surface | Purpose |

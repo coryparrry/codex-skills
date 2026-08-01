@@ -11,6 +11,8 @@ This guide explains when and how to invoke the skills in this repository.
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
+Both research workflows require the root parent task to use `gpt-5.6-luna` with maximum reasoning. They stop before reading research or repository context when the parent model cannot be verified. Luna Max subagents do not compensate for a different parent model.
+
 ## Continue Existing Deep Research
 
 Use `continue-deep-research` when ChatGPT Deep Research, notes, a report, source links, or a prior task already contain useful work and Codex should extend it with repository context:

@@ -1,11 +1,22 @@
 ---
 name: continue-deep-research
-description: Continue existing technical or general research from notes, files, URLs, papers, task IDs, or prior reports. Use when verifying or updating findings, investigating open questions, resolving contradictions, or producing a primary-source-cited delta without restarting or losing provenance.
+description: Continue existing technical or general research from notes, files, URLs, papers, task IDs, or prior reports. Use when verifying or updating findings, investigating open questions, resolving contradictions, or producing a primary-source-cited delta without restarting or losing provenance. Requires the root parent agent to be gpt-5.6-luna with max reasoning.
 ---
 
 # Continue Deep Research
 
 Treat the user's research as an evolving evidence base. Preserve useful prior work, challenge unsupported claims, and return the verified research delta rather than a rewritten summary of the same material.
+
+## Require a Luna Max parent
+
+Run this preflight before inspecting supplied research, browsing, or spawning subagents:
+
+1. Check the current root parent agent's model identity and reasoning level from runtime metadata. Do not infer them from output quality or from the availability of subagent model overrides.
+2. Continue only when the parent is `gpt-5.6-luna` with `reasoning_effort: "max"`.
+3. If either value cannot be verified or does not match, stop and tell the user: `This workflow requires Luna Max as the parent agent. Luna Max subagents cannot make it work correctly when the parent is not Luna Max. Start a new Luna Max task and invoke $continue-deep-research there.`
+4. Do not ingest research, inspect repository context, browse, or dispatch lanes until this check passes.
+
+The parent requirement and the subagent requirement are separate. A verified Luna Max parent must still use Luna Max for every research lane.
 
 ## Preserve the research boundary
 

@@ -1,11 +1,22 @@
 ---
 name: research-repo-technology
-description: Research technologies an existing repository should adopt, adapt, build, or reject. Use when assessing architecture or product opportunities, comparing external projects at source level, or producing evidence-backed recommendations and proofs of concept from the live codebase.
+description: Research technologies an existing repository should adopt, adapt, build, or reject. Use when assessing architecture or product opportunities, comparing external projects at source level, or producing evidence-backed recommendations and proofs of concept from the live codebase. Requires the root parent agent to be gpt-5.6-luna with max reasoning.
 ---
 
 # Repository Technology Research
 
 Produce decision-grade, repo-specific technology research without turning the result into a generic tool catalogue.
+
+## Require a Luna Max parent
+
+Run this preflight before auditing the repository, browsing, or spawning subagents:
+
+1. Check the current root parent agent's model identity and reasoning level from runtime metadata. Do not infer them from output quality or from the availability of subagent model overrides.
+2. Continue only when the parent is `gpt-5.6-luna` with `reasoning_effort: "max"`.
+3. If either value cannot be verified or does not match, stop and tell the user: `This workflow requires Luna Max as the parent agent. Luna Max subagents cannot make it work correctly when the parent is not Luna Max. Start a new Luna Max task and invoke $research-repo-technology there.`
+4. Do not inspect the repository, browse, or dispatch lanes until this check passes.
+
+The parent requirement and the subagent requirement are separate. A verified Luna Max parent must still use Luna Max for every research lane.
 
 ## Preserve the research boundary
 
