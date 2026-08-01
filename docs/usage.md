@@ -6,8 +6,32 @@ This guide explains when and how to invoke the skills in this repository.
 
 | Goal | Skill |
 |---|---|
+| Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
+| Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
+
+Both research workflows require the root parent task to use `gpt-5.6-luna` with maximum reasoning. They stop before reading research or repository context when the parent model cannot be verified. Luna Max subagents do not compensate for a different parent model.
+
+## Continue Existing Deep Research
+
+Use `continue-deep-research` when ChatGPT Deep Research, notes, a report, source links, or a prior task already contain useful work and Codex should extend it with repository context:
+
+```text
+Use $continue-deep-research to continue this ChatGPT Deep Research report against the live repository. Verify the unresolved claims and return only the research delta.
+```
+
+The skill recovers the existing evidence base, checks the claims most likely to change the conclusion, and separates retained, confirmed, corrected, new, contradicted, and unresolved findings. It preserves the supplied materials and keeps research-only work read-only.
+
+## Research Repository Technology
+
+Use `research-repo-technology` when technology choices must be derived from verified gaps in the live repository:
+
+```text
+Use $research-repo-technology to determine which technologies this repository should adopt, adapt, build, or reject.
+```
+
+The skill audits the checkout before searching externally, inspects promising technologies at source level, ranks a short set of repo-specific opportunities, and proposes bounded proofs of concept without implementing them.
 
 ## Clean Up A Merged Branch
 
@@ -45,3 +69,5 @@ It does not implement fixes automatically. If current PR context is unavailable,
 - [Reference](reference.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
+- [Continue Deep Research](continue-deep-research.md)
+- [Repository Technology Research](research-repo-technology.md)

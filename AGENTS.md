@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository packages a small Codex skill bundle. Source skills live under `skills/`, with one directory per skill: `skills/git-clean-merged-branch/` and `skills/triage-review-comments/`. Each skill keeps its entrypoint in `SKILL.md`; supporting files belong in local `agents/`, `references/`, `scripts/`, or `tests/` subdirectories.
+This repository packages a small Codex skill bundle. Source skills live under `skills/`, with one directory per skill, including research, review-triage, and branch-cleanup workflows. Each skill keeps its entrypoint in `SKILL.md`; supporting files belong in local `agents/`, `references/`, `scripts/`, or `tests/` subdirectories.
 
 The installable plugin mirror lives under `plugins/codex-skills/skills/`, and plugin metadata is in `plugins/codex-skills/.codex-plugin/plugin.json`. Keep mirrored skill files synchronized when changing shipped skill behavior. User-facing documentation belongs in `docs/`; repository install helpers live in `scripts/`.
 
@@ -13,6 +13,8 @@ The installable plugin mirror lives under `plugins/codex-skills/skills/`, and pl
 - `python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py`: runs branch cleanup behavior tests.
 - `python3 scripts/check_skill_mirror.py git-clean-merged-branch`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py triage-review-comments`: verifies source/plugin mirror parity.
+- `python3 scripts/check_skill_mirror.py continue-deep-research`: verifies source/plugin mirror parity.
+- `python3 scripts/check_skill_mirror.py research-repo-technology`: verifies source/plugin mirror parity.
 - `python3 -m json.tool skills.sh.json >/dev/null`: validates package metadata JSON.
 - `git diff --check`: catches trailing whitespace and patch formatting issues.
 

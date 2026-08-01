@@ -23,9 +23,17 @@ assert_installed() {
   test -f "$codex_home/skills/triage-review-comments/references/EVALUATION.md"
   test -f "$codex_home/skills/triage-review-comments/references/EXAMPLE.md"
   test -f "$codex_home/skills/triage-review-comments/references/INTEGRATION.md"
+  test -f "$codex_home/skills/continue-deep-research/SKILL.md"
+  test -f "$codex_home/skills/continue-deep-research/agents/openai.yaml"
+  test -f "$codex_home/skills/continue-deep-research/references/research-delta.md"
+  test -f "$codex_home/skills/continue-deep-research/references/source-routing.md"
+  test -f "$codex_home/skills/research-repo-technology/SKILL.md"
+  test -f "$codex_home/skills/research-repo-technology/agents/openai.yaml"
+  test -f "$codex_home/skills/research-repo-technology/references/report-contract.md"
+  test -f "$codex_home/skills/research-repo-technology/references/research-lanes.md"
 
   installed_skills="$(find "$codex_home/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)"
-  test "$installed_skills" = "$(printf '%s\n' git-clean-merged-branch triage-review-comments)"
+  test "$installed_skills" = "$(printf '%s\n' continue-deep-research git-clean-merged-branch research-repo-technology triage-review-comments)"
 }
 
 LOCAL_HOME="$TMP_DIR/codex-local"
@@ -46,14 +54,20 @@ CODEX_HOME="$PRESERVE_HOME" bash "$INSTALLER" >/dev/null
 assert_installed "$PRESERVE_HOME"
 before_cleanup_checksum="$(shasum "$PRESERVE_HOME/skills/git-clean-merged-branch/SKILL.md")"
 before_triage_checksum="$(shasum "$PRESERVE_HOME/skills/triage-review-comments/SKILL.md")"
+before_continue_research_checksum="$(shasum "$PRESERVE_HOME/skills/continue-deep-research/SKILL.md")"
+before_repo_research_checksum="$(shasum "$PRESERVE_HOME/skills/research-repo-technology/SKILL.md")"
 if CODEX_HOME="$PRESERVE_HOME" bash -c "$(cat "$INSTALLER")" >/dev/null 2>&1; then
   echo "curl-style root installer unexpectedly replaced existing install" >&2
   exit 1
 fi
 after_cleanup_checksum="$(shasum "$PRESERVE_HOME/skills/git-clean-merged-branch/SKILL.md")"
 after_triage_checksum="$(shasum "$PRESERVE_HOME/skills/triage-review-comments/SKILL.md")"
+after_continue_research_checksum="$(shasum "$PRESERVE_HOME/skills/continue-deep-research/SKILL.md")"
+after_repo_research_checksum="$(shasum "$PRESERVE_HOME/skills/research-repo-technology/SKILL.md")"
 test "$before_cleanup_checksum" = "$after_cleanup_checksum"
 test "$before_triage_checksum" = "$after_triage_checksum"
+test "$before_continue_research_checksum" = "$after_continue_research_checksum"
+test "$before_repo_research_checksum" = "$after_repo_research_checksum"
 assert_installed "$PRESERVE_HOME"
 
 echo "Install tests passed"

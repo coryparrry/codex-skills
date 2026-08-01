@@ -3,6 +3,14 @@
   "notGrouped": "bottom",
   "groupings": [
     {
+      "title": "Research",
+      "description": "Skills for continuing evidence bases and researching repository technology decisions.",
+      "skills": [
+        "continue-deep-research",
+        "research-repo-technology"
+      ]
+    },
+    {
       "title": "PR Review",
       "description": "Skills for PR feedback triage.",
       "skills": [

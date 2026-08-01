@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repository Technology Research"
+  short_description: "Find evidence-backed technology opportunities"
+  default_prompt: "Use $research-repo-technology to research the strongest technologies this repository should adopt, adapt, or build."
