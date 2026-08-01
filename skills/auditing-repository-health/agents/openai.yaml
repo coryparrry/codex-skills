@@ -1,4 +1,0 @@
-interface:
-  display_name: "Audit Repository Health"
-  short_description: "Run a repo health audit"
-  default_prompt: "Use $auditing-repository-health to run the read-only repository health audit for this repo."

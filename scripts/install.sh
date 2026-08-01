@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ADVERSARIAL_GATE="codex-adversarial-gate"
-PACKAGE_INSTALLER="skills/$ADVERSARIAL_GATE/scripts/install.sh"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 SKILLS_DIR="$CODEX_HOME/skills"
-
 TEMP_DIRS=()
 
 cleanup() {
@@ -45,9 +42,8 @@ replace_skill_dir() {
   fi
 
   if [ -n "$backup_dir" ] && [ -d "$backup_dir" ]; then
-    local restore_dir="$backup_dir"
-    if ! mv "$restore_dir" "$skill_dir"; then
-      echo "failed to restore existing install from $restore_dir" >&2
+    if ! mv "$backup_dir" "$skill_dir"; then
+      echo "failed to restore existing install from $backup_dir" >&2
       exit 1
     fi
   fi
@@ -74,36 +70,29 @@ install_skill_dir() {
 trap cleanup EXIT
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-}"
-if [ -n "$SCRIPT_PATH" ] && [ -f "$SCRIPT_PATH" ]; then
-  ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
-fi
-
-if [ -z "${ROOT_DIR:-}" ] || [ ! -d "$ROOT_DIR/skills" ] || [ ! -f "$ROOT_DIR/$PACKAGE_INSTALLER" ]; then
-  cat >&2 <<EOF
+if [ -z "$SCRIPT_PATH" ] || [ ! -f "$SCRIPT_PATH" ]; then
+  cat >&2 <<'EOF'
 This installer must be run from a trusted local checkout.
 
-Install the repo skills first:
+Install the repo skills with:
   npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
-
-Then run the installed adversarial gate agent installer when needed:
-  bash "\${CODEX_HOME:-\$HOME/.codex}/skills/$ADVERSARIAL_GATE/scripts/install.sh"
 EOF
+  exit 1
+fi
+
+ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+if [ ! -d "$ROOT_DIR/skills" ]; then
+  echo "skills directory not found under trusted checkout: $ROOT_DIR" >&2
   exit 1
 fi
 
 mkdir -p "$SKILLS_DIR"
 
 for source_dir in "$ROOT_DIR"/skills/*; do
-  if [ ! -f "$source_dir/SKILL.md" ]; then
-    continue
+  if [ -f "$source_dir/SKILL.md" ]; then
+    install_skill_dir "$source_dir"
   fi
-  if [ "$(basename "$source_dir")" = "$ADVERSARIAL_GATE" ]; then
-    continue
-  fi
-  install_skill_dir "$source_dir"
 done
-
-bash "$ROOT_DIR/$PACKAGE_INSTALLER" >/dev/null
 
 cat <<EOF
 Installed codex-skills bundle
@@ -115,11 +104,3 @@ for source_dir in "$ROOT_DIR"/skills/*; do
     printf '  %s\n' "$SKILLS_DIR/$(basename "$source_dir")"
   fi
 done
-
-cat <<EOF
-
-Adversarial gate agents:
-  $CODEX_HOME/agents/plan-adversarial-reviewer.toml
-  $CODEX_HOME/agents/task-completion-adversarial-reviewer.toml
-  $CODEX_HOME/agents/task-completion-review-critic.toml
-EOF
