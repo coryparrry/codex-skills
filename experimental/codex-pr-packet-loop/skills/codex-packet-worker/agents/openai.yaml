@@ -1,4 +1,0 @@
-interface:
-  display_name: "Packet Worker"
-  short_description: "Execute one leased packet"
-  default_prompt: "Use $codex-packet-worker to execute the assigned packet in this worktree."

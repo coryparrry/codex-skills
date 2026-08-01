@@ -3,34 +3,6 @@
   "notGrouped": "bottom",
   "groupings": [
     {
-      "title": "Repository Audits",
-      "description": "Skills for repository onboarding, validation, hygiene, and packaging readiness.",
-      "skills": [
-        "auditing-repository-health"
-      ]
-    },
-    {
-      "title": "Repository Context",
-      "description": "Skills for evidence-backed repository context and efficient agent navigation.",
-      "skills": [
-        "knowledge-setup"
-      ]
-    },
-    {
-      "title": "Review Gates",
-      "description": "Skills for adversarial plan and implementation closeout.",
-      "skills": [
-        "codex-adversarial-gate"
-      ]
-    },
-    {
-      "title": "Automation Loops",
-      "description": "Skills for bounded Codex automations and recurring workflows.",
-      "skills": [
-        "writing-codex-loops"
-      ]
-    },
-    {
       "title": "PR Review",
       "description": "Skills for PR feedback triage.",
       "skills": [
@@ -42,13 +14,6 @@
       "description": "Skills for practical Git workflow cleanup.",
       "skills": [
         "git-clean-merged-branch"
-      ]
-    },
-    {
-      "title": "Beta Orchestration",
-      "description": "Beta skills for multi-worktree orchestration.",
-      "skills": [
-        "multi-phase-orchestrator"
       ]
     }
   ]

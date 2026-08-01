@@ -4,27 +4,21 @@ Thanks for improving `codex-skills`.
 
 ## Development Principles
 
-- Preserve the reviewer-plus-critic gate.
 - Keep shipped skill source under `skills/` synchronized with the plugin mirror under `plugins/codex-skills/skills/`.
-- Keep custom agent names stable unless there is a migration path.
-- Keep reviewer and critic agents read-only.
-- Keep Codex loop skills bounded with live-state observation, retry limits, stop conditions, and escalation rules.
+- Treat PR review comments as hypotheses and verify them against current code before recommending action.
+- Keep merged-branch cleanup conservative: verify remote state, protect dirty worktrees, and require explicit force for unmerged deletion.
 - Do not add private workflow assumptions, personal paths, secrets, or organization-specific jargon.
-- Prefer references and templates over bloating `SKILL.md`.
+- Prefer references and scripts over bloating `SKILL.md`.
 
 ## Project Layout
 
 | Path | Purpose |
 |---|---|
-| `skills/codex-adversarial-gate/SKILL.md` | Skill entrypoint |
-| `skills/codex-adversarial-gate/agents/*.toml` | Bundled custom agents |
-| `skills/codex-adversarial-gate/references/` | Detailed workflow and rubric docs |
-| `skills/codex-adversarial-gate/templates/` | Snippets copied into plans or closeout packets |
-| `skills/codex-adversarial-gate/scripts/` | Package installer, archive helper, and smoke test |
-| `skills/writing-codex-loops/` | Bounded Codex loop and automation-writing skill |
+| `skills/git-clean-merged-branch/` | Safe local merged-branch cleanup skill and tests |
+| `skills/triage-review-comments/` | PR review feedback triage skill and references |
 | `plugins/codex-skills/skills/` | Installable plugin mirror of shipped skills |
-| `scripts/` | Repo-level install wrapper and install tests |
-| `docs/` | User-facing docs and captured learnings |
+| `scripts/` | Repo-level installer, mirror checker, and install tests |
+| `docs/` | User-facing documentation |
 
 ## Before You Commit
 
@@ -32,59 +26,31 @@ Run:
 
 ```bash
 bash -n scripts/install.sh
-bash -n skills/codex-adversarial-gate/scripts/install.sh
 bash scripts/test_install.sh
-python3 skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
-python3 -m py_compile \
-  skills/codex-adversarial-gate/scripts/archive_adversarial_review.py \
-  skills/codex-adversarial-gate/scripts/test_archive_adversarial_review.py
-python3 /path/to/skill-creator/scripts/quick_validate.py skills/writing-codex-loops
+python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
+python3 scripts/check_skill_mirror.py git-clean-merged-branch
+python3 scripts/check_skill_mirror.py triage-review-comments
+python3 -m json.tool skills.sh.json >/dev/null
+python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
+python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 git diff --check
 ```
 
-Check custom agent TOMLs with Python 3.11+:
+Run the Codex skill validator for each changed skill if it is available:
 
 ```bash
-python3 - <<'PY'
-from pathlib import Path
-import tomllib
-
-for path in sorted(Path("skills/codex-adversarial-gate/agents").glob("*.toml")):
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    for key in ("name", "description", "developer_instructions"):
-        assert data.get(key), f"{path}: missing {key}"
-    print(f"{path}: {data['name']}")
-PY
-```
-
-Run the Codex skill validator if available:
-
-```bash
-python3 /path/to/skill-creator/scripts/quick_validate.py skills/codex-adversarial-gate
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/git-clean-merged-branch
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/triage-review-comments
 ```
 
 ## Documentation Changes
 
-When changing workflow behavior, update all relevant surfaces:
-
-- `skills/codex-adversarial-gate/SKILL.md`
-- `skills/codex-adversarial-gate/references/`
-- `skills/codex-adversarial-gate/templates/`
-- `skills/codex-adversarial-gate/agents/*.toml`
-- `skills/codex-adversarial-gate/scripts/install.sh`
-- `skills/<changed-skill>/agents/openai.yaml`
-- `plugins/codex-skills/skills/<changed-skill>/`
-- `scripts/install.sh`
-- `scripts/test_install.sh`
-- `docs/reference.md`
-- `docs/usage.md`
-- `docs/<changed-skill>.md`
+When changing shipped behavior, update the relevant source skill, plugin mirror, user guide, reference documentation, and validation coverage.
 
 ## Pull Request Checklist
 
-- [ ] Skills with bundled custom agents still route to those agents.
 - [ ] Source and plugin mirror copies match for changed shipped skills.
-- [ ] Fallback prompts do not allow same-context self-review.
-- [ ] Review archive behavior is documented and tested.
+- [ ] Review findings are verified against current code.
+- [ ] Branch cleanup retains dirty-worktree and unmerged-branch safeguards.
 - [ ] No private paths, credentials, or local workflow assumptions were introduced.
 - [ ] Validation commands pass.

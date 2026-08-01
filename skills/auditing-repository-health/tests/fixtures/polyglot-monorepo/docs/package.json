@@ -1,7 +1,0 @@
-{
-  "name": "polyglot-docs",
-  "private": true,
-  "scripts": {
-    "build": "echo build docs"
-  }
-}

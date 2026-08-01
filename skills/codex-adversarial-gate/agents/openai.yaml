@@ -1,4 +1,0 @@
-interface:
-  display_name: "Codex Adversarial Gate"
-  short_description: "Gate Codex slice completion with review"
-  default_prompt: "Use $codex-adversarial-gate to close an implementation slice with archived reviewer and critic evidence."
