@@ -13,7 +13,12 @@ You need Codex with local skills enabled and `skills` CLI support through `npx`.
 3. Add `https://github.com/coryparrry/codex-skills` as the marketplace source.
 4. Open **Codex Skills** and click the plus button or **Add to Codex**.
 
-The marketplace plugin exposes `git-clean-merged-branch` and `triage-review-comments`.
+The marketplace plugin exposes:
+
+- `continue-deep-research`
+- `git-clean-merged-branch`
+- `research-repo-technology`
+- `triage-review-comments`
 
 ## Install Through skills.sh
 
@@ -31,6 +36,14 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
+```
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill continue-deep-research
+```
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill research-repo-technology
 ```
 
 Global Codex skill copies are stored under `${CODEX_HOME:-$HOME/.codex}/skills/`.
@@ -59,3 +72,5 @@ If the marketplace plugin does not appear, verify that `.agents/plugins/marketpl
 - [Reference](reference.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
+- [Continue Deep Research](continue-deep-research.md)
+- [Repository Technology Research](research-repo-technology.md)

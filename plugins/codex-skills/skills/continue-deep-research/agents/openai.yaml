@@ -1,0 +1,4 @@
+interface:
+  display_name: "Continue Deep Research"
+  short_description: "Extend existing research with verified evidence"
+  default_prompt: "Use $continue-deep-research to audit my current research, investigate the remaining questions, and return the verified research delta."
