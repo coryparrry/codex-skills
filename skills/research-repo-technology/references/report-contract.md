@@ -46,7 +46,9 @@ Distinguish adopting a dependency from learning a pattern. A permissive licence 
 
 Name credible alternatives that were considered and rejected. Give the shortest concrete reason: wrong product boundary, redundant capability, excessive dependency or operational cost, privacy conflict, performance risk, incompatible licence, weak maintenance, or insufficient evidence.
 
-## 6. Three bounded proofs of concept
+## 6. Up to three bounded proofs of concept
+
+Include one proof for each selected qualified opportunity, up to three. Include fewer, including none, when the evidence does not justify three opportunities, and state why the report stops there. Do not invent a weak opportunity or proof to fill this section.
 
 For each selected opportunity, specify:
 

@@ -31,7 +31,7 @@ The report leads with a strategic recommendation and includes:
 - ranked opportunities with exact repository integration points;
 - adopt, adapt, build, or reject decisions;
 - privacy, security, performance, maintenance, platform, and licence risks;
-- rejected alternatives and three bounded proof-of-concept designs.
+- rejected alternatives and up to three bounded proof-of-concept designs, with fewer when the evidence does not justify them.
 
 Research-only runs do not edit the repository, install dependencies, update tasks, or implement the proposed proofs.
 

@@ -118,7 +118,7 @@ Rank opportunities by expected value, evidence confidence, strategic fit, risk, 
 
 Before writing the final report, read [report-contract.md](references/report-contract.md) and follow its evidence and proof-of-concept fields.
 
-Select the three strongest opportunities. For each, propose a bounded proof of concept with:
+Select up to three of the strongest qualified opportunities. Use fewer, including none, when the evidence gate above does not justify three, and state why the report stops there. Never add a weak opportunity to meet a quota. For each selected opportunity, propose a bounded proof of concept with:
 
 - one question to answer;
 - the smallest representative fixture or workload;
