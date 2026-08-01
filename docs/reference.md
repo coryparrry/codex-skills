@@ -15,6 +15,7 @@ skills/
   continue-deep-research/
   git-clean-merged-branch/
   research-repo-technology/
+  swift-code-review/
   triage-review-comments/
 ```
 
@@ -27,6 +28,7 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
 | `research-repo-technology` | Research which technologies a live repository should adopt, adapt, build, or reject | `SKILL.md`, `agents/openai.yaml`, `references/` |
+| `swift-code-review` | Review Swift and Apple-platform changes that affect Swift targets | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/` |
 
 ## Package Metadata
@@ -78,6 +80,7 @@ python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
 python3 scripts/check_skill_mirror.py research-repo-technology
+python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
@@ -92,3 +95,4 @@ git diff --check
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)
 - [Repository Technology Research](research-repo-technology.md)
+- [Swift Code Review](swift-code-review.md)

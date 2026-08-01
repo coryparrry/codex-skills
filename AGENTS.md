@@ -15,6 +15,7 @@ The installable plugin mirror lives under `plugins/codex-skills/skills/`, and pl
 - `python3 scripts/check_skill_mirror.py triage-review-comments`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py continue-deep-research`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py research-repo-technology`: verifies source/plugin mirror parity.
+- `python3 scripts/check_skill_mirror.py swift-code-review`: verifies source/plugin mirror parity.
 - `python3 -m json.tool skills.sh.json >/dev/null`: validates package metadata JSON.
 - `git diff --check`: catches trailing whitespace and patch formatting issues.
 

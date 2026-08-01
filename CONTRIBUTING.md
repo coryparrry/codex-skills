@@ -7,6 +7,7 @@ Thanks for improving `codex-skills`.
 - Keep shipped skill source under `skills/` synchronized with the plugin mirror under `plugins/codex-skills/skills/`.
 - Preserve research-only non-mutation boundaries, primary-source verification, contradiction handling, and explicit uncertainty.
 - Treat PR review comments as hypotheses and verify them against current code before recommending action.
+- Keep Swift reviews focused on risk. Use the active toolchain and the changed execution paths as evidence.
 - Keep merged-branch cleanup conservative: verify remote state, protect dirty worktrees, and require explicit force for unmerged deletion.
 - Do not add private workflow assumptions, personal paths, secrets, or organization-specific jargon.
 - Prefer references and scripts over bloating `SKILL.md`.
@@ -18,6 +19,7 @@ Thanks for improving `codex-skills`.
 | `skills/continue-deep-research/` | Existing-research continuation skill and evidence-delta references |
 | `skills/git-clean-merged-branch/` | Safe local merged-branch cleanup skill and tests |
 | `skills/research-repo-technology/` | Repository technology research skill and report contracts |
+| `skills/swift-code-review/` | Swift and Apple-platform review workflow and reference files |
 | `skills/triage-review-comments/` | PR review feedback triage skill and references |
 | `plugins/codex-skills/skills/` | Installable plugin mirror of shipped skills |
 | `scripts/` | Repo-level installer, mirror checker, and install tests |
@@ -35,6 +37,7 @@ python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
 python3 scripts/check_skill_mirror.py research-repo-technology
+python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
@@ -48,6 +51,7 @@ python3 /path/to/skill-creator/scripts/quick_validate.py skills/git-clean-merged
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/triage-review-comments
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/continue-deep-research
 python3 /path/to/skill-creator/scripts/quick_validate.py skills/research-repo-technology
+python3 /path/to/skill-creator/scripts/quick_validate.py skills/swift-code-review
 ```
 
 ## Documentation Changes
