@@ -1,6 +1,6 @@
 {
   "name": "codex-skills",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Codex skills for evidence-led research, PR review triage, and safe merged-branch cleanup.",
   "author": {
     "name": "Cory Parry",
