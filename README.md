@@ -4,51 +4,64 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-A focused Codex skill bundle for evidence-led research, PR review triage, and safe merged-branch cleanup.
+> Four Codex skills for evidence-led research, PR review triage, and safe branch cleanup.
 
-Each skill handles one repeated workflow, keeps its top-level `SKILL.md` readable, and places supporting rules in local references, scripts, or tests.
+Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
-## Install
+Supporting details stay in references, scripts, or tests.
 
-Install the full bundle for Codex:
+## 🚀 Install
+
+### Codex marketplace
+
+1. Open **Plugins** in Codex.
+2. Select **Add marketplace**.
+3. Add `https://github.com/coryparrry/codex-skills`.
+4. Install **Codex Skills**.
+
+Read the [installation guide](docs/installation.md) for more information.
+
+### skills.sh
+
+Install the full bundle:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
 ```
 
-Install one skill by replacing the slug:
+Install one skill:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill triage-review-comments
 ```
 
-Prefer the Codex app marketplace? Add `https://github.com/coryparrry/codex-skills` as a marketplace source and install **Codex Skills**. Full install notes are in [docs/installation.md](docs/installation.md).
+Replace the skill slug in the command.
 
-## Pick The Skill
+## ✨ Pick a Skill
 
-| Use this when... | Skill | What it protects |
+| Goal | Skill | Guardrail |
 |---|---|---|
-| Existing ChatGPT Deep Research, notes, or reports need continuing with repository context. | [`continue-deep-research`](docs/continue-deep-research.md) | Prior evidence and provenance, current verification, contradictions, and a clear research delta. |
-| A live repository needs evidence-backed technology recommendations. | [`research-repo-technology`](docs/research-repo-technology.md) | Repository-specific fit, source-level evidence, privacy and licence constraints, and bounded proof costs. |
-| PR comments need separating from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Stale review threads, duplicate findings, unverified claims, and missing prevention checks. |
-| A merged branch needs local cleanup. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Unsafe deletion, stale default branches, and mistaken cleanup of unmerged work. |
+| 🔬 Continue existing research with repository context. | [`continue-deep-research`](docs/continue-deep-research.md) | Preserves prior evidence, shows contradictions, and returns a verified research delta. |
+| 🔭 Research technologies for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Requires repository evidence, primary sources, clear integration points, and qualified proofs of concept. |
+| 🧭 Separate real PR feedback from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Finds stale comments, duplicate findings, unsupported claims, and missing prevention checks. |
+| 🧹 Remove a merged local branch safely. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Protects dirty worktrees and unmerged work. Resolves the current default branch before deletion. |
 
-Both research skills require the root parent task to run on Luna Max. Spawning Luna Max research lanes from another parent model is not a supported substitute.
+The two research skills require a Luna Max parent with maximum reasoning. Luna Max subagents cannot replace the required parent.
 
-## What Is Shipped
+## 🧰 What the Plugin Contains
 
 | Surface | Purpose |
 |---|---|
-| [`skills/`](skills/) | Source skill folders loaded by local installs and maintainers. |
-| [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/) | Marketplace mirror for the shipped skills. |
+| [`skills/`](skills/) | Source skill folders for maintainers and skills.sh installations. |
+| [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/) | Plugin copies of the shipped skills. |
 | [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json) | Codex plugin metadata. |
-| [`skills.sh.json`](skills.sh.json) | skills.sh repo-page grouping metadata. |
+| [`skills.sh.json`](skills.sh.json) | Skill groups for the skills.sh repository page. |
 | [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | Codex marketplace entry. |
-| [`experimental/`](experimental/) | Reserved for unshipped experiments. |
+| [`experimental/`](experimental/) | Unshipped experiments. The installer does not include them. |
 
-## Validation
+## 🧪 Validation
 
-For packaging changes, run:
+Run these commands after a packaging change:
 
 ```bash
 bash -n scripts/install.sh
@@ -64,7 +77,7 @@ python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
 git diff --check
 ```
 
-## Documentation
+## 📖 Documentation
 
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
@@ -76,10 +89,10 @@ git diff --check
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
-## Security
+## 🛡️ Security
 
 Do not commit secrets, tokens, private paths, or sensitive diagnostics. See [SECURITY.md](SECURITY.md).
 
-## License
+## 📄 License
 
 MIT. See [LICENSE](LICENSE).
