@@ -47,7 +47,7 @@ Replace the skill slug in the command.
 | 🧭 Separate real PR feedback from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Finds stale comments, duplicate findings, unsupported claims, and missing prevention checks. |
 | 🧹 Remove a merged local branch safely. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Protects dirty worktrees and unmerged work. Resolves the current default branch before deletion. |
 
-The two research skills require a Luna Max parent with maximum reasoning. Luna Max subagents cannot replace the required parent.
+The research skills work with the available runtime. They use independent lanes when that materially improves coverage; otherwise they complete a bounded root-only audit and disclose the reduced coverage.
 
 ## 🧰 What the Plugin Contains
 

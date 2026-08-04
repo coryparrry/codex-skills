@@ -12,7 +12,7 @@ This guide explains when and how to invoke the skills in this repository.
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
-Both research workflows require the root parent task to use `gpt-5.6-luna` with maximum reasoning. They stop before reading research or repository context when the parent model cannot be verified. Luna Max subagents do not compensate for a different parent model.
+Both research workflows begin from the available runtime. They use independent lanes when that materially improves coverage and the runtime supports them; otherwise they complete a bounded root-only audit and disclose the reduced coverage.
 
 ## Continue Existing Deep Research
 
