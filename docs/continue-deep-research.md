@@ -17,11 +17,9 @@ Use $continue-deep-research to continue this Deep Research report against the li
 
 Provide the existing report, notes, links, local paths, or task IDs and state the decision the research should support when it is not already clear.
 
-## Parent Model Requirement
+## Runtime Availability
 
-Start the root task with `gpt-5.6-luna` at maximum reasoning. The skill checks the parent model before inspecting the supplied research and stops with restart guidance when the requirement cannot be verified.
-
-Luna Max research subagents cannot compensate for a different parent model because the parent owns intake, contradiction resolution, synthesis, and final citations.
+The skill starts from the supplied evidence with the current root agent. When the runtime supports useful independent lanes, it uses them for bounded verification gaps; otherwise it completes a root-only audit and discloses the reduced coverage. It never refuses a well-scoped research request merely because a preferred model is unavailable.
 
 ## What It Returns
 

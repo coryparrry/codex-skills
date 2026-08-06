@@ -17,7 +17,7 @@ Use this menu to create independent lanes from the repository's actual gaps. Sel
 
 ## Lane prompt contract
 
-Give every subagent:
+When subagents are available and justified, give each one:
 
 - the exact repository path and the relevant local scope;
 - the read-only boundary;
@@ -39,6 +39,6 @@ Keep these with the root agent:
 - adopt/adapt/build/reject decisions;
 - final ranking, proof-of-concept design, and closeout.
 
-Continue local inspection while lanes run. Use bounded waits, then synthesize available evidence if a lane stalls. Disclose incomplete lanes instead of treating silence as confirmation.
+Continue local inspection while lanes run. If no lanes can run, perform the highest-impact checks root-only. Use bounded waits, then synthesize available evidence if a lane stalls. Disclose incomplete or root-only coverage instead of treating silence as confirmation.
 
 Define the stopping rule before dispatch. A lane is complete when it has enough primary repository and external evidence to distinguish the credible choices, not when it has found every adjacent project.

@@ -17,11 +17,9 @@ Use $research-repo-technology to determine which technologies this repository sh
 
 The skill first establishes repository truth—implementation, tests, constraints, direction, and working-tree state—then derives external research questions from verified gaps.
 
-## Parent Model Requirement
+## Runtime Availability
 
-Start the root task with `gpt-5.6-luna` at maximum reasoning. The skill checks the parent model before auditing the repository and stops with restart guidance when the requirement cannot be verified.
-
-Luna Max research subagents cannot compensate for a different parent model because the parent owns baseline verification, integration, contradiction resolution, ranking, and closeout.
+The skill starts from the live checkout with the current root agent. When the runtime supports useful independent lanes, it uses them for bounded evidence gaps; otherwise it completes a root-only audit and discloses the reduced coverage. It never refuses a well-scoped research request merely because a preferred model is unavailable.
 
 ## What It Returns
 

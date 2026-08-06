@@ -1,22 +1,22 @@
 ---
 name: research-repo-technology
-description: Research technologies an existing repository should adopt, adapt, build, or reject. Use when assessing architecture or product opportunities, comparing external projects at source level, or producing evidence-backed recommendations and proofs of concept from the live codebase. Requires the root parent agent to be gpt-5.6-luna with max reasoning.
+description: Research technologies an existing repository should adopt, adapt, build, or reject. Use when assessing architecture or product opportunities, comparing external projects at source level, or producing evidence-backed recommendations and proofs of concept from the live codebase.
 ---
 
 # Repository Technology Research
 
 Produce decision-grade, repo-specific technology research without turning the result into a generic tool catalogue.
 
-## Require a Luna Max parent
+## Adapt to the available runtime
 
-Run this preflight before auditing the repository, browsing, or spawning subagents:
+Do not refuse research solely because a preferred model, reasoning level, or subagent type is unavailable. Establish the available capabilities before planning the work, then preserve the evidence standard with the best supported execution shape:
 
-1. Check the current root parent agent's model identity and reasoning level from runtime metadata. Do not infer them from output quality or from the availability of subagent model overrides.
-2. Continue only when the parent is `gpt-5.6-luna` with `reasoning_effort: "max"`.
-3. If either value cannot be verified or does not match, stop and tell the user: `This workflow requires Luna Max as the parent agent. Luna Max subagents cannot make it work correctly when the parent is not Luna Max. Start a new Luna Max task and invoke $research-repo-technology there.`
-4. Do not inspect the repository, browse, or dispatch lanes until this check passes.
+1. Use the current root agent to establish the local baseline and integrate the findings.
+2. Use independent research lanes only when subagents are available, permitted, and materially improve coverage. Select only models and reasoning levels explicitly exposed by the runtime.
+3. If subagents are unavailable or inappropriate, perform a bounded root-only audit. Reduce the number of gaps or candidates if necessary rather than inventing coverage.
+4. State the execution shape, incomplete lanes, and any coverage trade-off in the closeout. A missing capability is a limitation to disclose, not a reason to abandon a well-scoped request.
 
-The parent requirement and the subagent requirement are separate. A verified Luna Max parent must still use Luna Max for every research lane.
+Never claim that a model identity or capability was verified when it was not. Never fabricate an unsupported model selector.
 
 ## Preserve the research boundary
 
@@ -58,9 +58,9 @@ Do not start with a fashionable technology and search for somewhere to put it.
 
 Before fan-out, set an evidence budget from the user's requested depth: opportunity limit, number of independent lanes, maximum candidates to inspect per gap, wait budget, and a stopping condition. Scale the budget up for an explicitly exhaustive task, but stop once the leading options can be distinguished with primary evidence.
 
-Use subagents on every run. Spawn as many independent lanes as the research needs and available slots allow, without an arbitrary minimum or cap. Set `model: "gpt-5.6-luna"`, `reasoning_effort: "max"`, and `fork_turns: "none"` for every lane. Never use another subagent model or reasoning level, and tell each Luna Max agent not to spawn further agents. Keep root ownership of integration. Give each lane the repository path, non-mutation boundary, one specific question, and the required evidence. Do not leak an intended answer or assign overlapping catalogue searches.
+When available and useful, spawn as many independent lanes as the research needs and available slots allow, without an arbitrary minimum or cap. Choose only a model and reasoning level the runtime exposes, keep root ownership of integration, and tell lane agents not to spawn further agents. Give each lane the repository path, non-mutation boundary, one specific question, and the required evidence. Do not leak an intended answer or assign overlapping catalogue searches.
 
-If Luna Max or subagent tools are unavailable, stop and tell the user. Do not substitute another model or perform the research root-only.
+If lanes cannot run, continue root-only with a bounded set of the highest-impact questions. Say which independent checks could not be performed and do not represent the result as exhaustive.
 
 Use a divergent pass to surface non-obvious opportunities, then focus evidence lanes on the strongest clusters. Read [research-lanes.md](references/research-lanes.md) when designing the fan-out.
 
