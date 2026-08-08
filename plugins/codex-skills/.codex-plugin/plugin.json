@@ -1,6 +1,6 @@
 {
   "name": "codex-skills",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "Codex skills for research, advisor-led engineering, Swift code review, PR feedback triage, and safe branch cleanup.",
   "author": {
     "name": "Cory Parry",
@@ -35,6 +35,7 @@
     "defaultPrompt": [
       "Continue research with continue-deep-research; direct worker implementation with engineering-advisor; assess repository technologies with research-repo-technology; review Swift changes with swift-code-review; verify PR feedback with triage-review-comments; clean merged branches with git-clean-merged-branch."
     ],
-    "screenshots": []
+    "screenshots": [],
+    "logo": "./assets/codex-skills-logo.png"
   }
 }
