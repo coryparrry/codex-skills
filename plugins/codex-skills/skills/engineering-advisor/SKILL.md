@@ -35,7 +35,7 @@ Use Terra Low only when every Low condition holds. Otherwise select the initial 
 
 | Tier | Use when |
 |---|---|
-| Terra Low | The edit is mechanical and the root already knows the exact files, required behaviour, existing pattern, and focused validation. Do not use when diagnosis, design, state, public interfaces, security, concurrency, or non-trivial test design remains. |
+| Terra Low | Use only for a local, reversible, mechanically specified edit when the root already knows the exact files, required behaviour, existing pattern, and deterministic focused validation. The work must require no diagnosis, design choice, cross-file invariant reasoning, public-interface judgment, security or permission reasoning, state or lifecycle reasoning, concurrency analysis, or non-trivial test design. If unexpected context or implementation judgment appears, stop and return the task to the root for rerouting; do not guess. |
 | Terra Medium | Bounded implementation within one subsystem with clear acceptance criteria and ordinary implementation or test judgment. |
 | Terra High | Interacting components, non-trivial state or data flow, lifecycle or asynchronous behaviour, important API or compatibility changes, or non-obvious regression tests. |
 | Terra Xhigh | The change affects authentication decisions or credential handling, authorization enforcement, a real trust boundary, irreversible data integrity, migration rollback risk, race-prone or distributed state, cryptographic enforcement, or sandbox enforcement. |

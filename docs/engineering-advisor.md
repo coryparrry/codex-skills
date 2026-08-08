@@ -16,7 +16,7 @@ This is a behavioural restriction on the root, not a requirement to make the par
 
 ## Routed Workers
 
-Editing agents always use the `worker` type, `gpt-5.6-terra`, an explicitly selected reasoning effort, `fork_turns: "none"`, and a self-contained assignment. Medium is the default; Low is reserved for fully specified mechanical edits, High handles non-trivial interactions or state, and Xhigh is reserved for real trust, authorization, data-integrity, migration, race, cryptographic, or sandbox boundaries.
+Editing agents always use the `worker` type, `gpt-5.6-terra`, an explicitly selected reasoning effort, `fork_turns: "none"`, and a self-contained assignment. Medium is the default; Low is reserved for local, reversible, fully specified mechanical edits and must stop when unexpected context or implementation judgment appears. High handles non-trivial interactions or state, and Xhigh is reserved for real trust, authorization, data-integrity, migration, race, cryptographic, or sandbox boundaries.
 
 Reconnaissance and independent review use read-only Terra explorers. A bounded Sol Low second opinion may challenge one decision but never implements or accepts the final diff. Delegated agents cannot spawn their own agents.
 
