@@ -21,6 +21,19 @@ For every shipped plugin update, complete this release sequence:
 7. Verify `codex plugin list --marketplace codex-skills --available --json` reports the expected version, enabled state, and Git marketplace source. Confirm the installed manifest matches the Git-backed `main` snapshot, the previous version cache is absent, and no standalone copy exists under `${CODEX_HOME:-$HOME/.codex}/skills/`.
 8. Start a new Codex task after installation so it loads the refreshed plugin catalog and skills. Remove any local testing installation when validation is complete.
 
+## skills.sh Publication Workflow
+
+Treat `skills.sh` as a separate GitHub-backed distribution surface from the Codex plugin marketplace. There is no `skills publish` command and `plugin.json` SemVer does not version skills.sh packages. The public `skills/` directories on GitHub `main` are the published source; skills.sh discovers them through the `skills` CLI and adds repositories to its directory automatically from install telemetry.
+
+For every skills.sh release:
+
+1. Keep each public skill under `skills/<skill-name>/SKILL.md` with valid YAML frontmatter whose `name` matches the directory. Do not publish experimental or internal skills through the public `skills/` tree.
+2. Add every new or renamed public skill to the appropriate grouping in `skills.sh.json`, remove stale names, and keep group labels and descriptions aligned with the current bundle. `skills.sh.json` controls repository-page grouping; it does not replace skill discovery from `SKILL.md`.
+3. Before publishing, run the system `skill-creator` validator for every changed source skill, parse `skills.sh.json` with `python3 -m json.tool`, run the relevant mirror checks and install smoke test, and run `npx skills add . --list`. The local discovery result must contain exactly the intended public skill names.
+4. Merge the complete change to GitHub `main` before treating it as published. After merge, run `npx skills add coryparrry/codex-skills --list` to verify discovery from the remote GitHub source rather than the working tree.
+5. Verify `https://skills.sh/coryparrry/codex-skills` and any new skill page after the service indexes the repository. Directory appearance and install counts are telemetry-driven and may lag; do not invent a manual registry upload or claim publication from a local-only result.
+6. Do not globally install a skills.sh copy merely to force indexing. If a disposable install test is necessary, isolate it from the user's real Codex home and remove it after verification so the Git-backed Codex plugin remains the only durable local installation.
+
 ## Build, Test, and Development Commands
 
 - `bash scripts/test_install.sh`: runs the install smoke test against temporary Codex homes.
