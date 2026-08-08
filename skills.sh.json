@@ -19,6 +19,13 @@
       ]
     },
     {
+      "title": "Orchestration",
+      "description": "Skills for strict advisor-led delegation and validation.",
+      "skills": [
+        "engineering-advisor"
+      ]
+    },
+    {
       "title": "Git Workflow",
       "description": "Skills for practical Git workflow cleanup.",
       "skills": [

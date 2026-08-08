@@ -16,6 +16,7 @@ You need Codex with local skills enabled and `skills` CLI support through `npx`.
 The marketplace plugin exposes:
 
 - `continue-deep-research`
+- `engineering-advisor`
 - `git-clean-merged-branch`
 - `research-repo-technology`
 - `swift-code-review`
@@ -33,6 +34,10 @@ Install one skill:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
+```
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill engineering-advisor
 ```
 
 ```bash
@@ -75,6 +80,7 @@ If the marketplace plugin does not appear, verify that `.agents/plugins/marketpl
 
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)

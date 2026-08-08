@@ -8,11 +8,22 @@ This guide explains when and how to invoke the skills in this repository.
 |---|---|
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
+| Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
 | Review Swift or Apple-platform changes that affect Swift targets | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
 Both research workflows begin from the available runtime. They use independent lanes when that materially improves coverage and the runtime supports them; otherwise they complete a bounded root-only audit and disclose the reduced coverage.
+
+## Run As An Engineering Advisor
+
+Use `engineering-advisor` when the root agent must investigate, scope, delegate, review, and validate without modifying repository files itself:
+
+```text
+Use $engineering-advisor to route verified fixes to capability-matched Terra workers. Remain the non-implementing advisor and reject unnecessary code or behavior drift.
+```
+
+The root proves findings before assigning them, selects the lowest sufficient Terra reasoning tier, gives workers non-overlapping ownership, reviews every resulting diff, and runs the final validation. All tracked-file changes and follow-up corrections remain with Terra workers. If that lane is unavailable, the skill reports implementation blocked instead of falling back to root edits.
 
 ## Continue Existing Deep Research
 
@@ -84,6 +95,7 @@ It does not implement fixes automatically. If current PR context is unavailable,
 
 - [Installation](installation.md)
 - [Reference](reference.md)
+- [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)

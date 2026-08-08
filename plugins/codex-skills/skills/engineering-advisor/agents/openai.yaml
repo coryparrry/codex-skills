@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engineering Advisor"
+  short_description: "Route Terra edits while root remains advisor-only"
+  default_prompt: "Use $engineering-advisor to route repository edits to capability-matched Terra workers while the root remains the non-implementing engineering advisor."
