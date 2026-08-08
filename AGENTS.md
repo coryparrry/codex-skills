@@ -6,6 +6,10 @@ This repository packages a small Codex skill bundle. Source skills live under `s
 
 The installable plugin mirror lives under `plugins/codex-skills/skills/`, and plugin metadata is in `plugins/codex-skills/.codex-plugin/plugin.json`. Keep mirrored skill files synchronized when changing shipped skill behavior. User-facing documentation belongs in `docs/`; repository install helpers live in `scripts/`.
 
+## Marketplace Installation Workflow
+
+Treat the Git-backed marketplace on GitHub `main` as the only durable installed source for these skills. During development, a skill may be installed from the local checkout only for bounded testing. After validation, remove that local installation, publish the completed change to `main`, repoint or refresh the marketplace against `main`, and verify the enabled plugin resolves from the Git-backed marketplace cache. Do not leave a standalone local skill, a local-path marketplace registration, or a marketplace pinned to a feature branch after testing is complete.
+
 ## Build, Test, and Development Commands
 
 - `bash scripts/test_install.sh`: runs the install smoke test against temporary Codex homes.
