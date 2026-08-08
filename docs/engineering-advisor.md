@@ -1,33 +1,30 @@
 # Engineering Advisor
 
-`engineering-advisor` runs implementation through Terra Xhigh workers while the root agent remains a non-implementing advisor.
+`engineering-advisor` routes repository edits to capability-matched Terra workers while the root agent remains a non-implementing advisor.
 
-## Use It For
-
-- asking Sol or the current root to advise workers without editing files;
-- sending verified audit or review findings to Terra for implementation;
-- keeping bug fixes narrow, regression-safe, and free of unnecessary code;
-- making root-owned review and validation independent from worker implementation.
-
-Ask Codex:
+Use it only when the user explicitly requires Sol or the current root to advise without editing files:
 
 ```text
-Use $engineering-advisor to verify these findings and send legitimate fixes to Terra Xhigh. You are the advisor only: do not implement, and reject unnecessary code or behavior drift.
+Use $engineering-advisor to verify these findings and route legitimate fixes to capability-matched Terra workers. You are the advisor only: do not implement.
 ```
 
 ## Role Boundary
 
-The root may inspect, reproduce, scope, delegate, review, test, validate a fresh runtime, and perform authorized Git handoff. It must not modify repository files, finish a worker patch, or make a small follow-up edit. Every implementation correction returns to the owning Terra Xhigh worker.
+The root investigates, scopes, delegates, reviews, validates a fresh runtime, and performs authorized Git publication after reviewing the final diff. It does not modify tracked working-tree contents as implementation or finish a worker patch. Every implementation correction returns to the owning Terra worker.
 
-The root still owns the result. It verifies findings before delegation, gives workers explicit non-overlapping ownership, reviews the combined diff, and runs the final tests and runtime checks. Worker claims are evidence to inspect, not proof by themselves.
+This is a behavioural restriction on the root, not a requirement to make the parent runtime read-only. When implementation is authorized, the permission mode must still let the worker edit.
 
-If Terra Xhigh is unavailable, the skill can continue read-only diagnosis but reports implementation blocked. It does not silently substitute another model or let the root implement.
+## Routed Workers
 
-## Scope And Minimality
+Editing agents always use the `worker` type, `gpt-5.6-terra`, an explicitly selected reasoning effort, `fork_turns: "none"`, and a self-contained assignment. Medium is the default; Low is reserved for fully specified mechanical edits, High handles non-trivial interactions or state, and Xhigh is reserved for real trust, authorization, data-integrity, migration, race, cryptographic, or sandbox boundaries.
 
-Each worker receives a bounded packet containing the proven trigger, desired behavior, preservation constraints, prevention check, validation, owned files, and explicit out-of-scope work. The skill rejects speculative abstractions, compatibility layers, configuration, services, or UI changes that the verified problem does not require.
+Reconnaissance and independent review use read-only Terra explorers. A bounded Sol Low second opinion may challenge one decision but never implements or accepts the final diff. Delegated agents cannot spawn their own agents.
 
-For user-visible work, completion requires a fresh build from the final source when that validation is available. Direct user feedback about live behavior overrides stale artifacts or green tests.
+## Evidence And Minimality
+
+The root verifies findings before delegation, keeps ownership non-overlapping, and reviews the actual diff rather than accepting worker claims. Assignments describe the behavioural contract, preservation constraints, prevention, validation, and out-of-scope work without dictating a line-by-line patch.
+
+For user-visible work, completion requires a fresh build from the final source when available. Direct user feedback about live behaviour overrides stale artifacts or green tests.
 
 ## Related Docs
 

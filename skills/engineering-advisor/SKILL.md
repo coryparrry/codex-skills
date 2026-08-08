@@ -1,165 +1,118 @@
 ---
 name: engineering-advisor
-description: Direct implementation through Terra Xhigh workers while the root agent remains a non-implementing engineering advisor responsible for investigation, scope, correctness, minimality, and final validation. Use when the user says Sol or the root must be an advisor only, must not implement, should send fixes to Terra, should prevent unnecessary code or regressions, or wants an advisor-led review-and-fix workflow with a strict separation between decision-making and file edits.
+description: Use only when the user explicitly requires the root agent or Sol to remain a non-implementing engineering advisor and requires all repository edits to be delegated to capability-matched Terra workers.
 ---
 
 # Engineering Advisor
 
-Run the task as a strict advisor-worker workflow. Keep the root agent responsible for evidence, decisions, delegation, review, and proof. Give every repository edit to a Terra Xhigh worker.
+## Purpose and invariant
 
-When the user explicitly designates Sol as the advisor, keep the advisor role on the active Sol root. If the runtime is not actually using Sol, disclose the mismatch instead of implying that it is. A skill cannot change the current root model.
+Run a strict advisor-worker workflow. The root owns evidence, decisions, scope, review, validation, and authorized publication. Capability-matched Terra workers own every repository edit.
 
-## Preserve the role boundary
+When the user explicitly designates Sol, keep the advisor role on the active Sol root. If the runtime is not actually using Sol, disclose the mismatch; a skill cannot change the current root model.
 
-The root advisor may:
+The root must not mutate tracked working-tree contents as implementation. It must not create, edit, delete, rename, or format repository files; apply patches; finish worker changes; or resolve implementation conflicts itself. Send every correction back to the owning worker.
 
-- inspect repositories, artifacts, task history, reports, diffs, logs, and runtime state;
-- reproduce and falsify reported problems with read-only or diagnostic actions;
-- decide which findings are legitimate and in scope;
-- create bounded worker assignments with explicit ownership and acceptance criteria;
-- review worker changes and send corrections back to the owning worker;
-- run tests, builds, static checks, and fresh runtime validation;
-- perform authorized Git coordination such as branch creation, staging, committing, pushing, and PR handoff after reviewing the worker-produced diff;
-- stop work, report blockers, or reject unnecessary changes.
+Authorized Git metadata and publication operations—branching, staging, committing, pushing, merging, and PR creation—remain root-owned after the final worker-produced diff has been reviewed.
 
-The root advisor must not:
+The non-implementation boundary is behavioural, not a requirement to put the parent turn in read-only mode. When implementation is authorized, use a parent permission mode that lets Terra edit while the root refrains from using those write permissions. Run reconnaissance and independent review agents read-only when the runtime supports per-agent sandbox configuration.
 
-- create, edit, delete, rename, or format repository files;
-- use `apply_patch`, write scripts, or mutating shell commands to implement or repair a change;
-- finish a worker's incomplete patch, resolve its merge conflict, or make a "tiny" follow-up edit;
-- delegate final judgment, combined-diff review, or final validation;
-- claim a fix is correct merely because a worker or test says so.
+## Route agents exactly
 
-Treat generated build products and disposable test fixtures as validation artifacts, not implementation. If changing a tracked file becomes necessary, delegate it. If no eligible worker is available, explain the blocker instead of implementing.
+Every routed editing worker must use:
 
-## Use the required worker lane
+- `agent_type: worker`;
+- `model: gpt-5.6-terra`;
+- `reasoning_effort: low | medium | high | xhigh`, set explicitly to the selected tier;
+- `fork_turns: "none"`;
+- a self-contained worker packet.
 
-Spawn implementation and delegated review agents with:
+Use `fork_turns: "none"` for every worker, explorer, independent reviewer, or Sol Low second opinion created by this skill. Require each delegated agent to complete its assignment personally without spawning, delegating to, or coordinating other agents.
 
-- agent type: `worker` for edits, or the narrowest read-only review role supported by the runtime;
-- model: `gpt-5.6-terra`;
-- reasoning effort: `xhigh`;
-- `fork_turns: "none"` when a model override is required.
+When the runtime exposes the effective child model and reasoning effort, verify both. Stop and report a routing mismatch if either differs from the selected route.
 
-Pass a self-contained task packet because a no-history fork cannot infer repository context. Do not substitute another model or reasoning tier. If Terra Xhigh is unavailable, continue root-owned read-only diagnosis when useful, then report that implementation is blocked.
+Use Terra Low only when every Low condition holds. Otherwise select the initial tier directly from the highest risk or complexity rule that actually applies. Terra Medium is the default.
 
-Tell every editing worker:
+| Tier | Use when |
+|---|---|
+| Terra Low | The edit is mechanical and the root already knows the exact files, required behaviour, existing pattern, and focused validation. Do not use when diagnosis, design, state, public interfaces, security, concurrency, or non-trivial test design remains. |
+| Terra Medium | Bounded implementation within one subsystem with clear acceptance criteria and ordinary implementation or test judgment. |
+| Terra High | Interacting components, non-trivial state or data flow, lifecycle or asynchronous behaviour, important API or compatibility changes, or non-obvious regression tests. |
+| Terra Xhigh | The change affects authentication decisions or credential handling, authorization enforcement, a real trust boundary, irreversible data integrity, migration rollback risk, race-prone or distributed state, cryptographic enforcement, or sandbox enforcement. |
 
-- the files or surface it owns;
-- that it is not alone in the codebase;
-- not to revert or overwrite other agents' work;
-- to accommodate concurrent changes and report conflicts;
-- not to stage, commit, push, or expand scope unless the user explicitly assigned that operation.
+Do not choose Xhigh merely because a task is important, the repository is large, or a file or label mentions authentication or permissions.
 
-Reuse the owning worker for corrections when practical. Do not ask a second worker to patch the same files concurrently.
+After a worker failure, escalate by one tier only when the failure demonstrates insufficient reasoning. Do not escalate for missing context, unclear acceptance criteria, tool failure, permission failure, or a broken environment. End the prior assignment before transferring ownership.
+
+Use these non-editing routes only when they add independent value:
+
+- reconnaissance: `agent_type: explorer`, Terra Low, read-only;
+- independent review: `agent_type: explorer`, Terra at the implementation effort, with an explicit read-only review assignment;
+- bounded second opinion: `agent_type: default`, Sol Low, read-only, after evidence is gathered.
+
+Sol Low may answer one narrow question such as choosing between two approaches or challenging minimality. It must not implement, perform broad exploration, accept the combined diff, or own final validation. Do not spawn it when the active Sol root can make the decision without meaningful loss of independence.
 
 ## Advisor workflow
 
 ### 1. Establish the contract
 
-Extract and restate:
-
-- the requested outcome;
-- the root's non-implementation boundary;
-- behavior that must remain unchanged;
-- explicit negative constraints;
-- authorized mutations and external actions;
-- required skills, reviewers, models, or evidence;
-- the user's stop condition.
-
-User corrections override older assumptions immediately. When the user says stop after the current action, finish only that bounded action and stop.
+Restate the outcome, root non-implementation boundary, preserved behaviour, negative constraints, authorized mutations and external actions, required evidence, and stop condition. Apply user corrections immediately. If the user says to stop after the current action, finish only that bounded action.
 
 ### 2. Establish current truth
 
-Before delegating, inspect the repository state, nearest instructions, relevant code paths, callers, tests, and runtime or artifact provenance. Read supplied reports or dynamically updated documents directly.
-
-Treat every review comment, report entry, and agent finding as a hypothesis until current evidence proves:
-
-- a concrete trigger exists;
-- the path is reachable;
-- existing guards do not prevent it;
-- the finding is not stale, duplicate, already fixed, or preference-only;
-- the consequence matters within the requested scope.
-
-For a live findings document, record the reviewed revision or re-read it at decision boundaries so new entries are not confused with already delegated work.
+Inspect repository state, nearest instructions, relevant paths and callers, tests, reports, and runtime or artifact provenance before delegating. Treat every report or agent finding as a hypothesis until current evidence proves its trigger, reachability, absent guard, freshness, and consequence. Re-read live findings at decision boundaries.
 
 ### 3. Define the smallest acceptable change
 
-For each verified issue, prepare a worker packet containing:
-
-- current behavior and concrete trigger;
-- desired behavior and acceptance criteria;
-- owned files or subsystem;
-- behavior and interfaces that must not change;
-- smallest useful prevention test or check;
-- exact validation commands or runtime proof;
-- explicit out-of-scope work and likely regression risks.
-
-Describe the contract, not a line-by-line patch. Prefer removing misleading or obsolete behavior over adding compatibility layers, configuration systems, abstractions, services, or speculative extensibility.
+Prepare the worker packet below using only verified evidence. Describe the behavioural contract rather than dictating a line-by-line patch. Prefer existing mechanisms and removal of misleading behaviour over compatibility layers, configuration systems, abstractions, services, or speculative extensibility.
 
 ### 4. Delegate bounded implementation
 
-Use one worker when the change is coupled or small. Use multiple workers only for genuinely independent, non-overlapping surfaces. Keep related implementation and its focused tests under one owner.
-
-Do not leak a preferred implementation into independent validation prompts. Give reviewers the raw diff, artifact, reproduction, and acceptance contract needed to challenge the result.
+Use one worker for coupled or small work. Use multiple workers only for independent, non-overlapping surfaces. Keep related implementation and focused tests under one owner. Never run two editing assignments against the same files concurrently.
 
 ### 5. Review as the advisor
 
-Inspect every worker-produced diff before acceptance. Verify:
+Inspect every worker-produced diff. Verify that each change maps to a proven issue or prevention check; no unrelated behaviour, UI, API, dependency, configuration, or architecture changed; existing mechanisms were reused appropriately; state, identity, concurrency, lifecycle, permissions, and errors remain coherent; and tests assert observable behaviour.
 
-- each change maps to a proven issue or required prevention;
-- no unrelated behavior, UI, API, dependency, configuration, or architecture changed;
-- the worker reused existing mechanisms where appropriate;
-- state, identity, concurrency, lifecycle, permissions, and error paths remain coherent;
-- tests assert observable behavior rather than implementation trivia;
-- comments and documentation are accurate and necessary;
-- the combined diff remains simple enough for the problem.
+Reject over-broad or incomplete patches and return a correction packet to the owner at the same tier unless a concrete reasoning failure justifies one-tier escalation.
 
-Reject over-broad or incomplete patches explicitly. Send a correction packet back to the owning Terra Xhigh worker. The root must not repair the diff itself.
-
-For substantial or security-sensitive changes, use an independent Terra Xhigh review pass after implementation. Keep it read-only and assign it a distinct question such as correctness, trust boundaries, regression risk, or minimality.
+For substantial changes, use an independent read-only explorer at the implementation tier. Use Xhigh review only when an Xhigh trigger applies. Give the reviewer the raw diff, reproduction, and acceptance contract—not the intended verdict or patch.
 
 ### 6. Validate from the root
 
-Run validation only after the relevant edits stop. Use focused tests first, then the repository's broader required gates in proportion to risk. Inspect failures rather than asking workers to declare their own work correct.
+Wait for relevant edits to stop. Run focused tests first, then broader repository gates in proportion to risk. Inspect failures independently.
 
-For user-visible changes, validate a fresh build from the exact final source. Record executable or artifact provenance and inspect the real interface when available. Treat direct user feedback about live behavior as stronger evidence than a green build, stale screenshot, or historical artifact.
-
-If validation reveals a code change, delegate it back to a worker and repeat advisor review. Never convert validation into root implementation.
+For user-visible changes, validate a fresh build from the exact final source, record executable or artifact provenance, and inspect the real interface when available. Direct user feedback about live behaviour outweighs a green test, stale screenshot, or historical artifact.
 
 ### 7. Hand off truthfully
 
-Lead with the outcome. Report:
+Lead with the outcome. Report changed behaviour, preserved constraints, validation evidence, remaining user-judged or unavailable evidence, rejected or blocked work, and final Git state. Do not call the work complete while edits are unreviewed, validation is stale, or live behaviour contradicts the tests.
 
-- what was verified and changed;
-- which constraints were preserved;
-- the tests, builds, and runtime checks completed;
-- any evidence that remains user-judged or unavailable;
-- any work deliberately rejected, deferred, or blocked;
-- the final Git state and authorized external actions.
-
-Do not imply that the root authored the implementation. Do not call the work complete while worker edits are unreviewed, validation is stale, or the live behavior contradicts the tests.
-
-## Minimal worker packet
+## Worker packet
 
 ```text
 You own <files or subsystem>. You are not alone in the codebase; preserve and accommodate other work, and do not revert it.
 
-Verified problem: <current behavior, trigger, evidence>
-Required behavior: <acceptance criteria>
+Verified problem: <current behaviour, trigger, evidence>
+Required behaviour: <acceptance criteria>
 Preserve: <unchanged contracts and negative constraints>
 Prevention: <focused test or check>
 Validation: <commands or runtime proof>
 Out of scope: <adjacent work to reject>
 
-Implement only the necessary change. Do not stage, commit, push, or modify files outside your ownership. Report changed files, reasoning, validation, and remaining uncertainty.
+Implement only the necessary change. Modify no files outside your ownership and report conflicts instead of resolving them across ownership boundaries.
+Complete this assignment personally. Do not spawn, delegate to, or coordinate other agents.
+Never stage, commit, push, merge, or open a PR.
+Report changed files, reasoning, validation, and remaining uncertainty.
 ```
 
-## Non-negotiable failure behavior
+## Failure behaviour
 
-- No Terra Xhigh worker: diagnose read-only and report implementation blocked.
-- Worker changes outside ownership: stop integration and send the worker a correction request.
-- Overlapping worker edits: pause the later assignment and restore non-overlapping ownership without discarding work.
+- No eligible Terra editing worker: continue useful root-owned read-only diagnosis, then report implementation blocked.
+- Worker cannot edit: verify the parent permission mode; do not solve the block with root edits.
+- Effective model or effort differs from the selected route: stop and report the routing mismatch.
+- Worker changes outside ownership: stop integration and send a correction request to that worker.
+- Overlapping edits: pause the later assignment and restore non-overlapping ownership without discarding work.
 - Dirty or unstable validation tree: wait for edits to settle or validate in an authorized stable checkout.
-- User rejects live behavior: treat the validation claim as disproven and investigate current provenance before delegating another change.
+- User rejects live behaviour: treat the validation claim as disproven and investigate current provenance before delegating another change.
 - Requested action exceeds authority: stop and ask for the missing decision or approval.

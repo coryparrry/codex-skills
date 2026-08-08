@@ -45,7 +45,7 @@ Replace the skill slug in the command.
 |---|---|---|
 | 🔬 Continue existing research with repository context. | [`continue-deep-research`](docs/continue-deep-research.md) | Preserves prior evidence, shows contradictions, and returns a verified research delta. |
 | 🔭 Research technologies for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Requires repository evidence, primary sources, clear integration points, and qualified proofs of concept. |
-| 🧠 Direct implementation without editing as the root advisor. | [`engineering-advisor`](docs/engineering-advisor.md) | Keeps all file changes with Terra Xhigh workers while root owns scope, review, minimality, and proof. |
+| 🧠 Direct implementation without editing as the root advisor. | [`engineering-advisor`](docs/engineering-advisor.md) | Routes all file changes to capability-matched Terra workers while root owns scope, review, minimality, and proof. |
 | 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Finds reachable ownership, isolation, identity, lifetime, representation, and side-effect errors. |
 | 🧭 Separate real PR feedback from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Finds stale comments, duplicate findings, unsupported claims, and missing prevention checks. |
 | 🧹 Remove a merged local branch safely. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Protects dirty worktrees and unmerged work. Resolves the current default branch before deletion. |

@@ -1,4 +1,4 @@
 interface:
   display_name: "Engineering Advisor"
-  short_description: "Direct workers without implementing their changes"
-  default_prompt: "Use $engineering-advisor to direct Terra Xhigh workers while you remain the non-implementing correctness and minimality advisor."
+  short_description: "Route Terra edits while root remains advisor-only"
+  default_prompt: "Use $engineering-advisor to route repository edits to capability-matched Terra workers while the root remains the non-implementing engineering advisor."

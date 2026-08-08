@@ -27,7 +27,7 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | Skill | Purpose | Main files |
 |---|---|---|
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
-| `engineering-advisor` | Direct Terra Xhigh workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
+| `engineering-advisor` | Route edits to capability-matched Terra workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
 | `research-repo-technology` | Research which technologies a live repository should adopt, adapt, build, or reject | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `swift-code-review` | Review Swift and Apple-platform changes that affect Swift targets | `SKILL.md`, `agents/openai.yaml`, `references/` |
