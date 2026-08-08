@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> Six Codex skills for evidence-led research, engineering orchestration, Swift code review, PR feedback triage, and safe branch cleanup.
+> Six Codex skills for research, engineering advice, Swift review, PR feedback triage, and safe branch cleanup.
 
 Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
@@ -39,18 +39,18 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill triage-rev
 
 Replace the skill slug in the command.
 
-## ✨ Pick a Skill
+## ✨ Skills
 
-| Goal | Skill | Guardrail |
+| Need | Skill | What it does |
 |---|---|---|
-| 🔬 Continue existing research with repository context. | [`continue-deep-research`](docs/continue-deep-research.md) | Preserves prior evidence, shows contradictions, and returns a verified research delta. |
-| 🔭 Research technologies for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Requires repository evidence, primary sources, clear integration points, and qualified proofs of concept. |
-| 🧠 Direct implementation without editing as the root advisor. | [`engineering-advisor`](docs/engineering-advisor.md) | Routes all file changes to capability-matched Terra workers while root owns scope, review, minimality, and proof. |
-| 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Finds reachable ownership, isolation, identity, lifetime, representation, and side-effect errors. |
-| 🧭 Separate real PR feedback from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Finds stale comments, duplicate findings, unsupported claims, and missing prevention checks. |
-| 🧹 Remove a merged local branch safely. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Protects dirty worktrees and unmerged work. Resolves the current default branch before deletion. |
+| Continue an existing research packet. | [`continue-deep-research`](docs/continue-deep-research.md) | Checks the existing evidence, resolves contradictions, and reports the verified delta. |
+| Assess technology options for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
+| Keep the root agent in an advisor role. | [`engineering-advisor`](docs/engineering-advisor.md) | Sends edits to matched workers while the root owns scope, review, and validation. |
+| Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
+| Triage pull-request feedback. | [`triage-review-comments`](docs/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |
+| Remove a merged local branch. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Checks the default branch, protects dirty worktrees and unmerged work, then removes the branch safely. |
 
-The research skills work with the available runtime. They use independent lanes when that materially improves coverage; otherwise they complete a bounded root-only audit and disclose the reduced coverage.
+The research skills work with the runtime that is available. They use independent lanes only when that improves coverage. Otherwise, they run a bounded root-only audit and say what was not covered.
 
 ## 🧰 What the Plugin Contains
 
