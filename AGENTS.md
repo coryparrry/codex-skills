@@ -10,6 +10,17 @@ The installable plugin mirror lives under `plugins/codex-skills/skills/`, and pl
 
 Treat the Git-backed marketplace on GitHub `main` as the only durable installed source for these skills. During development, a skill may be installed from the local checkout only for bounded testing. After validation, remove that local installation, publish the completed change to `main`, repoint or refresh the marketplace against `main`, and verify the enabled plugin resolves from the Git-backed marketplace cache. Do not leave a standalone local skill, a local-path marketplace registration, or a marketplace pinned to a feature branch after testing is complete.
 
+For every shipped plugin update, complete this release sequence:
+
+1. Update the canonical skill under `skills/` and its copy under `plugins/codex-skills/skills/`. Keep the two copies byte-identical.
+2. Update `plugins/codex-skills/.codex-plugin/plugin.json` in the same change. Increment its `version` for every change to shipped skills, plugin metadata, or plugin assets because Codex uses that SemVer value as the installed-cache key. Use a minor version for a new capability and a patch version for a compatible fix or metadata refresh. Update descriptions, prompts, capabilities, and asset paths when the shipped surface changes, and verify every referenced file exists.
+3. Keep `.agents/plugins/marketplace.json` valid and ensure the `codex-skills` entry retains `source.path: "./plugins/codex-skills"`, `policy.installation: "AVAILABLE"`, `policy.authentication: "ON_INSTALL"`, and a category. Do not put the release version in the marketplace entry; the authoritative version is in `plugin.json`.
+4. Validate the source and mirrored skills, run `python3 scripts/check_skill_mirror.py <skill>`, validate the plugin with the system `plugin-creator` validator, parse `plugin.json`, `marketplace.json`, and `skills.sh.json` with `python3 -m json.tool`, run `bash scripts/test_install.sh`, and run `git diff --check`.
+5. Commit and push the complete update, merge it to GitHub `main`, and verify the marketplace checkout revision equals `origin/main` before installing. Never release from an unmerged feature branch.
+6. For a registered Git marketplace, run `codex plugin marketplace upgrade codex-skills`, then remove and reinstall `codex-skills@codex-skills` so the new version creates a fresh cache directory. If the marketplace is not registered, add `https://github.com/coryparrry/codex-skills.git` without a feature-branch `--ref`, then install the plugin.
+7. Verify `codex plugin list --marketplace codex-skills --available --json` reports the expected version, enabled state, and Git marketplace source. Confirm the installed manifest matches the Git-backed `main` snapshot, the previous version cache is absent, and no standalone copy exists under `${CODEX_HOME:-$HOME/.codex}/skills/`.
+8. Start a new Codex task after installation so it loads the refreshed plugin catalog and skills. Remove any local testing installation when validation is complete.
+
 ## Build, Test, and Development Commands
 
 - `bash scripts/test_install.sh`: runs the install smoke test against temporary Codex homes.
