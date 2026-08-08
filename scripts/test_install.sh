@@ -17,6 +17,8 @@ assert_installed() {
   test -f "$codex_home/skills/git-clean-merged-branch/SKILL.md"
   test -f "$codex_home/skills/git-clean-merged-branch/agents/openai.yaml"
   test -f "$codex_home/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh"
+  test -f "$codex_home/skills/engineering-advisor/SKILL.md"
+  test -f "$codex_home/skills/engineering-advisor/agents/openai.yaml"
   test -f "$codex_home/skills/triage-review-comments/SKILL.md"
   test -f "$codex_home/skills/triage-review-comments/agents/openai.yaml"
   test -f "$codex_home/skills/triage-review-comments/references/CLASSIFICATION.md"
@@ -39,7 +41,7 @@ assert_installed() {
   test -f "$codex_home/skills/swift-code-review/references/swiftui-and-appkit.md"
 
   installed_skills="$(find "$codex_home/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)"
-  test "$installed_skills" = "$(printf '%s\n' continue-deep-research git-clean-merged-branch research-repo-technology swift-code-review triage-review-comments)"
+  test "$installed_skills" = "$(printf '%s\n' continue-deep-research engineering-advisor git-clean-merged-branch research-repo-technology swift-code-review triage-review-comments)"
 }
 
 LOCAL_HOME="$TMP_DIR/codex-local"
@@ -59,6 +61,7 @@ PRESERVE_HOME="$TMP_DIR/codex-preserve"
 CODEX_HOME="$PRESERVE_HOME" bash "$INSTALLER" >/dev/null
 assert_installed "$PRESERVE_HOME"
 before_cleanup_checksum="$(shasum "$PRESERVE_HOME/skills/git-clean-merged-branch/SKILL.md")"
+before_advisor_checksum="$(shasum "$PRESERVE_HOME/skills/engineering-advisor/SKILL.md")"
 before_triage_checksum="$(shasum "$PRESERVE_HOME/skills/triage-review-comments/SKILL.md")"
 before_continue_research_checksum="$(shasum "$PRESERVE_HOME/skills/continue-deep-research/SKILL.md")"
 before_repo_research_checksum="$(shasum "$PRESERVE_HOME/skills/research-repo-technology/SKILL.md")"
@@ -68,11 +71,13 @@ if CODEX_HOME="$PRESERVE_HOME" bash -c "$(cat "$INSTALLER")" >/dev/null 2>&1; th
   exit 1
 fi
 after_cleanup_checksum="$(shasum "$PRESERVE_HOME/skills/git-clean-merged-branch/SKILL.md")"
+after_advisor_checksum="$(shasum "$PRESERVE_HOME/skills/engineering-advisor/SKILL.md")"
 after_triage_checksum="$(shasum "$PRESERVE_HOME/skills/triage-review-comments/SKILL.md")"
 after_continue_research_checksum="$(shasum "$PRESERVE_HOME/skills/continue-deep-research/SKILL.md")"
 after_repo_research_checksum="$(shasum "$PRESERVE_HOME/skills/research-repo-technology/SKILL.md")"
 after_swift_review_checksum="$(shasum "$PRESERVE_HOME/skills/swift-code-review/SKILL.md")"
 test "$before_cleanup_checksum" = "$after_cleanup_checksum"
+test "$before_advisor_checksum" = "$after_advisor_checksum"
 test "$before_triage_checksum" = "$after_triage_checksum"
 test "$before_continue_research_checksum" = "$after_continue_research_checksum"
 test "$before_repo_research_checksum" = "$after_repo_research_checksum"

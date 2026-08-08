@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engineering Advisor"
+  short_description: "Direct workers without implementing their changes"
+  default_prompt: "Use $engineering-advisor to direct Terra Xhigh workers while you remain the non-implementing correctness and minimality advisor."

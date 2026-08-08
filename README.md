@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> Five Codex skills for evidence-led research, Swift code review, PR feedback triage, and safe branch cleanup.
+> Six Codex skills for evidence-led research, engineering orchestration, Swift code review, PR feedback triage, and safe branch cleanup.
 
 Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
@@ -45,6 +45,7 @@ Replace the skill slug in the command.
 |---|---|---|
 | 🔬 Continue existing research with repository context. | [`continue-deep-research`](docs/continue-deep-research.md) | Preserves prior evidence, shows contradictions, and returns a verified research delta. |
 | 🔭 Research technologies for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Requires repository evidence, primary sources, clear integration points, and qualified proofs of concept. |
+| 🧠 Direct implementation without editing as the root advisor. | [`engineering-advisor`](docs/engineering-advisor.md) | Keeps all file changes with Terra Xhigh workers while root owns scope, review, minimality, and proof. |
 | 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Finds reachable ownership, isolation, identity, lifetime, representation, and side-effect errors. |
 | 🧭 Separate real PR feedback from bot noise. | [`triage-review-comments`](docs/triage-review-comments.md) | Finds stale comments, duplicate findings, unsupported claims, and missing prevention checks. |
 | 🧹 Remove a merged local branch safely. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Protects dirty worktrees and unmerged work. Resolves the current default branch before deletion. |
@@ -70,6 +71,7 @@ Run these commands after a packaging change:
 bash -n scripts/install.sh
 bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
+python3 scripts/check_skill_mirror.py engineering-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
@@ -85,6 +87,7 @@ git diff --check
 
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
+- [Engineering Advisor](docs/engineering-advisor.md)
 - [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
 - [Triage Review Comments](docs/triage-review-comments.md)
 - [Continue Deep Research](docs/continue-deep-research.md)
