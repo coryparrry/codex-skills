@@ -1,6 +1,6 @@
 {
   "name": "codex-skills",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Codex skills for research, advisor-led engineering, Swift code review, PR feedback triage, and safe branch cleanup.",
   "author": {
     "name": "Cory Parry",
