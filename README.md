@@ -43,12 +43,12 @@ Replace the skill slug in the command.
 
 | Need | Skill | What it does |
 |---|---|---|
-| Continue an existing research packet. | [`continue-deep-research`](docs/continue-deep-research.md) | Checks the existing evidence, resolves contradictions, and reports the verified delta. |
-| Assess technology options for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
-| Keep the root agent in an advisor role. | [`engineering-advisor`](docs/engineering-advisor.md) | Sends edits to matched workers while the root owns scope, review, and validation. |
-| Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
-| Triage pull-request feedback. | [`triage-review-comments`](docs/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |
-| Remove a merged local branch. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Checks the default branch, protects dirty worktrees and unmerged work, then removes the branch safely. |
+| 🔬 Continue an existing research packet. | [`continue-deep-research`](docs/continue-deep-research.md) | Checks the existing evidence, resolves contradictions, and reports the verified delta. |
+| 🔭 Assess technology options for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
+| 🧠 Keep the root agent in an advisor role. | [`engineering-advisor`](docs/engineering-advisor.md) | Sends edits to matched workers while the root owns scope, review, and validation. |
+| 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
+| 🧭 Triage pull-request feedback. | [`triage-review-comments`](docs/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |
+| 🧹 Remove a merged local branch. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Checks the default branch, protects dirty worktrees and unmerged work, then removes the branch safely. |
 
 The research skills work with the runtime that is available. They use independent lanes only when that improves coverage. Otherwise, they run a bounded root-only audit and say what was not covered.
 
