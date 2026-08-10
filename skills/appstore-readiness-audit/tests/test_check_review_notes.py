@@ -38,10 +38,10 @@ class EvaluateTests(unittest.TestCase):
 
 class CommandTests(unittest.TestCase):
     def test_json_output_does_not_include_note_text(self) -> None:
-        secret_text = "review-user@example.com\nprivate-password"
+        note_text = "UNIQUE_REVIEW_NOTES_MARKER"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "notes.txt"
-            path.write_text(secret_text, encoding="utf-8")
+            path.write_text(note_text, encoding="utf-8")
 
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--json", str(path)],
@@ -52,8 +52,8 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["bytes"], len(secret_text.encode("utf-8")))
-        self.assertNotIn(secret_text, result.stdout)
+        self.assertEqual(payload["bytes"], len(note_text.encode("utf-8")))
+        self.assertNotIn(note_text, result.stdout)
 
     def test_over_limit_returns_one(self) -> None:
         result = subprocess.run(
