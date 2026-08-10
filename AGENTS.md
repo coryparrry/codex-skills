@@ -44,7 +44,9 @@ For every skills.sh release:
 
 - `bash scripts/test_install.sh`: runs the install smoke test against temporary Codex homes.
 - `bash -n scripts/install.sh`: syntax-checks the repo installer.
+- `python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py`: runs the App Review Notes byte-limit tests.
 - `python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py`: runs branch cleanup behavior tests.
+- `python3 scripts/check_skill_mirror.py appstore-readiness-audit`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py git-clean-merged-branch`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py triage-review-comments`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py continue-deep-research`: verifies source/plugin mirror parity.

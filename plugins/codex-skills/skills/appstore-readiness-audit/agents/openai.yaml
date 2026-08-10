@@ -1,0 +1,4 @@
+interface:
+  display_name: "App Store Readiness Audit"
+  short_description: "Audit Apple apps before App Store submission"
+  default_prompt: "Use $appstore-readiness-audit to audit this app for App Store submission readiness without changing it."

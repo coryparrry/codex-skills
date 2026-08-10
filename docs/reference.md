@@ -12,6 +12,7 @@ plugins/
 scripts/
 skills.sh.json
 skills/
+  appstore-readiness-audit/
   continue-deep-research/
   engineering-advisor/
   git-clean-merged-branch/
@@ -26,6 +27,7 @@ The source skill folders under `skills/` must match their copies under `plugins/
 
 | Skill | Purpose | Main files |
 |---|---|---|
+| `appstore-readiness-audit` | Audit an Apple release candidate before App Store upload or submission | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `engineering-advisor` | Route edits to capability-matched Terra workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
@@ -78,6 +80,8 @@ The script refuses to run outside a Git repository, without an `origin` remote, 
 bash -n scripts/install.sh
 bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
+python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
+python3 scripts/check_skill_mirror.py appstore-readiness-audit
 python3 scripts/check_skill_mirror.py engineering-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
@@ -94,6 +98,7 @@ git diff --check
 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
+- [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
