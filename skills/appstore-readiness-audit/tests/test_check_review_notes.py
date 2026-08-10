@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check_review_notes.py"
+REPORT_FORMAT = Path(__file__).parents[1] / "references" / "report-format.md"
 SPEC = importlib.util.spec_from_file_location("check_review_notes", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -66,6 +67,18 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("over limit", result.stdout)
+
+
+class DocumentationTests(unittest.TestCase):
+    def test_report_command_requires_refreshed_limit(self) -> None:
+        report = REPORT_FORMAT.read_text(encoding="utf-8")
+        expected_command = (
+            'python3 "<skill-root>/scripts/check_review_notes.py" '
+            '--max-bytes <review-notes-byte-limit> "/path/to/review-notes.txt"'
+        )
+
+        self.assertIn(expected_command, report)
+        self.assertIn("Create a new command after each source refresh.", report)
 
 
 if __name__ == "__main__":

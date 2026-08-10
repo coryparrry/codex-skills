@@ -151,10 +151,10 @@ Contact
 <Current review contact supplied in App Store Connect.>
 ```
 
-Save the draft outside version control if it contains sensitive information. Resolve `<skill-root>` to the absolute directory containing the loaded `appstore-readiness-audit/SKILL.md`, then replace the placeholder before presenting or running this command:
+If the draft contains sensitive information, save it outside version control. During each Apple source refresh, record the current Review Notes byte limit. Use the integer value without commas or units. Resolve `<skill-root>` to the absolute directory that contains the loaded `appstore-readiness-audit/SKILL.md`. Replace both placeholders before you present or run this command:
 
 ```bash
-python3 "<skill-root>/scripts/check_review_notes.py" "/path/to/review-notes.txt"
+python3 "<skill-root>/scripts/check_review_notes.py" --max-bytes <review-notes-byte-limit> "/path/to/review-notes.txt"
 ```
 
-The final command must contain the resolved absolute script path, not `<skill-root>`. The script reports only the UTF-8 byte count and never prints the note content.
+The final command must contain the resolved absolute script path and a numeric `--max-bytes` value. Create a new command after each source refresh. The script reports only the UTF-8 byte count. It does not print the note content.

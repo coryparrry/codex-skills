@@ -179,7 +179,7 @@ Reconcile the candidate with:
 - IAP and subscription metadata;
 - review contact, credentials, notes, attachments, sample data, video, QR codes, hardware, and special configuration.
 
-Review Notes should tell an uninformed reviewer how to reach non-obvious features, purchases, permissions, region-specific behavior, hardware, and success states. Validate the current byte limit with `scripts/check_review_notes.py` resolved relative to the loaded `SKILL.md`, not the app repository.
+Write Review Notes that tell an uninformed reviewer how to reach each non-obvious feature and success state. Include purchase, permission, region, and hardware steps when applicable. Use the current byte limit from the Apple source refresh. Pass this value to `--max-bytes`. Resolve `scripts/check_review_notes.py` relative to the loaded `SKILL.md`, not the app repository.
 
 Never copy live reviewer credentials into the audit report, source control, logs, screenshots, or test fixtures. Report only whether credentials were supplied, tested, and non-expiring.
 
