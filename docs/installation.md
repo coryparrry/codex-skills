@@ -17,6 +17,7 @@ After installation, Codex lists the plugin with installed plugins rather than in
 
 The marketplace plugin exposes:
 
+- `appstore-readiness-audit`
 - `continue-deep-research`
 - `engineering-advisor`
 - `git-clean-merged-branch`
@@ -33,6 +34,10 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill '*'
 ```
 
 Install one skill:
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill appstore-readiness-audit
+```
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-merged-branch
@@ -82,6 +87,7 @@ If the marketplace itself does not appear, verify that `.agents/plugins/marketpl
 
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
+- [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

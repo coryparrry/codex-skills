@@ -11,9 +11,10 @@
       ]
     },
     {
-      "title": "Code Review",
-      "description": "Skills that review Swift code and sort PR feedback.",
+      "title": "App and Code Review",
+      "description": "Skills that audit App Store readiness, review Swift code, and sort PR feedback.",
       "skills": [
+        "appstore-readiness-audit",
         "swift-code-review",
         "triage-review-comments"
       ]

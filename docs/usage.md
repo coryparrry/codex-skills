@@ -6,6 +6,7 @@ This guide explains when and how to invoke the skills in this repository.
 
 | Goal | Skill |
 |---|---|
+| Audit an Apple app before upload or submission to App Store Connect | `appstore-readiness-audit` |
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
 | Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
@@ -14,6 +15,18 @@ This guide explains when and how to invoke the skills in this repository.
 | Classify PR review feedback | `triage-review-comments` |
 
 Both research workflows begin from the available runtime. They use independent lanes when that materially improves coverage and the runtime supports them; otherwise they complete a bounded root-only audit and disclose the reduced coverage.
+
+## Audit App Store readiness
+
+Use `appstore-readiness-audit` before uploading or submitting an Apple app to App Store Connect:
+
+```text
+Use $appstore-readiness-audit to audit this release candidate for App Store submission readiness without changing it.
+```
+
+The skill refreshes current Apple sources, identifies the exact source and artifact under review, classifies product features, and runs separate project, release, privacy, policy, runtime, metadata, and reviewer-access gates. It distinguishes a candidate that is ready to upload from one with enough evidence to submit for review.
+
+The audit is read-only. Missing runtime or App Store Connect evidence remains `NOT_TESTED` or `UNKNOWN` and can hold the verdict. A successful build or archive does not become a submission-ready result by itself.
 
 ## Run As An Engineering Advisor
 
@@ -95,6 +108,7 @@ It does not implement fixes automatically. If current PR context is unavailable,
 
 - [Installation](installation.md)
 - [Reference](reference.md)
+- [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
