@@ -53,17 +53,17 @@ The skill returns one result:
 | `READY_FOR_UPLOAD` | Local project, Release, artifact, and toolchain gates pass. App Store Connect or reviewer evidence may still be incomplete. |
 | `READY_FOR_SUBMISSION` | Project, artifact, policy, runtime, privacy, metadata, commerce, compliance, and reviewer checks have current passing evidence. |
 
-The report leads with findings and includes the audit boundary, feature map, evidence ledger, missing checks, reviewer handoff, and direct Apple sources. It does not use a readiness score or guarantee approval.
+The report leads with findings. It includes the audit boundary, feature map, evidence ledger, missing checks, reviewer handoff, and applicable Apple sources. It does not use a readiness score or guarantee approval.
 
 ## Review Notes byte check
 
-Apple measures App Review Notes in bytes. Check a local draft without printing its content:
+Apple measures App Review Notes in bytes. Get the current byte limit from Apple. The installation commands put the skill in `$HOME/.agents/skills/appstore-readiness-audit`. Run:
 
 ```bash
-python3 skills/appstore-readiness-audit/scripts/check_review_notes.py /path/to/review-notes.txt
+python3 "$HOME/.agents/skills/appstore-readiness-audit/scripts/check_review_notes.py" --max-bytes <review-notes-byte-limit> "/path/to/review-notes.txt"
 ```
 
-Use `--json` for machine-readable output or `-` to read from standard input. Keep credentials out of source control and audit reports.
+Replace `<review-notes-byte-limit>` with the current integer value. Do not include commas or units. If you need machine-readable output, use `--json`. Use `-` to read from standard input. Keep credentials out of source control and audit reports.
 
 ## Skill layout
 

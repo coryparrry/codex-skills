@@ -56,7 +56,7 @@ Evidence
 - Candidate: <bundle ID, version, build, artifact hash>
 - Runtime: <device, OS, steps, observed result>
 - Project: <tight file and line reference when relevant>
-- Apple: <direct current URL and short policy statement>
+- Apple: <direct current URL and short policy statement, or N/A when the basis does not depend on Apple policy or tooling>
 
 Reviewer impact
 <What App Review can see or be unable to do.>

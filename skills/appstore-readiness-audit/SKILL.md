@@ -64,7 +64,7 @@ Classify the basis separately as `APPLE_POLICY`, `APPLE_TOOLCHAIN`, `DETERMINIST
 
 Use `BLOCKER`, `HIGH`, `MEDIUM`, or `INFO` severity. Do not calculate a readiness score.
 
-Each finding needs a stable ID, status, severity, confidence, basis, applicable platform and feature, direct Apple source, exact app evidence, reviewer impact, smallest resolution direction, and a verification step. Do not call an absent file a blocker until the rule applies and the relevant scope is complete.
+For each finding, record a stable ID, status, severity, confidence, and basis. Record the applicable platform and feature. Record exact app evidence and reviewer impact. Record the smallest resolution direction and a verification step. If the finding depends on Apple policy or tooling, record a direct Apple source. Otherwise, record `N/A` for the Apple source. Do not call an absent file a blocker until the rule applies and the relevant scope is complete.
 
 ## 6. Decide readiness
 

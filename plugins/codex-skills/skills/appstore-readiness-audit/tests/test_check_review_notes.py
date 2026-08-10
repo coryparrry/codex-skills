@@ -79,6 +79,10 @@ class DocumentationTests(unittest.TestCase):
 
         self.assertIn(expected_command, report)
         self.assertIn("Create a new command after each source refresh.", report)
+        self.assertIn(
+            "or N/A when the basis does not depend on Apple policy or tooling",
+            report,
+        )
 
 
 if __name__ == "__main__":
