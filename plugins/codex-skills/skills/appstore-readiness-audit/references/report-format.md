@@ -151,10 +151,10 @@ Contact
 <Current review contact supplied in App Store Connect.>
 ```
 
-Save the draft outside version control if it contains sensitive information. Run:
+Save the draft outside version control if it contains sensitive information. Resolve `<skill-root>` to the absolute directory containing the loaded `appstore-readiness-audit/SKILL.md`, then replace the placeholder before presenting or running this command:
 
 ```bash
-python3 scripts/check_review_notes.py /path/to/review-notes.txt
+python3 "<skill-root>/scripts/check_review_notes.py" "/path/to/review-notes.txt"
 ```
 
-The script reports only the UTF-8 byte count and never prints the note content.
+The final command must contain the resolved absolute script path, not `<skill-root>`. The script reports only the UTF-8 byte count and never prints the note content.

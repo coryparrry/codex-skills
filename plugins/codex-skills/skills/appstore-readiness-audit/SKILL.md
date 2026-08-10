@@ -81,6 +81,6 @@ If the user asks about submission and store or runtime evidence is missing, retu
 
 Use [report-format.md](references/report-format.md). Lead with blockers and high-risk findings, then give the verdict, evidence boundary, gate ledger, incomplete checks, feature map, reviewer handoff, and lower-severity observations.
 
-Never print credentials or private reviewer data. Use `scripts/check_review_notes.py` for the current UTF-8 byte limit after refreshing Apple's field requirement.
+Never print credentials or private reviewer data. Resolve `scripts/check_review_notes.py` relative to this loaded `SKILL.md`, not the audited app repository. Replace `<skill-root>` in the report template with that absolute directory before showing or running the command.
 
 End by stating that the audit identifies known readiness risks and does not guarantee App Review approval. If no material finding survives verification, say so without inventing one.
