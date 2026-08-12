@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deep Code Review"
+  short_description: "Audit repository changes beyond the diff"
+  default_prompt: "Use $deep-code-review to review this change across the repository for validated correctness, security, compatibility, and mergeability risks."

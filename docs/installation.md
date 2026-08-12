@@ -19,6 +19,7 @@ The marketplace plugin exposes:
 
 - `appstore-readiness-audit`
 - `continue-deep-research`
+- `deep-code-review`
 - `engineering-advisor`
 - `git-clean-merged-branch`
 - `research-repo-technology`
@@ -37,6 +38,10 @@ Install one skill:
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill appstore-readiness-audit
+```
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill deep-code-review
 ```
 
 ```bash
@@ -88,6 +93,7 @@ If the marketplace itself does not appear, verify that `.agents/plugins/marketpl
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
 - [App Store Readiness Audit](appstore-readiness-audit.md)
+- [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

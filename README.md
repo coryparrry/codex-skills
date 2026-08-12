@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> Seven Codex skills for research, App Store readiness, engineering advice, code review, PR feedback triage, and safe branch cleanup.
+> Eight Codex skills for research, App Store readiness, engineering advice, deep repository review, Swift review, PR feedback triage, and safe branch cleanup.
 
 Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
@@ -47,6 +47,7 @@ Replace the skill slug in the command.
 | 🔭 Assess technology options for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
 | 🍎 Audit an app before App Store submission. | [`appstore-readiness-audit`](docs/appstore-readiness-audit.md) | Reconciles the release candidate, Apple policy, runtime evidence, privacy, metadata, and reviewer access without changing the app. |
 | 🧠 Keep the root agent in an advisor role. | [`engineering-advisor`](docs/engineering-advisor.md) | Sends edits to matched workers while the root owns scope, review, and validation. |
+| 🔎 Review a change across its repository. | [`deep-code-review`](docs/deep-code-review.md) | Traces affected behavior, missing companion changes, risk-specific paths, and mergeability before reporting validated findings. |
 | 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
 | 🧭 Triage pull-request feedback. | [`triage-review-comments`](docs/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |
 | 🧹 Remove a merged local branch. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Checks the default branch, protects dirty worktrees and unmerged work, then removes the branch safely. |
@@ -74,6 +75,7 @@ bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
 python3 scripts/check_skill_mirror.py appstore-readiness-audit
+python3 scripts/check_skill_mirror.py deep-code-review
 python3 scripts/check_skill_mirror.py engineering-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
@@ -91,6 +93,7 @@ git diff --check
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
 - [App Store Readiness Audit](docs/appstore-readiness-audit.md)
+- [Deep Code Review](docs/deep-code-review.md)
 - [Engineering Advisor](docs/engineering-advisor.md)
 - [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
 - [Triage Review Comments](docs/triage-review-comments.md)

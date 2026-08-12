@@ -10,6 +10,7 @@ This guide explains when and how to invoke the skills in this repository.
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
 | Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
+| Review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` |
 | Review Swift or Apple-platform changes that affect Swift targets | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
@@ -57,6 +58,18 @@ Use $research-repo-technology to determine which technologies this repository sh
 ```
 
 The skill audits the checkout before searching externally, inspects promising technologies at source level, ranks a short set of repo-specific opportunities, and proposes bounded proofs of concept without implementing them.
+
+## Deep Code Review
+
+Use `deep-code-review` for a language-agnostic, repository-wide review of a pull request, branch, commit, diff, or working tree:
+
+```text
+Use $deep-code-review to review this change across the repository for validated correctness, security, compatibility, and mergeability risks.
+```
+
+The skill binds the review to an exact state, resolves repository policy, reconstructs intent, traces affected behavior beyond the diff, activates only relevant specialist lanes, challenges verification, and checks missing companion changes. It tries to disprove every candidate finding before reporting it.
+
+The review is read-only. A partial inventory cannot produce an approval. Tests, scanners, AI authorship, and suspicious-looking patterns remain evidence or search leads until the reviewer proves a reachable violated property.
 
 ## Swift Code Review
 
@@ -109,6 +122,7 @@ It does not implement fixes automatically. If current PR context is unavailable,
 - [Installation](installation.md)
 - [Reference](reference.md)
 - [App Store Readiness Audit](appstore-readiness-audit.md)
+- [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

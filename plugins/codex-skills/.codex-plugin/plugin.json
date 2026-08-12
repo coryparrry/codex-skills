@@ -1,7 +1,7 @@
 {
   "name": "codex-skills",
-  "version": "0.13.5",
-  "description": "Codex skills for research, App Store readiness, advisor-led engineering, Swift code review, PR feedback triage, and safe branch cleanup.",
+  "version": "0.14.0",
+  "description": "Codex skills for research, App Store readiness, advisor-led engineering, deep repository review, Swift review, PR feedback triage, and safe branch cleanup.",
   "author": {
     "name": "Cory Parry",
     "url": "https://github.com/coryparrry"
@@ -14,6 +14,8 @@
     "skills",
     "research",
     "review",
+    "code-review",
+    "repository",
     "apple",
     "app-store",
     "orchestration",
@@ -22,8 +24,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex Skills",
-    "shortDescription": "Research, Apple readiness, review, and Git workflows.",
-    "longDescription": "Continue research, audit apps before App Store submission, direct Terra implementation as a non-implementing advisor, evaluate repository technologies, review Swift changes, sort PR feedback, and remove merged local branches.",
+    "shortDescription": "Research, Apple readiness, deep review, and Git workflows.",
+    "longDescription": "Continue research, audit apps before App Store submission, direct Terra implementation as a non-implementing advisor, evaluate repository technologies, review changes across a repository, run Swift-specific review, sort PR feedback, and remove merged local branches.",
     "developerName": "Cory Parry",
     "category": "Coding",
     "capabilities": [
@@ -35,7 +37,7 @@
     "privacyPolicyURL": "https://github.com/coryparrry/codex-skills/security/policy",
     "termsOfServiceURL": "https://github.com/coryparrry/codex-skills/blob/main/LICENSE",
     "defaultPrompt": [
-      "Continue research with continue-deep-research; audit App Store readiness with appstore-readiness-audit; direct worker implementation with engineering-advisor; assess repository technologies with research-repo-technology; review Swift changes with swift-code-review; verify PR feedback with triage-review-comments; clean merged branches with git-clean-merged-branch."
+      "Continue research with continue-deep-research; audit App Store readiness with appstore-readiness-audit; direct worker implementation with engineering-advisor; assess repository technologies with research-repo-technology; review repository-wide changes with deep-code-review; review Swift changes with swift-code-review; verify PR feedback with triage-review-comments; clean merged branches with git-clean-merged-branch."
     ],
     "screenshots": [],
     "logo": "./assets/codex-skills-logo.png"
