@@ -17,6 +17,21 @@ Use evidence to settle claims and calibrate uncertainty. Do not substitute fluen
 
 Tool unavailability, failure, timeout, or environment mismatch is an evidence gap. Coverage shows execution, not correctness. Scanner output shows a candidate pattern, not reachability or exploitability.
 
+## Gate execution of proposed code
+
+Assume that a proposed change can alter package scripts, Makefiles, build phases, test setup, compiler or package plugins, dependency resolution, generated commands, configuration, and workflow hooks. Inspect the command and every reachable hook before running it. Reading a familiar command name is not enough.
+
+Run code from the reviewed state only when the available boundary is proportionate to its trust and impact:
+
+- withhold repository-write tokens, cloud credentials, signing identities, production access, and unrelated secrets;
+- prefer an ephemeral sandbox, container, virtual machine, disposable checkout, isolated derived data, cache, database, and temporary output;
+- disable or restrict network access unless the check requires a specific reviewed destination;
+- avoid user home, Keychain, device, simulator, daemon, global package, and shared-cache mutations unless the user explicitly authorizes them and the review requires them;
+- never deploy, publish, release, notarize, rotate credentials, apply production migrations, or invoke destructive cleanup as an implicit review step;
+- capture repository and relevant external state before and after any command that may mutate them.
+
+If isolation, credential removal, or side-effect inspection is not possible, do not execute the command. Report the exact skipped validation and the evidence needed to close the gap. A repository-defined command is not automatically trusted merely because policy names it.
+
 ## Challenge self-confirming verification
 
 An implementation and its new test can share the same wrong interpretation. Ask:
@@ -35,6 +50,8 @@ Use the cheapest discriminating challenge first: focused regression, broader rel
 Create a candidate packet containing the exact base/head, requirement evidence, changed and affected paths, factual execution/data path, tool or reproduction output, alternative explanations, and missing evidence. Do not include persuasive severity language.
 
 Have the validation pass independently test reachability, preconditions, safeguards, framework guarantees, current-head applicability, and whether the proposed correction would regress valid behavior. Accept `no defect established`.
+
+When a command fails, reproduce the same relevant check on the resolved base in an equivalent environment before attributing the failure to the change. If that comparison is unsafe, unavailable, or inconclusive, classify the failure as unassigned rather than change-caused.
 
 Use these statuses:
 

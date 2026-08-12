@@ -4,6 +4,8 @@
 
 The skill finds reachable errors that a compiler or a passing test can miss. These errors include ownership, isolation, identity, and lifetime failures.
 
+Use it directly for a focused Swift or Apple review. For a mixed-language or repository-wide review, `deep-code-review` remains the umbrella and uses this skill as the Swift/Apple specialist lane.
+
 ## Install
 
 To install only this skill, run:
