@@ -58,6 +58,49 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("frontmatter description cannot contain angle brackets", errors)
         self.assertIn("unexpected frontmatter field: unknown", errors)
 
+    def test_parse_skill_frontmatter_resolves_folded_yaml_description(self) -> None:
+        text = (
+            "---\n"
+            "name: example-skill\n"
+            "description: >-\n"
+            "  A valid folded\n"
+            "  description.\n"
+            "---\n"
+        )
+        self.assertEqual(parse_skill_frontmatter(text, "example-skill"), [])
+
+    def test_parse_skill_frontmatter_checks_literal_yaml_description(self) -> None:
+        text = (
+            "---\n"
+            "name: example-skill\n"
+            "description: |\n"
+            "  Hidden <invalid> content.\n"
+            "---\n"
+        )
+        self.assertIn(
+            "frontmatter description cannot contain angle brackets",
+            parse_skill_frontmatter(text, "example-skill"),
+        )
+
+    def test_parse_skill_frontmatter_checks_resolved_description_length(self) -> None:
+        text = (
+            "---\n"
+            "name: example-skill\n"
+            "description: |\n"
+            f"  {'a' * 1025}\n"
+            "---\n"
+        )
+        self.assertIn(
+            "frontmatter description must be at most 1024 characters",
+            parse_skill_frontmatter(text, "example-skill"),
+        )
+
+    def test_parse_skill_frontmatter_rejects_non_string_values(self) -> None:
+        text = "---\nname: 123\ndescription: [not, text]\n---\n"
+        errors = parse_skill_frontmatter(text, "example-skill")
+        self.assertIn("frontmatter name must be a string", errors)
+        self.assertIn("frontmatter description must be a string", errors)
+
     def test_skills_sh_rejects_duplicate_and_stale_entries(self) -> None:
         data = {
             "groupings": [

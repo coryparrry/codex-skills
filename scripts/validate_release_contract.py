@@ -13,6 +13,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 
 PLUGIN_MANIFEST = Path("plugins/codex-skills/.codex-plugin/plugin.json")
 MARKETPLACE_MANIFEST = Path(".agents/plugins/marketplace.json")
@@ -64,26 +66,33 @@ def parse_skill_frontmatter(text: str, expected_name: str) -> list[str]:
     except ValueError:
         return ["SKILL.md frontmatter is not closed"]
 
-    fields: dict[str, str] = {}
     allowed_fields = {"name", "description", "license", "allowed-tools", "metadata"}
-    for line in lines[1:end]:
-        if not line or line[0].isspace() or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip()
+    try:
+        fields = yaml.safe_load("\n".join(lines[1:end]))
+    except yaml.YAMLError as error:
+        return [f"SKILL.md frontmatter is invalid YAML: {error}"]
+    if not isinstance(fields, dict):
+        return ["SKILL.md frontmatter must be a YAML mapping"]
 
-    for field in sorted(set(fields) - allowed_fields):
-        errors.append(f"unexpected frontmatter field: {field}")
+    for field in fields:
+        if not isinstance(field, str):
+            errors.append("frontmatter field names must be strings")
+        elif field not in allowed_fields:
+            errors.append(f"unexpected frontmatter field: {field}")
 
     actual_name = fields.get("name")
-    if actual_name != expected_name:
+    if not isinstance(actual_name, str):
+        errors.append("frontmatter name must be a string")
+    elif actual_name != expected_name:
         errors.append(
-            f"frontmatter name must be {expected_name}, got {actual_name or '<missing>'}"
+            f"frontmatter name must be {expected_name}, got {actual_name}"
         )
-    if actual_name and len(actual_name) > 64:
+    if isinstance(actual_name, str) and len(actual_name) > 64:
         errors.append("frontmatter name must be at most 64 characters")
-    description = fields.get("description", "")
-    if not description:
+    description = fields.get("description")
+    if not isinstance(description, str):
+        errors.append("frontmatter description must be a string")
+    elif not description.strip():
         errors.append("frontmatter description is required")
     elif len(description) > 1024:
         errors.append("frontmatter description must be at most 1024 characters")
