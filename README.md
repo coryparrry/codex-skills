@@ -70,6 +70,7 @@ The research skills work with the runtime that is available. They use independen
 Run these commands after a packaging change:
 
 ```bash
+python3 -m pip install -r requirements-release.txt
 python3 scripts/tests/test_validate_release_contract.py
 python3 scripts/validate_release_contract.py --base-ref origin/main
 bash -n scripts/install.sh

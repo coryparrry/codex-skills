@@ -80,6 +80,7 @@ The script refuses to run outside a Git repository, without an `origin` remote, 
 ## Validation Commands
 
 ```bash
+python3 -m pip install -r requirements-release.txt
 python3 scripts/tests/test_validate_release_contract.py
 python3 scripts/validate_release_contract.py --base-ref origin/main
 bash -n scripts/install.sh
