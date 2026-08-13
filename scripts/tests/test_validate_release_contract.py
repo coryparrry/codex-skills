@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,6 +17,7 @@ from validate_release_contract import (  # noqa: E402
     parse_semver,
     parse_skill_frontmatter,
     relative_files,
+    changed_paths,
     shipped_plugin_change,
     validate_skills_sh,
     validate_plugin_manifest,
@@ -134,6 +136,46 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(
                 "plugin manifest logo does not exist: ./assets/logo.png", errors
             )
+
+    def test_changed_paths_includes_non_ignored_untracked_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo = Path(temporary_directory)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "tests@example.com"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Release Tests"],
+                cwd=repo,
+                check=True,
+            )
+            (repo / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+            (repo / ".gitignore").write_text("ignored.txt\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "tracked.txt", ".gitignore"], cwd=repo, check=True
+            )
+            subprocess.run(
+                ["git", "commit", "-qm", "initial"], cwd=repo, check=True
+            )
+            base_ref = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            skill = repo / "skills/new-skill"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("new skill\n", encoding="utf-8")
+            (repo / "ignored.txt").write_text("ignored\n", encoding="utf-8")
+
+            changed, errors = changed_paths(repo, base_ref)
+
+            self.assertEqual(errors, [])
+            self.assertIn("skills/new-skill/SKILL.md", changed)
+            self.assertNotIn("ignored.txt", changed)
 
 
 if __name__ == "__main__":

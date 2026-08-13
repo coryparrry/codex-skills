@@ -370,6 +370,13 @@ def changed_paths(repo: Path, base_ref: str) -> tuple[set[str], list[str]]:
         )
         for args in (("diff", "--name-only"), ("diff", "--cached", "--name-only")):
             changed.update(line for line in git_output(repo, *args).splitlines() if line)
+        changed.update(
+            line
+            for line in git_output(
+                repo, "ls-files", "--others", "--exclude-standard"
+            ).splitlines()
+            if line
+        )
     except subprocess.CalledProcessError as error:
         errors.append(f"cannot resolve base ref {base_ref}: {error.stderr.strip()}")
     return changed, errors

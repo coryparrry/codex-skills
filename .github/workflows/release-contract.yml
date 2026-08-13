@@ -32,6 +32,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install plugin-validator dependency
+        run: python3 -m pip install --disable-pip-version-check PyYAML==6.0.3
+
       - name: Test release-contract validator
         run: python3 scripts/tests/test_validate_release_contract.py
 
@@ -43,6 +46,19 @@ jobs:
             args=(--base-ref "$BASE_REF")
           fi
           python3 scripts/validate_release_contract.py "${args[@]}"
+
+      - name: Run system plugin validator
+        shell: bash
+        env:
+          PLUGIN_VALIDATOR_REF: f898ebcafdeb0052abc844d9e11b5e754b8ec4af
+          PLUGIN_VALIDATOR_SHA256: ebda00d55d7518b127f675f062fb5c6e7a1ffdc0a99df1a55ac594400d7d3228
+        run: |
+          validator_path="$RUNNER_TEMP/validate_plugin.py"
+          curl --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/openai/codex/$PLUGIN_VALIDATOR_REF/codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py" \
+            --output "$validator_path"
+          echo "$PLUGIN_VALIDATOR_SHA256  $validator_path" | sha256sum --check --strict
+          python3 "$validator_path" plugins/codex-skills
 
       - name: Test installer
         run: |
