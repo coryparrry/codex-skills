@@ -1,10 +1,12 @@
 # Risk-routed review lanes
 
-Always run the compact core lane. Activate other lanes only when the change or affected system triggers them.
+Always run the compact core lane. Activate other lanes only when the change or reviewed system triggers them.
 
 ## Core lane
 
-Establish requested behavior, observable change, preserved invariants, necessity of each changed area, affected callers and consumers, missing companions, applicable deterministic checks, and mergeability under repository policy.
+For a change review, establish requested behavior, observable change, preserved invariants, necessity of each changed area, affected callers and consumers, missing companions, applicable deterministic checks, and mergeability under repository policy.
+
+For a snapshot audit, establish supported behavior, reachable entry points and sinks, invariants, cross-area contracts, failure paths, trust boundaries, missing operational or verification companions, and applicable deterministic checks. Judge snapshot risk and completeness, not mergeability.
 
 ## Compose repository and platform review
 
@@ -16,7 +18,7 @@ When affected paths include Swift, Objective-C interoperability, Xcode project s
 
 | Trigger | Lane | Required questions |
 |---|---|---|
-| Ambiguous requirement, incomplete fix, alternate entry points | Specification and correctness | Does every relevant path satisfy the reconstructed behavior? Is the root cause fixed rather than one symptom? |
+| Ambiguous requirement, incomplete behavior, alternate entry points | Specification and correctness | Does every relevant path satisfy the reconstructed behavior? For a change, is the root cause fixed rather than one symptom? |
 | New abstraction, helper, framework, duplicate logic, broad refactor | Architecture and reuse | Does dependency direction, ownership, and the established repository mechanism remain intact? Is each edit necessary? |
 | Authentication, authorization, secrets, untrusted input, tenant or user data | Security and trust | What is attacker controlled? Which control protects which sink? Is the path reachable and the guard effective? |
 | Personal data, analytics, logging, telemetry, retention, consent, deletion | Privacy and data governance | What data is collected, inferred, retained, transmitted, or exposed? Are purpose, consent, minimization, redaction, deletion, and access boundaries preserved? |
@@ -28,7 +30,7 @@ When affected paths include Swift, Objective-C interoperability, Xcode project s
 | Language, compiler, framework, SDK, or platform-specific behavior | Language and platform semantics | Which exact version and configuration defines the behavior? Do primary documentation, active toolchain, and supported-runtime evidence agree? |
 | Filesystem, network, database, process, timeout, background work | Reliability and resources | What happens on partial failure, retry, restart, cancellation, duplicate execution, and resource cleanup? |
 | Hot path, loops, queries, large data, allocation, cache, lock | Performance | What changed in asymptotic work, calls, queries, allocation, contention, or resource lifetime? Is the production trigger realistic? |
-| New or changed tests, assertions, fixtures, mocks, skips, snapshots | Test oracle | Did the test fail before the patch? Is the expected result independent? Which realistic wrong implementation still passes? |
+| Tests, assertions, fixtures, mocks, skips, snapshots | Test oracle | Is the expected result independent and does the test exercise the production path? For a change, did it fail before the patch? Which realistic wrong implementation still passes? |
 | Package, action, image, binary, build tool, generated dependency | Dependency and supply chain | Does it exist in the intended registry? Is the resolved version locked, necessary, supported, licensed, and from the expected maintainer? |
 | CI, build, packaging, feature flag, environment, deployment, release | Operations | Does the exact production and release path receive the change? Are rollout, observability, failure recovery, and rollback viable? |
 | Dead scaffolding, one-off utility, broad exception, swallowed failure | Maintainability and failure semantics | What concrete property is violated? Is failure hidden, code unreachable, or conceptual complexity materially increased? |

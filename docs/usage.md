@@ -61,13 +61,15 @@ The skill audits the checkout before searching externally, inspects promising te
 
 ## Deep Code Review
 
-Use `deep-code-review` for a language-agnostic, repository-wide review of a pull request, branch, commit, diff, or working tree:
+Use `deep-code-review` for a language-agnostic review of a pull request, branch, commit, diff, or working tree, or for a whole-repository snapshot audit:
 
 ```text
 Use $deep-code-review as the repository-wide umbrella to review this change safely, validate only change-caused defects, and assess correctness, security, compatibility, and merge readiness.
 ```
 
 The skill binds the review to an exact state, resolves repository policy, reconstructs intent, traces affected behavior beyond the diff, activates only relevant specialist lanes, challenges verification, and checks missing companion changes. It inspects execution hooks before running proposed code, tries to disprove every candidate finding, runs one bounded omission pass, and re-snapshots the state before reporting.
+
+In snapshot-audit mode, the skill records each production area, supported entry point, and shared contract in an evidence ledger. File inventories, searches, and passing test counts do not count as end-to-end trace coverage. If a material path, lane, or runtime boundary remains unreviewed, the result stays partial.
 
 The review is read-only. A partial inventory cannot produce an approval. Tests, scanners, AI authorship, and suspicious-looking patterns remain evidence or search leads until the reviewer proves a reachable violated property.
 
