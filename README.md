@@ -70,6 +70,8 @@ The research skills work with the runtime that is available. They use independen
 Run these commands after a packaging change:
 
 ```bash
+python3 scripts/tests/test_validate_release_contract.py
+python3 scripts/validate_release_contract.py --base-ref origin/main
 bash -n scripts/install.sh
 bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
@@ -85,6 +87,7 @@ python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+npx skills add . --list
 git diff --check
 ```
 

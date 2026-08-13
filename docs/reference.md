@@ -54,6 +54,7 @@ The plugin manifest exposes all skill folders under `plugins/codex-skills/skills
 | `scripts/install.sh` | Installs all top-level repo skills from a trusted checkout |
 | `scripts/test_install.sh` | Smoke-tests bundle installation, preservation, and curl-style rejection |
 | `scripts/check_skill_mirror.py` | Confirms a source skill matches its plugin mirror |
+| `scripts/validate_release_contract.py` | Checks source, plugin, marketplace, docs, and skills.sh publication contracts |
 
 ## Git Cleanup Script
 
@@ -79,6 +80,8 @@ The script refuses to run outside a Git repository, without an `origin` remote, 
 ## Validation Commands
 
 ```bash
+python3 scripts/tests/test_validate_release_contract.py
+python3 scripts/validate_release_contract.py --base-ref origin/main
 bash -n scripts/install.sh
 bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
@@ -94,6 +97,7 @@ python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+npx skills add . --list
 git diff --check
 ```
 
