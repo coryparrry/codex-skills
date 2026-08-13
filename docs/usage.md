@@ -10,7 +10,8 @@ This guide explains when and how to invoke the skills in this repository.
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
 | Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
-| Review Swift or Apple-platform changes that affect Swift targets | `swift-code-review` |
+| Review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
+| Review focused Swift or Apple-platform changes, or provide the specialist lane for a deep review | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
@@ -58,9 +59,21 @@ Use $research-repo-technology to determine which technologies this repository sh
 
 The skill audits the checkout before searching externally, inspects promising technologies at source level, ranks a short set of repo-specific opportunities, and proposes bounded proofs of concept without implementing them.
 
+## Deep Code Review
+
+Use `deep-code-review` for a language-agnostic, repository-wide review of a pull request, branch, commit, diff, or working tree:
+
+```text
+Use $deep-code-review as the repository-wide umbrella to review this change safely, validate only change-caused defects, and assess correctness, security, compatibility, and merge readiness.
+```
+
+The skill binds the review to an exact state, resolves repository policy, reconstructs intent, traces affected behavior beyond the diff, activates only relevant specialist lanes, challenges verification, and checks missing companion changes. It inspects execution hooks before running proposed code, tries to disprove every candidate finding, runs one bounded omission pass, and re-snapshots the state before reporting.
+
+The review is read-only. A partial inventory cannot produce an approval. Tests, scanners, AI authorship, and suspicious-looking patterns remain evidence or search leads until the reviewer proves a reachable violated property.
+
 ## Swift Code Review
 
-Use `swift-code-review` for a Swift or Apple-platform diff, branch, commit, or pull request:
+Use `swift-code-review` directly for a focused Swift or Apple-platform diff, branch, commit, or pull request. For a mixed-language or repository-wide review, use it as the specialist lane under `deep-code-review`:
 
 ```text
 Use $swift-code-review to review these Swift and SwiftUI changes for concrete correctness and regression risks.
@@ -109,6 +122,7 @@ It does not implement fixes automatically. If current PR context is unavailable,
 - [Installation](installation.md)
 - [Reference](reference.md)
 - [App Store Readiness Audit](appstore-readiness-audit.md)
+- [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

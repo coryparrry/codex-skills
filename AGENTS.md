@@ -10,7 +10,7 @@ The installable plugin mirror lives under `plugins/codex-skills/skills/`, and pl
 
 When adding, renaming, or removing a shipped skill, update the README in the same change. Keep its skill count, Skills table, documentation links, installation examples where relevant, and validation commands aligned with `skills/`. Also update the source skill, plugin mirror, plugin manifest, `skills.sh.json`, and any affected pages in `docs/`.
 
-Use the `$humanizer:humanizer` skill before writing or revising Markdown prose in this repository. Keep frontmatter, code blocks, commands, data, and link targets unchanged unless the task requires a functional change.
+Use the `$humanizer:humanizer` skill only for README files and repository instruction documents such as `AGENTS.md`. Never use it for skill writing, including `SKILL.md`, skill references, prompts, or skill metadata. Keep frontmatter, code blocks, commands, data, and link targets unchanged unless the task requires a functional change.
 
 ## Marketplace Installation Workflow
 

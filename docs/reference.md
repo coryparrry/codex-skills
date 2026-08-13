@@ -14,6 +14,7 @@ skills.sh.json
 skills/
   appstore-readiness-audit/
   continue-deep-research/
+  deep-code-review/
   engineering-advisor/
   git-clean-merged-branch/
   research-repo-technology/
@@ -29,10 +30,11 @@ The source skill folders under `skills/` must match their copies under `plugins/
 |---|---|---|
 | `appstore-readiness-audit` | Audit an Apple release candidate before App Store upload or submission | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
+| `deep-code-review` | Review affected behavior across a repository and report validated defects, unresolved risks, blockers, coverage, and verified merge readiness | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `engineering-advisor` | Route edits to capability-matched Terra workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
 | `research-repo-technology` | Research which technologies a live repository should adopt, adapt, build, or reject | `SKILL.md`, `agents/openai.yaml`, `references/` |
-| `swift-code-review` | Review Swift and Apple-platform changes that affect Swift targets | `SKILL.md`, `agents/openai.yaml`, `references/` |
+| `swift-code-review` | Review focused Swift and Apple-platform changes or provide their specialist lane in a deep review | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/` |
 
 ## Package Metadata
@@ -82,6 +84,7 @@ bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
 python3 scripts/check_skill_mirror.py appstore-readiness-audit
+python3 scripts/check_skill_mirror.py deep-code-review
 python3 scripts/check_skill_mirror.py engineering-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
@@ -99,6 +102,7 @@ git diff --check
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
 - [App Store Readiness Audit](appstore-readiness-audit.md)
+- [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)

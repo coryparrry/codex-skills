@@ -1,6 +1,6 @@
 ---
 name: swift-code-review
-description: Review Swift and Apple-platform changes, including SwiftUI/AppKit behavior, concurrency, persistence, packages, Xcode project/build configuration, mixed-language boundaries, generated code, and unsafe interoperability, for reachable correctness and regression risks. Use when asked to review a Swift diff, pull request, branch, commit, Swift 6 migration, AI-authored Swift, or Apple-platform and Xcode project changes affecting Swift targets.
+description: Review Swift and Apple-platform changes, including SwiftUI/AppKit behavior, concurrency, persistence, packages, Xcode project/build configuration, mixed-language boundaries, generated code, and unsafe interoperability, for reachable correctness and regression risks. Use directly for a focused Swift diff, pull request, branch, commit, Swift 6 migration, AI-authored Swift, or Apple-platform and Xcode project change, and use as the Swift/Apple specialist lane when `deep-code-review` covers a mixed-language or repository-wide change.
 ---
 
 # Swift Code Review
@@ -8,6 +8,8 @@ description: Review Swift and Apple-platform changes, including SwiftUI/AppKit b
 Review invariants, not surface syntax. Produce one evidence-led review that keeps scope explicit and findings first while distinguishing compiler acceptance, data-race safety, and application correctness.
 
 Treat review as read-only. Do not edit, stage, commit, push, post comments, or resolve threads unless the user separately asks for those actions.
+
+When invoked as a specialist lane under `deep-code-review`, return exact-state evidence, coverage, validation gaps, and candidate findings to the umbrella reviewer. Let the umbrella review own cross-language integration, deduplication, final disposition, and merge-readiness claims.
 
 When the same request includes fixes, complete and report the review phase before entering a separately identified write-enabled repair phase. Do not edit while evidence collection is still changing the review inventory.
 
