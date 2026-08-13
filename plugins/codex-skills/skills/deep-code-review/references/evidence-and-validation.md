@@ -2,6 +2,19 @@
 
 Use evidence to settle claims and calibrate uncertainty. Do not substitute fluent explanations for execution, tool output, or verified repository relationships.
 
+## Start from non-acceptance
+
+Operationally, assume each claim is wrong until independent evidence proves it right. Do not convert repetition, authority, confidence, a green check, or agreement between agents into proof. Treat all of these as untrusted claims:
+
+- implementation and architecture assumptions;
+- expected values in tests, fixtures, mocks, and snapshots;
+- documentation, comments, issues, specifications, and commit messages;
+- CI, lint, type-check, scanner, benchmark, and test summaries;
+- prior reviewer, maintainer, tool, model, or subagent confirmations;
+- the current reviewer's own candidate and conclusion.
+
+Do not report a claim that lacks sufficient independent evidence. Continue investigating until it is validated or disproved. If a material risk cannot be settled because required evidence is unavailable or conflicting, report that exact blocker and next discriminating check under unresolved risks. Accept a claim only when its oracle does not merely repeat the implementation, its production path is reachable, relevant counterexamples and safeguards were tested, and the result survives a discriminating falsification attempt.
+
 ## Match questions to evidence
 
 | Question | Preferred evidence |
@@ -16,6 +29,8 @@ Use evidence to settle claims and calibrate uncertainty. Do not substitute fluen
 | Is the repository relationship real? | AST/call graph, configuration, runtime trace, history, direct consumer evidence |
 
 Tool unavailability, failure, timeout, or environment mismatch is an evidence gap. Coverage shows execution, not correctness. Scanner output shows a candidate pattern, not reachability or exploitability.
+
+A passing command proves only the assertions and environment it actually exercised. Before relying on it, inspect the oracle and challenge at least one realistic wrong implementation or adverse input that should fail. If the check would still pass, it is not proof of the reviewed property.
 
 ## Gate execution of proposed code
 
@@ -50,6 +65,8 @@ Use the cheapest discriminating challenge first: focused regression, broader rel
 Create a candidate packet containing the exact base/head, requirement evidence, changed and affected paths, factual execution/data path, tool or reproduction output, alternative explanations, and missing evidence. Do not include persuasive severity language.
 
 Have the validation pass independently test reachability, preconditions, safeguards, framework guarantees, current-head applicability, and whether the proposed correction would regress valid behavior. Accept `no defect established`.
+
+Do not tell a validation pass that a candidate is "confirmed." Give it the raw claim, exact state, factual path, and evidence needed to reproduce or refute it. Agreement without an independent oracle is correlated opinion, not confirmation.
 
 When a command fails, reproduce the same relevant check on the resolved base in an equivalent environment before attributing the failure to the change. If that comparison is unsafe, unavailable, or inconclusive, classify the failure as unassigned rather than change-caused.
 

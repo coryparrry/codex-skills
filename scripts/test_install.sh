@@ -27,6 +27,7 @@ assert_installed() {
   test -f "$codex_home/skills/deep-code-review/references/impact-and-negative-space.md"
   test -f "$codex_home/skills/deep-code-review/references/report-format.md"
   test -f "$codex_home/skills/deep-code-review/references/risk-lanes.md"
+  test -f "$codex_home/skills/deep-code-review/references/whole-repository-audit.md"
   test -f "$codex_home/skills/git-clean-merged-branch/SKILL.md"
   test -f "$codex_home/skills/git-clean-merged-branch/agents/openai.yaml"
   test -f "$codex_home/skills/git-clean-merged-branch/scripts/clean_merged_branch.sh"

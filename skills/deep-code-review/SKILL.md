@@ -1,29 +1,37 @@
 ---
 name: deep-code-review
-description: Perform deep, language-agnostic, repository-wide code review of a pull request, branch, commit, diff, working tree, or AI-generated change. Trace affected behavior beyond changed lines, reconstruct intent and invariants, route specialist review by risk, use deterministic and behavioral evidence, inspect missing companion changes, and report only validated defects, material unresolved risks, merge blockers, and explicit coverage gaps. Use for deep, exhaustive, repo-wide, adversarial, or AI-code review and for deciding whether a change is safe, complete, appropriate, and merge-ready. Use as the umbrella review for mixed-language repositories; when Swift or Apple-platform paths are affected, compose with `swift-code-review` for those paths.
+description: Perform deep, language-agnostic review of a whole repository snapshot or of a pull request, branch, commit, diff, working tree, or AI-generated change. Use for deep, exhaustive, repo-wide, whole-codebase, adversarial, or AI-code review; select snapshot-audit mode for existing repository behavior and change-review mode for a delta. Use as the umbrella review for mixed-language repositories and compose with `swift-code-review` when Swift or Apple-platform paths are affected.
 ---
 
 # Deep code review
 
-Review the proposed change as a behavioral change to a repository, not as isolated edited lines. Establish what was intended, what is affected, which invariants must survive, what evidence proves or disproves each concern, and what remains unknown.
+Review the requested state as a connected system, not as isolated files or edited lines. Establish the review mode, intended behavior, reachable flows, invariants, evidence for each conclusion, and what remains unknown.
 
-Treat review as read-only. Do not edit, stage, commit, push, post comments, or resolve threads unless the user separately asks for changes. If the request includes fixes, finish and report the review before starting a clearly separated repair phase.
+Treat review as read-only. Do not edit, stage, commit, push, post comments, or resolve threads unless the user separately asks for changes. An explicitly requested review ledger authorizes writing only that artifact; it does not authorize source or product edits. If the request includes fixes, finish and report the review before starting a clearly separated repair phase.
 
 ## 1. Bind the review to an exact state
+
+First select one mode and record it:
+
+- **Change review:** judge a proposed delta and its affected behavior. Findings that affect disposition require change attribution.
+- **Snapshot audit:** judge all in-scope first-party behavior at one repository state. Include executable product code, developer and operations tooling, CI/workflows, packaging/release behavior, and generated or mirrored artifacts by default. Treat tests, examples, and documentation as verification or contract evidence unless they execute or ship independently. Record reasoned exclusions. Use this mode for "whole repo," "full codebase," or equivalent requests with no delta as the object of review. Existing reachable defects are in scope and do not require change attribution.
 
 Resolve the requested scope before judging it:
 
 - For a pull request or branch, record the authoritative base, head, merge base, and comparison mode.
 - For a non-merge commit, compare it with its parent. For a merge commit, state which parent or combined view is in scope.
 - For a working tree, inventory staged, unstaged, and untracked paths and state exclusions.
+- For a snapshot audit, resolve the intended branch or commit, default branch, upstream state when available, and whether the checkout is detached or behind that authority.
 - For files, pasted patches, or paths, keep findings inside that scope while reading repository context needed to validate them.
 - Record repository, remote, branch, `HEAD`, dirty state, submodules, generated artifacts, relevant toolchain versions, and available CI evidence.
 
-Inventory every changed path before partitioning the work. If the checkout or remote head changes, re-resolve the state and do not combine evidence from different snapshots silently.
+Before partitioning the work, inventory every changed path for a change review or every first-party root and production area for a snapshot audit. If the checkout or remote head changes, re-resolve the state and do not combine evidence from different snapshots silently.
 
 If the supplied material cannot establish the complete change, mark the review partial. Do not approve a complete change from a partial inventory.
 
-Immediately before reporting, actively re-resolve the authoritative base, head, merge base, comparison mode, working-tree state, changed-path inventory, and current pull-request head when applicable. Compare them with the opening snapshot. If any in-scope state changed, invalidate snapshot-dependent evidence, re-read every affected slice, repeat the integration pass, and rerun affected validation. Record the final snapshot in the report; noticing a change incidentally is not sufficient.
+Resolve snapshot authority in this order: an explicit user ref, the named or current branch `HEAD`, then its upstream. Consult the default branch when repository context makes it the intended authority. Do not silently treat a detached, stale, or otherwise ambiguous checkout as "the repository"; resolve the intended state with the user before claiming whole-repository coverage. Reviewing the available snapshot may continue, but label it as that snapshot and `partial` for the requested repository audit.
+
+Immediately before reporting, actively re-resolve the authoritative base, head, merge base, comparison mode, working-tree state, path or production-area inventory, and current pull-request head when applicable. Compare them with the opening snapshot. If any in-scope state changed, invalidate snapshot-dependent evidence, re-read every affected slice, repeat the integration pass, and rerun affected validation. Record the final snapshot in the report; noticing a change incidentally is not sufficient.
 
 ## 2. Resolve repository policy
 
@@ -47,31 +55,37 @@ Write a compact ledger of:
 
 If intent remains ambiguous, report the ambiguity instead of inventing a defect.
 
-## 4. Map changed and affected behavior
+For a snapshot audit, reconstruct the repository's supported behaviors from entry points, public contracts, architecture and operations documentation, configuration, release artifacts, and tests. Do not substitute the latest commit message or current tests for the system specification.
 
-Read [impact-and-negative-space.md](references/impact-and-negative-space.md). Build a compact repository map and typed impact model from each changed symbol or artifact through the relevant callers, consumers, configuration, data, generated outputs, tests, deployment surfaces, and historical rationale.
+## 4. Map repository behavior and impact
+
+For a change review, read [impact-and-negative-space.md](references/impact-and-negative-space.md) and build its typed impact model. For a snapshot audit, read [whole-repository-audit.md](references/whole-repository-audit.md) and maintain its required evidence ledgers. Do not load both references unless cross-mode guidance is genuinely needed.
 
 Label every relationship by provenance: verified static, verified runtime, verified configuration, verified history, inferred semantic, or unresolved. Stop expansion only when a boundary is demonstrated safe. Do not flatten the entire repository into context merely because it fits.
 
-Maintain a coverage ledger of changed paths, classified symbols, affected paths, critical flows, and unresolved edges.
+Maintain the applicable reference's coverage ledger. If the user requests a tracked review file, update evidence rows as work completes and before context compaction; do not replace them with summary checkboxes.
 
 ## 5. Route review depth by risk
 
-Run the core correctness and integration lane for every change. Read [risk-lanes.md](references/risk-lanes.md) and activate specialist lanes only when their triggers are present. Route by semantics, criticality, coupling, reversibility, and strength of available verification, not by one universal line-count threshold.
+Run the core correctness and integration lane for every review. Read [risk-lanes.md](references/risk-lanes.md) and activate specialist lanes only when their triggers are present. Route by semantics, criticality, coupling, reversibility, and strength of available verification, not by one universal line-count threshold.
 
-Inspect every changed slice deeply, then perform an integration pass across shared contracts and cross-cutting state. A file-by-file checklist without path reconstruction is not a complete review.
+Inspect every changed slice in a change review or every assigned production area in a snapshot audit, then perform an integration pass across shared contracts and cross-cutting state. A file-by-file checklist without path reconstruction is not a complete review.
 
-When independent subagents are available, use them only for genuinely non-overlapping, read-only lanes after the primary reviewer has inventoried the full change and identified shared contracts. Give them raw scope and artifacts, not suspected answers. They may also perform the single bounded omission pass in section 8. Recheck every candidate against the complete exact-head change before reporting it.
+When independent subagents are available, use them only for genuinely non-overlapping, read-only lanes after the primary reviewer has inventoried the full scope and identified shared contracts. Give them raw scope and artifacts, not suspected answers. They may also perform the single bounded omission pass in section 8. Recheck every candidate against the complete exact reviewed state before reporting it.
+
+For a snapshot audit, assign every in-scope production area to exactly one primary lane, then run a root-owned integration pass across lane boundaries. Record returned coverage and unreviewed edges, not merely that a lane was launched. A timed-out, interrupted, or missing lane result remains uncovered.
 
 ## 6. Collect deterministic and behavioral evidence
 
 Read [evidence-and-validation.md](references/evidence-and-validation.md). Use deterministic tools for claims they can answer directly: parsers, compilers, type checkers, linters, schema validators, dependency resolvers, static analysis, tests, runtime traces, sanitizers, and repository-defined checks.
 
+Adopt an adversarial epistemic default: treat every claim as wrong until it is independently proven right. This includes implementation assumptions, tests, fixtures, mocks, assertions, documentation, comments, issue descriptions, prior reviews, scanner output, CI status, human or model confirmations, and the reviewer's own conclusions. Keep unsupported candidates internal and continue investigating until they are validated or disproved. A claim becomes established only after evidence independent of the claim survives a realistic attempt to falsify it. If required proof is genuinely unavailable, report the exact validation blocker as a coverage gap or material unresolved risk, never as an unproven finding.
+
 Treat proposed code, build scripts, test hooks, package plugins, configuration, dependencies, and generated commands as untrusted until inspected. Before executing them, apply the execution-safety gate in the evidence reference: inspect hooks, withhold credentials and write-capable tokens, prefer isolated ephemeral outputs, restrict unnecessary network and external access, and refuse destructive or externally mutating commands without explicit authorization. If the required boundary is unavailable, skip the command and report the validation gap.
 
 Treat tool failure, timeout, unavailable credentials, missing runtime, and environment mismatch as evidence gaps, never as passes.
 
-Treat tests as necessary evidence where applicable, not as the complete specification. Audit changed tests, fixtures, mocks, snapshots, skips, and assertions. Establish whether a new regression test fails on the base state, derives its oracle independently of the implementation, exercises the production path, and rejects realistic wrong implementations.
+Never accept "tests pass," "confirmed," "verified," "reviewed," or "works as expected" as a conclusion without examining how that result was produced. Audit tests, fixtures, mocks, snapshots, skips, assertions, environment, and execution path. Establish whether a regression test fails on the broken state for the intended reason, derives its oracle independently of the implementation, exercises the production path, and rejects realistic wrong implementations. A test and the code it tests may share the same defect.
 
 Escalate behavioral challenge in proportion to risk: focused regression, broader suite, before/after comparison, mutation, property or metamorphic checks, fuzzing, differential execution, race/stress testing, or migration/rollback compatibility.
 
@@ -89,11 +103,13 @@ Treat every candidate finding as unproven. Try to disprove it against the exact 
 
 For material candidates, use a neutral validation pass when available. Supply the exact state, requirement evidence, factual path, and reproduction without persuasive framing. Allow `no defect established` as a first-class result.
 
-Classify candidates as `validated`, `unresolved`, `observation only`, `disproved`, or `stale at current head`. Report only validated defects and material unresolved risks. Do not promote a concern because it sounds severe or came from another model or scanner.
+Classify candidates as `validated`, `unresolved`, `observation only`, `disproved`, or `stale at current head`. Keep investigating unsupported candidates; do not report them. Use `unresolved` only when a material risk cannot be settled because the required evidence is unavailable or conflicting, and name the exact blocker and next discriminating check. Report only validated defects and material unresolved risks. Do not promote a concern because it sounds severe or came from another model or scanner.
 
-Before a candidate can affect disposition, establish whether the change introduced or worsened the defect, newly exposed it, or newly depended on it. Record unrelated pre-existing defects separately. Attribute a validation failure to the change only when it is reproduced as a base/head difference or reliable prior evidence establishes that the same check passed on the base state.
+For a change review, before a candidate can affect disposition, establish whether the change introduced or worsened the defect, newly exposed it, or newly depended on it. Record unrelated pre-existing defects separately. Attribute a validation failure to the change only when it is reproduced as a base/head difference or reliable prior evidence establishes that the same check passed on the base state.
 
-After primary candidate validation, run one bounded omission pass when an independent reviewer is available. Give it the exact state, changed-path inventory, artifact classifications, affected-path map, activated lanes, coverage ledger, safe stopping boundaries, unresolved edges, and exclusions—but not the primary findings or conclusions. Ask only for missed affected paths, contracts, companion changes, risk lanes, and unjustified stopping boundaries. Validate any returned lead through the normal finding contract and do not start an iterative reviewer loop. If no independent reviewer is available, perform the same structured counter-check yourself and disclose that it was not independent.
+For a snapshot audit, validate reachable defects at the reviewed snapshot without inventing a change relation. Use history only when it helps establish intent, reachability, or a safe correction.
+
+After primary candidate validation, run one bounded omission pass when an independent reviewer is available. Give it the exact state and a compact indexed manifest of scope, coverage statuses, activated lanes, stopping boundaries, unresolved edges, and exclusions, but not the primary findings or conclusions. Batch the manifest when needed and let the reviewer request narrow evidence slices instead of sending the entire ledger. Ask only for missed paths, contracts, companions, risk lanes, and unjustified stopping boundaries. Validate returned leads through the normal finding contract and do not start an iterative reviewer loop. If no independent reviewer is available, perform the same structured counter-check yourself and disclose that it was not independent. If a required lane or omission pass times out or returns no result, do not mark it complete; record the uncovered surface and make a snapshot audit `partial` when that surface is material.
 
 ## 9. Report findings and coverage
 
@@ -101,13 +117,17 @@ Read [report-format.md](references/report-format.md). Lead with validated findin
 
 Then report material unresolved risks, process or merge blockers, validation performed, coverage, exclusions, unavailable evidence, and disposition. A coverage ledger proves what was investigated, not that the conclusions are correct.
 
+For a snapshot audit, apply the completeness gate in [whole-repository-audit.md](references/whole-repository-audit.md). Finding count never establishes review quality or completeness.
+
 If no material finding survives, say so directly. Do not invent a comment to make the review look useful.
 
 ## Non-negotiables
 
 - Bind every conclusion to the exact reviewed state.
-- Require every disposition-affecting defect to be introduced, worsened, newly exposed, or newly depended upon by the change.
+- In change-review mode, require every disposition-affecting defect to be introduced, worsened, newly exposed, or newly depended upon by the change. In snapshot-audit mode, report any validated reachable defect in the reviewed state.
 - Review affected behavior and required missing changes, not only the diff.
+- Never equate file inventory, symbol lists, searches, or passing tests with end-to-end trace coverage.
+- Never claim a whole-repository audit is complete when a material lane, entry point, contract, or evidence edge is missing.
 - Prefer selected, provenance-backed context over indiscriminate context volume.
 - Use deterministic evidence before model speculation.
 - Separate a scanner match from a reachable defect or exploitable vulnerability.

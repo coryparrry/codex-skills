@@ -42,6 +42,9 @@ For every skills.sh release:
 
 ## Build, Test, and Development Commands
 
+- `python3 -m pip install -r requirements-release.txt`: installs the pinned dependency used by release validation.
+- `python3 scripts/tests/test_validate_release_contract.py`: tests the release-contract checker.
+- `python3 scripts/validate_release_contract.py --base-ref origin/main`: validates the public catalogue and requires a plugin version increase when shipped plugin content changed.
 - `bash scripts/test_install.sh`: runs the install smoke test against temporary Codex homes.
 - `bash -n scripts/install.sh`: syntax-checks the repo installer.
 - `python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py`: runs the App Review Notes byte-limit tests.
@@ -57,7 +60,7 @@ For every skills.sh release:
 
 ## Coding Style & Naming Conventions
 
-Use Markdown for skill instructions and references, Bash for installers, and Python 3 for helpers/tests. Keep `SKILL.md` concise; move detailed rules into `references/` and reusable snippets into `templates/`. Python uses standard library modules, 4-space indentation, type-friendly `pathlib` patterns, and `unittest` tests. Shell scripts should start with `#!/usr/bin/env bash` and `set -euo pipefail`.
+Use Markdown for skill instructions and references, Bash for installers, and Python 3 for helpers/tests. Keep `SKILL.md` concise; move detailed rules into `references/` and reusable snippets into `templates/`. Python uses standard library modules unless a dependency is pinned in a repository requirements file. Use 4-space indentation, type-friendly `pathlib` patterns, and `unittest` tests. Shell scripts should start with `#!/usr/bin/env bash` and `set -euo pipefail`.
 
 ## Testing Guidelines
 

@@ -1,0 +1,85 @@
+name: Release contract
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate published surfaces
+    runs-on: ubuntu-latest
+    env:
+      BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install plugin-validator dependency
+        run: python3 -m pip install --disable-pip-version-check -r requirements-release.txt
+
+      - name: Test release-contract validator
+        run: python3 scripts/tests/test_validate_release_contract.py
+
+      - name: Validate release contract
+        shell: bash
+        run: |
+          args=()
+          if [[ -n "${BASE_REF:-}" && ! "$BASE_REF" =~ ^0+$ ]]; then
+            args=(--base-ref "$BASE_REF")
+          fi
+          python3 scripts/validate_release_contract.py "${args[@]}"
+
+      - name: Run system plugin validator
+        shell: bash
+        env:
+          PLUGIN_VALIDATOR_REF: f898ebcafdeb0052abc844d9e11b5e754b8ec4af
+          PLUGIN_VALIDATOR_SHA256: ebda00d55d7518b127f675f062fb5c6e7a1ffdc0a99df1a55ac594400d7d3228
+        run: |
+          validator_path="$RUNNER_TEMP/validate_plugin.py"
+          curl --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/openai/codex/$PLUGIN_VALIDATOR_REF/codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py" \
+            --output "$validator_path"
+          echo "$PLUGIN_VALIDATOR_SHA256  $validator_path" | sha256sum --check --strict
+          python3 "$validator_path" plugins/codex-skills
+
+      - name: Test installer
+        run: |
+          bash -n scripts/install.sh
+          bash scripts/test_install.sh
+
+      - name: Run skill tests
+        shell: bash
+        run: |
+          while IFS= read -r test_file; do
+            python3 "$test_file"
+          done < <(find skills -path '*/tests/test_*.py' -print | sort)
+
+      - name: Verify skills.sh discovery
+        run: npx --yes skills add . --list
+
+      - name: Check patch formatting
+        shell: bash
+        run: |
+          if [[ -n "${BASE_REF:-}" && ! "$BASE_REF" =~ ^0+$ ]]; then
+            git diff --check "$BASE_REF...HEAD"
+          else
+            git diff --check
+          fi

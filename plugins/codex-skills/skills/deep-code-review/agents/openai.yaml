@@ -1,4 +1,4 @@
 interface:
   display_name: "Deep Code Review"
-  short_description: "Audit repository changes beyond the diff"
-  default_prompt: "Use $deep-code-review as the repository-wide umbrella to review this change safely, validate only change-caused defects, and assess correctness, security, compatibility, and merge readiness."
+  short_description: "Trace changes or audit a whole repository"
+  default_prompt: "Use $deep-code-review to select change-review or snapshot-audit mode, trace production behavior and shared contracts, accept no test or confirmation until independent evidence survives falsification, validate or disprove every reported claim, and disclose concrete validation blockers."
