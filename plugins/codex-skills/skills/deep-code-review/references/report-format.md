@@ -69,7 +69,7 @@ For a snapshot audit, `complete` also requires the gate in [whole-repository-aud
 
 ## Review disposition
 
-Use review disposition for change reviews. For snapshot audits, report `audit completeness: complete | partial` and `snapshot risk: blockers found | material findings found | no validated findings in completed scope`. Do not call a repository snapshot approved or merge-ready.
+Use review disposition for change reviews. For snapshot audits, report `audit completeness: complete | partial` and `snapshot risk: blockers found | material findings found | minor findings found | no validated findings in completed scope`. Do not call a repository snapshot approved or merge-ready.
 
 - `request changes`: at least one validated P0 or P1, explicitly merge-blocking P2, or validated policy, process, compatibility, or release blocker survives. A partial review may request changes for a proven blocker in the reviewed scope.
 - `approve`: the inventory and required review lanes are complete, no validated finding or blocker survives, and no material unresolved risk or decision-blocking validation gap prevents approval.
