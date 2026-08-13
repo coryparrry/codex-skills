@@ -10,7 +10,7 @@ This guide explains when and how to invoke the skills in this repository.
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
 | Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
-| Review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
+| Audit a repository snapshot or review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
 | Review focused Swift or Apple-platform changes, or provide the specialist lane for a deep review | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
