@@ -1,4 +1,4 @@
 interface:
   display_name: "Deep Code Review"
   short_description: "Trace changes or audit a whole repository"
-  default_prompt: "Use $deep-code-review to select change-review or snapshot-audit mode, trace production behavior and shared contracts with auditable coverage, validate concrete defects, and disclose every material gap."
+  default_prompt: "Use $deep-code-review to select change-review or snapshot-audit mode, trace production behavior and shared contracts, treat tests and confirmations as unproven until independent evidence survives falsification, validate concrete defects, and disclose every material gap."

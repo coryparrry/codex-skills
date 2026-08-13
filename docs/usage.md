@@ -71,7 +71,7 @@ The skill binds the review to an exact state, resolves repository policy, recons
 
 In snapshot-audit mode, the skill records each production area, supported entry point, and shared contract in an evidence ledger. File inventories, searches, and passing test counts do not count as end-to-end trace coverage. If a material path, lane, or runtime boundary remains unreviewed, the result stays partial.
 
-The review is read-only. A partial inventory cannot produce an approval. Tests, scanners, AI authorship, and suspicious-looking patterns remain evidence or search leads until the reviewer proves a reachable violated property.
+The review is read-only. A partial inventory cannot produce an approval. Tests, green CI, documentation, prior confirmation, scanners, and the reviewer's own conclusions remain unproven until independent evidence survives a realistic falsification attempt.
 
 ## Swift Code Review
 

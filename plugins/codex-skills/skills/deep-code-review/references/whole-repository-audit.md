@@ -41,7 +41,7 @@ Typical contracts include schemas, config keys, permissions, feature flags, pack
 
 ### Candidate ledger
 
-Keep validated, unresolved, disproved, stale, and observation-only candidates. For each, record the trigger, path, violated property, evidence, false-positive check, and disposition. This prevents promising leads from disappearing across batches or compaction. Do not promote findings to meet a quota.
+Keep validated, unproven, unresolved, disproved, stale, and observation-only candidates. For each, record the trigger, path, violated property, evidence, false-positive check, and disposition. This prevents promising leads from disappearing across batches or compaction. Do not promote findings to meet a quota.
 
 ## Review in connected passes
 
@@ -53,6 +53,8 @@ Keep validated, unresolved, disproved, stale, and observation-only candidates. F
 6. Integrate specialist lanes, validate candidates, and run the omission pass against the ledger.
 
 Tests can validate a traced claim. They cannot prove that untraced paths were reviewed. Broad green suites are not substitutes for reading callers, consumers, and runtime wiring.
+
+Treat every ledger status, stopping boundary, lane conclusion, and claimed safe contract as unproven until another piece of evidence supports it and a realistic counterexample has been attempted. A row marked `traced` records work performed; it is not proof that the conclusion is correct.
 
 Do not stop the audit because several findings have already survived. Continue through every in-scope production area and flow until the completeness gate passes or a concrete limit forces a `partial` result. Finding count is neither a stopping rule nor a coverage metric.
 

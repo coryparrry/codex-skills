@@ -79,11 +79,13 @@ For a snapshot audit, assign every in-scope production area to exactly one prima
 
 Read [evidence-and-validation.md](references/evidence-and-validation.md). Use deterministic tools for claims they can answer directly: parsers, compilers, type checkers, linters, schema validators, dependency resolvers, static analysis, tests, runtime traces, sanitizers, and repository-defined checks.
 
+Adopt an adversarial epistemic default: treat every claim as wrong until it is independently proven right. This includes implementation assumptions, tests, fixtures, mocks, assertions, documentation, comments, issue descriptions, prior reviews, scanner output, CI status, human or model confirmations, and the reviewer's own conclusions. In the report, call unsupported claims `unproven` rather than falsely calling them disproved. A claim becomes established only after evidence independent of the claim survives a realistic attempt to falsify it.
+
 Treat proposed code, build scripts, test hooks, package plugins, configuration, dependencies, and generated commands as untrusted until inspected. Before executing them, apply the execution-safety gate in the evidence reference: inspect hooks, withhold credentials and write-capable tokens, prefer isolated ephemeral outputs, restrict unnecessary network and external access, and refuse destructive or externally mutating commands without explicit authorization. If the required boundary is unavailable, skip the command and report the validation gap.
 
 Treat tool failure, timeout, unavailable credentials, missing runtime, and environment mismatch as evidence gaps, never as passes.
 
-Treat tests as necessary evidence where applicable, not as the complete specification. Audit changed tests, fixtures, mocks, snapshots, skips, and assertions. Establish whether a new regression test fails on the base state, derives its oracle independently of the implementation, exercises the production path, and rejects realistic wrong implementations.
+Never accept "tests pass," "confirmed," "verified," "reviewed," or "works as expected" as a conclusion without examining how that result was produced. Audit tests, fixtures, mocks, snapshots, skips, assertions, environment, and execution path. Establish whether a regression test fails on the broken state for the intended reason, derives its oracle independently of the implementation, exercises the production path, and rejects realistic wrong implementations. A test and the code it tests may share the same defect.
 
 Escalate behavioral challenge in proportion to risk: focused regression, broader suite, before/after comparison, mutation, property or metamorphic checks, fuzzing, differential execution, race/stress testing, or migration/rollback compatibility.
 
@@ -101,7 +103,7 @@ Treat every candidate finding as unproven. Try to disprove it against the exact 
 
 For material candidates, use a neutral validation pass when available. Supply the exact state, requirement evidence, factual path, and reproduction without persuasive framing. Allow `no defect established` as a first-class result.
 
-Classify candidates as `validated`, `unresolved`, `observation only`, `disproved`, or `stale at current head`. Report only validated defects and material unresolved risks. Do not promote a concern because it sounds severe or came from another model or scanner.
+Classify candidates as `validated`, `unproven`, `unresolved`, `observation only`, `disproved`, or `stale at current head`. Use `unproven` when the claim lacks independent proof and `unresolved` when material evidence is missing or conflicting. Report only validated defects and material unproven or unresolved risks. Do not promote a concern because it sounds severe or came from another model or scanner.
 
 For a change review, before a candidate can affect disposition, establish whether the change introduced or worsened the defect, newly exposed it, or newly depended on it. Record unrelated pre-existing defects separately. Attribute a validation failure to the change only when it is reproduced as a base/head difference or reliable prior evidence establishes that the same check passed on the base state.
 

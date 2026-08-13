@@ -47,6 +47,7 @@ The skill:
 - routes security, privacy, concurrency, data, compatibility, accessibility, internationalization, native interoperability, dependency, performance, reliability, test, platform, and operations review only when triggered;
 - composes with `swift-code-review` for affected Swift and Apple-platform paths while retaining repository-wide integration and disposition;
 - uses deterministic tools and behavioral execution before model speculation;
+- treats tests, confirmations, documentation, prior reviews, and its own conclusions as unproven until independent evidence survives a falsification attempt;
 - inspects command hooks and requires an isolation, credential, network, and side-effect boundary before executing proposed code;
 - checks required-but-missing companion changes and established repository abstractions;
 - tries to disprove every candidate finding at the exact reviewed state;
@@ -54,7 +55,7 @@ The skill:
 - runs one bounded omission pass without exposing the primary findings when an independent reviewer is available;
 - reports coverage, unavailable evidence, and withheld verdicts.
 
-Tests and scanner output are evidence, not automatic proof. AI authorship, unusual code, broad exception handling, mocks, scaffolding, and missing files remain search leads until the reviewer proves a reachable violated property.
+Tests, green CI, scanner output, and reviewer confirmation are claims, not automatic proof. The skill inspects their oracle and production path, then challenges them with a realistic failure that should be rejected. AI authorship, unusual code, broad exception handling, mocks, scaffolding, and missing files remain search leads until the reviewer proves a reachable violated property.
 
 ## Output
 
