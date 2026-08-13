@@ -13,7 +13,7 @@ Operationally, assume each claim is wrong until independent evidence proves it r
 - prior reviewer, maintainer, tool, model, or subagent confirmations;
 - the current reviewer's own candidate and conclusion.
 
-Use `unproven` for a claim that lacks sufficient independent evidence. Reserve `disproved` for evidence that establishes the claim is false. Accept a claim only when its oracle does not merely repeat the implementation, its production path is reachable, relevant counterexamples and safeguards were tested, and the result survives a discriminating falsification attempt.
+Do not report a claim that lacks sufficient independent evidence. Continue investigating until it is validated or disproved. If a material risk cannot be settled because required evidence is unavailable or conflicting, report that exact blocker and next discriminating check under unresolved risks. Accept a claim only when its oracle does not merely repeat the implementation, its production path is reachable, relevant counterexamples and safeguards were tested, and the result survives a discriminating falsification attempt.
 
 ## Match questions to evidence
 
@@ -73,7 +73,6 @@ When a command fails, reproduce the same relevant check on the resolved base in 
 Use these statuses:
 
 - `validated`: evidence proves a reachable violated property;
-- `unproven`: the claim lacks independent evidence or a discriminating falsification attempt;
 - `unresolved`: material risk remains but required evidence is unavailable or conflicting;
 - `observation only`: useful context without a violated property;
 - `disproved`: evidence establishes the concern is false;

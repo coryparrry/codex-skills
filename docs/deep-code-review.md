@@ -47,7 +47,7 @@ The skill:
 - routes security, privacy, concurrency, data, compatibility, accessibility, internationalization, native interoperability, dependency, performance, reliability, test, platform, and operations review only when triggered;
 - composes with `swift-code-review` for affected Swift and Apple-platform paths while retaining repository-wide integration and disposition;
 - uses deterministic tools and behavioral execution before model speculation;
-- treats tests, confirmations, documentation, prior reviews, and its own conclusions as unproven until independent evidence survives a falsification attempt;
+- accepts no test, confirmation, documentation claim, prior review, or reviewer conclusion until independent evidence survives a falsification attempt;
 - inspects command hooks and requires an isolation, credential, network, and side-effect boundary before executing proposed code;
 - checks required-but-missing companion changes and established repository abstractions;
 - tries to disprove every candidate finding at the exact reviewed state;

@@ -41,7 +41,7 @@ Typical contracts include schemas, config keys, permissions, feature flags, pack
 
 ### Candidate ledger
 
-Keep validated, unproven, unresolved, disproved, stale, and observation-only candidates. For each, record the trigger, path, violated property, evidence, false-positive check, and disposition. This prevents promising leads from disappearing across batches or compaction. Do not promote findings to meet a quota.
+Keep validated, unresolved, disproved, stale, and observation-only candidates. Unsupported candidates remain internal until they are validated or disproved. For each, record the trigger, path, violated property, evidence, false-positive check, and disposition. This prevents promising leads from disappearing across batches or compaction. Do not promote findings to meet a quota.
 
 ## Review in connected passes
 
