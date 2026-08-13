@@ -126,6 +126,8 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertTrue(
             shipped_plugin_change({"plugins/codex-skills/assets/logo.png"})
         )
+        self.assertTrue(shipped_plugin_change({"plugins/codex-skills/.app.json"}))
+        self.assertTrue(shipped_plugin_change({"plugins/codex-skills/.mcp.json"}))
         self.assertFalse(shipped_plugin_change({"docs/example.md"}))
 
     def test_shipped_change_requires_a_strict_version_increase(self) -> None:
@@ -219,6 +221,43 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertEqual(errors, [])
             self.assertIn("skills/new-skill/SKILL.md", changed)
             self.assertNotIn("ignored.txt", changed)
+
+    def test_changed_paths_preserves_non_ascii_and_control_characters(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo = Path(temporary_directory)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "tests@example.com"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Release Tests"],
+                cwd=repo,
+                check=True,
+            )
+            unusual_path = Path("skills/demo/references/café\nnotes.md")
+            absolute_path = repo / unusual_path
+            absolute_path.parent.mkdir(parents=True)
+            absolute_path.write_text("before\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "initial"], cwd=repo, check=True
+            )
+            base_ref = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            absolute_path.write_text("after\n", encoding="utf-8")
+
+            changed, errors = changed_paths(repo, base_ref)
+
+            self.assertEqual(errors, [])
+            self.assertIn(unusual_path.as_posix(), changed)
+            self.assertTrue(shipped_plugin_change(changed))
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import filecmp
 import json
+import os
 import re
 import subprocess
 import sys
@@ -142,7 +143,13 @@ def shipped_plugin_change(changed_paths: set[str]) -> bool:
         "plugins/codex-skills/assets/",
         "plugins/codex-skills/.codex-plugin/",
     )
-    return any(path.startswith(release_prefixes) for path in changed_paths)
+    release_files = {
+        "plugins/codex-skills/.app.json",
+        "plugins/codex-skills/.mcp.json",
+    }
+    return bool(changed_paths & release_files) or any(
+        path.startswith(release_prefixes) for path in changed_paths
+    )
 
 
 def validate_version_change(
@@ -368,26 +375,39 @@ def git_output(repo: Path, *args: str) -> str:
     return result.stdout
 
 
+def git_paths(repo: Path, *args: str) -> set[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    return {
+        os.fsdecode(path)
+        for path in result.stdout.split(b"\0")
+        if path
+    }
+
+
 def changed_paths(repo: Path, base_ref: str) -> tuple[set[str], list[str]]:
     errors: list[str] = []
     changed: set[str] = set()
     try:
         changed.update(
-            line
-            for line in git_output(repo, "diff", "--name-only", f"{base_ref}...HEAD").splitlines()
-            if line
+            git_paths(repo, "diff", "--name-only", "-z", f"{base_ref}...HEAD")
         )
-        for args in (("diff", "--name-only"), ("diff", "--cached", "--name-only")):
-            changed.update(line for line in git_output(repo, *args).splitlines() if line)
+        for args in (
+            ("diff", "--name-only", "-z"),
+            ("diff", "--cached", "--name-only", "-z"),
+        ):
+            changed.update(git_paths(repo, *args))
         changed.update(
-            line
-            for line in git_output(
-                repo, "ls-files", "--others", "--exclude-standard"
-            ).splitlines()
-            if line
+            git_paths(repo, "ls-files", "--others", "--exclude-standard", "-z")
         )
     except subprocess.CalledProcessError as error:
-        errors.append(f"cannot resolve base ref {base_ref}: {error.stderr.strip()}")
+        errors.append(
+            f"cannot resolve base ref {base_ref}: {os.fsdecode(error.stderr).strip()}"
+        )
     return changed, errors
 
 
