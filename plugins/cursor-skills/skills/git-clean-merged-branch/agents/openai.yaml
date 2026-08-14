@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clean Merged Git Branch"
+  short_description: "Clean merged Git branches safely"
+  default_prompt: "Use $git-clean-merged-branch to safely clean up a local branch after confirming it was merged on GitHub."

@@ -23,6 +23,10 @@ Supporting details stay in references, scripts, or tests.
 
 Read the [installation guide](docs/installation.md) for more information.
 
+### Cursor
+
+The same eight skills are packaged as a native Cursor Plugin. Follow the [Cursor installation guide](docs/installation.md#install-in-cursor) to add the local marketplace now; the public Cursor Marketplace listing follows Cursor's manual review.
+
 ### skills.sh
 
 Install the full bundle:
@@ -61,6 +65,8 @@ The research skills work with the runtime that is available. They use independen
 | [`skills/`](skills/) | Source skill folders for maintainers and skills.sh installations. |
 | [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/) | Plugin copies of the shipped skills. |
 | [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json) | Codex plugin metadata. |
+| [`.cursor-plugin/marketplace.json`](.cursor-plugin/marketplace.json) | Cursor marketplace entry. |
+| [`plugins/cursor-skills/`](plugins/cursor-skills/) | Native Cursor Plugin package. |
 | [`skills.sh.json`](skills.sh.json) | Skill groups for the skills.sh repository page. |
 | [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | Codex marketplace entry. |
 | [`experimental/`](experimental/) | Unshipped experiments. The installer does not include them. |
@@ -85,9 +91,19 @@ python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
 python3 scripts/check_skill_mirror.py research-repo-technology
 python3 scripts/check_skill_mirror.py swift-code-review
+python3 scripts/check_skill_mirror.py appstore-readiness-audit cursor-skills
+python3 scripts/check_skill_mirror.py deep-code-review cursor-skills
+python3 scripts/check_skill_mirror.py engineering-advisor cursor-skills
+python3 scripts/check_skill_mirror.py git-clean-merged-branch cursor-skills
+python3 scripts/check_skill_mirror.py triage-review-comments cursor-skills
+python3 scripts/check_skill_mirror.py continue-deep-research cursor-skills
+python3 scripts/check_skill_mirror.py research-repo-technology cursor-skills
+python3 scripts/check_skill_mirror.py swift-code-review cursor-skills
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool .cursor-plugin/marketplace.json >/dev/null
+python3 -m json.tool plugins/cursor-skills/.cursor-plugin/plugin.json >/dev/null
 npx skills add . --list
 git diff --check
 ```

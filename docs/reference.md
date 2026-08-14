@@ -9,6 +9,9 @@ plugins/
   codex-skills/
     .codex-plugin/
     skills/
+  cursor-skills/
+    .cursor-plugin/
+    skills/
 scripts/
 skills.sh.json
 skills/
@@ -22,7 +25,7 @@ skills/
   triage-review-comments/
 ```
 
-The source skill folders under `skills/` must match their copies under `plugins/codex-skills/skills/`.
+The source skill folders under `skills/` must match their copies under both `plugins/codex-skills/skills/` and `plugins/cursor-skills/skills/`.
 
 ## Published Skills
 
@@ -42,10 +45,12 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | Surface | Path |
 |---|---|
 | Codex marketplace | `.agents/plugins/marketplace.json` |
-| Plugin manifest | `plugins/codex-skills/.codex-plugin/plugin.json` |
+| Cursor marketplace | `.cursor-plugin/marketplace.json` |
+| Codex plugin manifest | `plugins/codex-skills/.codex-plugin/plugin.json` |
+| Cursor plugin manifest | `plugins/cursor-skills/.cursor-plugin/plugin.json` |
 | skills.sh grouping | `skills.sh.json` |
 
-The plugin manifest exposes all skill folders under `plugins/codex-skills/skills/`. The skills.sh group names and entries must stay aligned with the source skill names.
+The plugin manifests expose all skill folders under their respective plugin directories. The skills.sh group names and entries must stay aligned with the source skill names.
 
 ## Repo-Level Scripts
 
@@ -95,9 +100,19 @@ python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
 python3 scripts/check_skill_mirror.py research-repo-technology
 python3 scripts/check_skill_mirror.py swift-code-review
+python3 scripts/check_skill_mirror.py appstore-readiness-audit cursor-skills
+python3 scripts/check_skill_mirror.py deep-code-review cursor-skills
+python3 scripts/check_skill_mirror.py engineering-advisor cursor-skills
+python3 scripts/check_skill_mirror.py git-clean-merged-branch cursor-skills
+python3 scripts/check_skill_mirror.py triage-review-comments cursor-skills
+python3 scripts/check_skill_mirror.py continue-deep-research cursor-skills
+python3 scripts/check_skill_mirror.py research-repo-technology cursor-skills
+python3 scripts/check_skill_mirror.py swift-code-review cursor-skills
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool .cursor-plugin/marketplace.json >/dev/null
+python3 -m json.tool plugins/cursor-skills/.cursor-plugin/plugin.json >/dev/null
 npx skills add . --list
 git diff --check
 ```

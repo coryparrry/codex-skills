@@ -18,7 +18,10 @@ from validate_release_contract import (  # noqa: E402
     parse_skill_frontmatter,
     relative_files,
     changed_paths,
+    cursor_plugin_change,
     shipped_plugin_change,
+    validate_cursor_marketplace,
+    validate_cursor_plugin_manifest,
     validate_skills_sh,
     validate_plugin_manifest,
     validate_version_change,
@@ -130,6 +133,11 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertTrue(shipped_plugin_change({"plugins/codex-skills/.mcp.json"}))
         self.assertFalse(shipped_plugin_change({"docs/example.md"}))
 
+    def test_cursor_plugin_change_detects_shared_and_cursor_surfaces(self) -> None:
+        self.assertTrue(cursor_plugin_change({"skills/example/SKILL.md"}))
+        self.assertTrue(cursor_plugin_change({"plugins/cursor-skills/plugin.json"}))
+        self.assertFalse(cursor_plugin_change({"docs/example.md"}))
+
     def test_shipped_change_requires_a_strict_version_increase(self) -> None:
         changed = {"skills/deep-code-review/SKILL.md"}
         self.assertEqual(
@@ -181,6 +189,49 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(
                 "plugin manifest logo does not exist: ./assets/logo.png", errors
             )
+
+    def test_cursor_plugin_manifest_requires_metadata(self) -> None:
+        manifest = {
+            "name": "cursor-skills",
+            "displayName": "Cursor Skills",
+            "version": "1.0.0",
+            "description": "Portable skills.",
+            "author": {"name": "Maintainer"},
+        }
+        errors, version = validate_cursor_plugin_manifest(manifest)
+        self.assertEqual(errors, [])
+        self.assertEqual(version, "1.0.0")
+
+        manifest["displayName"] = ""
+        errors, _ = validate_cursor_plugin_manifest(manifest)
+        self.assertIn(
+            "Cursor plugin manifest displayName must be a non-empty string",
+            errors,
+        )
+
+    def test_cursor_marketplace_references_cursor_skills(self) -> None:
+        marketplace = {
+            "name": "codex-skills",
+            "owner": {"name": "Maintainer"},
+            "metadata": {
+                "description": "Skills.",
+                "version": "1.0.0",
+                "pluginRoot": "plugins",
+            },
+            "plugins": [
+                {
+                    "name": "cursor-skills",
+                    "source": "cursor-skills",
+                    "description": "Skills.",
+                }
+            ],
+        }
+        self.assertEqual(validate_cursor_marketplace(marketplace), [])
+        marketplace["plugins"][0]["source"] = "./cursor-skills"
+        self.assertIn(
+            "Cursor marketplace plugin source must be cursor-skills",
+            validate_cursor_marketplace(marketplace),
+        )
 
     def test_changed_paths_includes_non_ignored_untracked_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

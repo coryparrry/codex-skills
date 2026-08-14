@@ -18,10 +18,14 @@ import yaml
 
 
 PLUGIN_MANIFEST = Path("plugins/codex-skills/.codex-plugin/plugin.json")
+CURSOR_PLUGIN_MANIFEST = Path("plugins/cursor-skills/.cursor-plugin/plugin.json")
+CURSOR_MARKETPLACE_MANIFEST = Path(".cursor-plugin/marketplace.json")
 MARKETPLACE_MANIFEST = Path(".agents/plugins/marketplace.json")
 SKILLS_SH_MANIFEST = Path("skills.sh.json")
 PLUGIN_ROOT = Path("plugins/codex-skills")
 MIRROR_ROOT = PLUGIN_ROOT / "skills"
+CURSOR_PLUGIN_ROOT = Path("plugins/cursor-skills")
+CURSOR_MIRROR_ROOT = CURSOR_PLUGIN_ROOT / "skills"
 SOURCE_ROOT = Path("skills")
 SEMVER_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -152,6 +156,11 @@ def shipped_plugin_change(changed_paths: set[str]) -> bool:
     )
 
 
+def cursor_plugin_change(changed_paths: set[str]) -> bool:
+    prefixes = ("skills/", "plugins/cursor-skills/", ".cursor-plugin/")
+    return any(path.startswith(prefixes) for path in changed_paths)
+
+
 def validate_version_change(
     base_version: str, current_version: str, changed: set[str]
 ) -> list[str]:
@@ -230,6 +239,87 @@ def validate_plugin_manifest(repo: Path, data: dict[str, Any]) -> tuple[list[str
     return errors, version
 
 
+def validate_cursor_plugin_manifest(data: dict[str, Any]) -> tuple[list[str], str]:
+    errors: list[str] = []
+    allowed_fields = {
+        "name",
+        "displayName",
+        "version",
+        "description",
+        "author",
+        "homepage",
+        "repository",
+        "license",
+        "keywords",
+    }
+    for field in sorted(set(data) - allowed_fields):
+        errors.append(f"Cursor plugin manifest has unsupported field: {field}")
+
+    if data.get("name") != CURSOR_PLUGIN_ROOT.name:
+        errors.append(f"Cursor plugin manifest name must be {CURSOR_PLUGIN_ROOT.name}")
+    for field in ("displayName", "version", "description"):
+        if not isinstance(data.get(field), str) or not data[field].strip():
+            errors.append(f"Cursor plugin manifest {field} must be a non-empty string")
+
+    version = str(data.get("version", ""))
+    try:
+        parse_semver(version)
+    except ValueError as error:
+        errors.append(str(error))
+
+    author = data.get("author")
+    if not isinstance(author, dict) or not str(author.get("name", "")).strip():
+        errors.append("Cursor plugin manifest author.name is required")
+    for field in ("homepage", "repository", "license"):
+        if field in data and not isinstance(data[field], str):
+            errors.append(f"Cursor plugin manifest {field} must be a string")
+    if "keywords" in data and (
+        not isinstance(data["keywords"], list)
+        or not all(
+            isinstance(keyword, str) and keyword.strip()
+            for keyword in data["keywords"]
+        )
+    ):
+        errors.append("Cursor plugin manifest keywords must contain strings")
+    return errors, version
+
+
+def validate_cursor_marketplace(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    owner = data.get("owner")
+    metadata = data.get("metadata")
+    plugins = data.get("plugins")
+    if data.get("name") != "codex-skills":
+        errors.append("Cursor marketplace name must be codex-skills")
+    if not isinstance(owner, dict) or not str(owner.get("name", "")).strip():
+        errors.append("Cursor marketplace owner.name is required")
+    if not isinstance(metadata, dict):
+        return [*errors, "Cursor marketplace metadata is required"]
+    if metadata.get("pluginRoot") != "plugins":
+        errors.append("Cursor marketplace metadata.pluginRoot must be plugins")
+    if not isinstance(metadata.get("version"), str) or not metadata["version"].strip():
+        errors.append("Cursor marketplace metadata.version is required")
+    else:
+        try:
+            parse_semver(metadata["version"])
+        except ValueError as error:
+            errors.append(str(error))
+    if not isinstance(metadata.get("description"), str) or not metadata["description"].strip():
+        errors.append("Cursor marketplace metadata.description is required")
+    if not isinstance(plugins, list) or len(plugins) != 1:
+        return [*errors, "Cursor marketplace must contain exactly one plugin"]
+    plugin = plugins[0]
+    if not isinstance(plugin, dict):
+        return [*errors, "Cursor marketplace plugin entry must be an object"]
+    if plugin.get("name") != CURSOR_PLUGIN_ROOT.name:
+        errors.append(f"Cursor marketplace plugin name must be {CURSOR_PLUGIN_ROOT.name}")
+    if plugin.get("source") != CURSOR_PLUGIN_ROOT.name:
+        errors.append(f"Cursor marketplace plugin source must be {CURSOR_PLUGIN_ROOT.name}")
+    if not isinstance(plugin.get("description"), str) or not plugin["description"].strip():
+        errors.append("Cursor marketplace plugin description is required")
+    return errors
+
+
 def load_json(path: Path) -> tuple[dict[str, Any], list[str]]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -261,6 +351,32 @@ def relative_files(root: Path) -> set[Path]:
     }
 
 
+def validate_skill_mirror(
+    source_root: Path, mirror_root: Path, public_skills: set[str], label: str
+) -> list[str]:
+    errors: list[str] = []
+    mirrored_skills = skill_names(mirror_root)
+    if public_skills != mirrored_skills:
+        for skill in sorted(public_skills - mirrored_skills):
+            errors.append(f"{label} mirror missing skill: {skill}")
+        for skill in sorted(mirrored_skills - public_skills):
+            errors.append(f"{label} mirror has stale skill: {skill}")
+
+    for skill in sorted(public_skills & mirrored_skills):
+        source = source_root / skill
+        mirror = mirror_root / skill
+        source_files = relative_files(source)
+        mirror_files = relative_files(mirror)
+        for path in sorted(source_files - mirror_files):
+            errors.append(f"{label} {skill}: mirror missing {path}")
+        for path in sorted(mirror_files - source_files):
+            errors.append(f"{label} {skill}: mirror has stale {path}")
+        for path in sorted(source_files & mirror_files):
+            if not filecmp.cmp(source / path, mirror / path, shallow=False):
+                errors.append(f"{label} {skill}: mirror differs at {path}")
+    return errors
+
+
 def section(text: str, heading: str) -> str:
     marker = f"## {heading}"
     start = text.find(marker)
@@ -275,38 +391,26 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     source_root = repo / SOURCE_ROOT
     mirror_root = repo / MIRROR_ROOT
     public_skills = skill_names(source_root)
-    mirrored_skills = skill_names(mirror_root)
 
     if not public_skills:
         errors.append("no public skills discovered under skills/")
-    if public_skills != mirrored_skills:
-        for skill in sorted(public_skills - mirrored_skills):
-            errors.append(f"plugin mirror missing skill: {skill}")
-        for skill in sorted(mirrored_skills - public_skills):
-            errors.append(f"plugin mirror has stale skill: {skill}")
+    errors.extend(validate_skill_mirror(source_root, mirror_root, public_skills, "Codex"))
+    errors.extend(
+        validate_skill_mirror(
+            source_root, repo / CURSOR_MIRROR_ROOT, public_skills, "Cursor"
+        )
+    )
 
     for skill in sorted(public_skills):
         if not SKILL_NAME_PATTERN.fullmatch(skill):
             errors.append(f"invalid skill directory name: {skill}")
         source = source_root / skill
-        mirror = mirror_root / skill
         for detail in parse_skill_frontmatter(
             (source / "SKILL.md").read_text(encoding="utf-8"), skill
         ):
             errors.append(f"skills/{skill}/SKILL.md: {detail}")
         if not (source / "agents/openai.yaml").is_file():
             errors.append(f"skills/{skill}: missing agents/openai.yaml")
-        if not mirror.is_dir():
-            continue
-        source_files = relative_files(source)
-        mirror_files = relative_files(mirror)
-        for path in sorted(source_files - mirror_files):
-            errors.append(f"{skill}: mirror missing {path}")
-        for path in sorted(mirror_files - source_files):
-            errors.append(f"{skill}: mirror has stale {path}")
-        for path in sorted(source_files & mirror_files):
-            if not filecmp.cmp(source / path, mirror / path, shallow=False):
-                errors.append(f"{skill}: mirror differs at {path}")
 
     skills_data, json_errors = load_json(repo / SKILLS_SH_MANIFEST)
     errors.extend(json_errors)
@@ -319,6 +423,25 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     if not json_errors:
         plugin_errors, plugin_version = validate_plugin_manifest(repo, plugin_data)
         errors.extend(plugin_errors)
+
+    cursor_plugin_data, cursor_json_errors = load_json(repo / CURSOR_PLUGIN_MANIFEST)
+    errors.extend(cursor_json_errors)
+    if not cursor_json_errors:
+        cursor_plugin_errors, _ = validate_cursor_plugin_manifest(cursor_plugin_data)
+        errors.extend(cursor_plugin_errors)
+
+    cursor_marketplace_data, cursor_marketplace_json_errors = load_json(
+        repo / CURSOR_MARKETPLACE_MANIFEST
+    )
+    errors.extend(cursor_marketplace_json_errors)
+    if not cursor_marketplace_json_errors:
+        errors.extend(validate_cursor_marketplace(cursor_marketplace_data))
+        if (
+            not cursor_json_errors
+            and cursor_plugin_data.get("version")
+            != cursor_marketplace_data.get("metadata", {}).get("version")
+        ):
+            errors.append("Cursor plugin and marketplace versions must match")
 
     marketplace, json_errors = load_json(repo / MARKETPLACE_MANIFEST)
     errors.extend(json_errors)
@@ -420,6 +543,17 @@ def version_at_ref(repo: Path, base_ref: str) -> tuple[str, list[str]]:
         return "", [f"cannot read plugin version at {base_ref}: {error}"]
 
 
+def cursor_version_at_ref(repo: Path, base_ref: str) -> tuple[str, list[str]]:
+    try:
+        raw = git_output(repo, "show", f"{base_ref}:{CURSOR_PLUGIN_MANIFEST}")
+        data = json.loads(raw)
+        return str(data.get("version", "")), []
+    except subprocess.CalledProcessError:
+        return "", []
+    except json.JSONDecodeError as error:
+        return "", [f"cannot parse Cursor plugin version at {base_ref}: {error}"]
+
+
 def validate_version_bump(
     repo: Path, base_ref: str, current_version: str
 ) -> list[str]:
@@ -431,6 +565,28 @@ def validate_version_bump(
     if version_errors:
         return errors
     errors.extend(validate_version_change(base_version, current_version, changed))
+    return errors
+
+
+def validate_cursor_version_bump(
+    repo: Path, base_ref: str, current_version: str
+) -> list[str]:
+    changed, errors = changed_paths(repo, base_ref)
+    if errors or not cursor_plugin_change(changed):
+        return errors
+    base_version, version_errors = cursor_version_at_ref(repo, base_ref)
+    errors.extend(version_errors)
+    if version_errors or not base_version:
+        return errors
+    try:
+        if parse_semver(current_version) > parse_semver(base_version):
+            return errors
+    except ValueError as error:
+        return [*errors, str(error)]
+    errors.append(
+        "Cursor plugin content changed but plugin version did not increase: "
+        f"{base_version} -> {current_version}"
+    )
     return errors
 
 
@@ -446,6 +602,13 @@ def main() -> int:
     errors, plugin_version = validate_catalogue(repo)
     if args.base_ref and args.base_ref.strip("0"):
         errors.extend(validate_version_bump(repo, args.base_ref, plugin_version))
+        cursor_data, cursor_json_errors = load_json(repo / CURSOR_PLUGIN_MANIFEST)
+        if not cursor_json_errors:
+            errors.extend(
+                validate_cursor_version_bump(
+                    repo, args.base_ref, str(cursor_data.get("version", ""))
+                )
+            )
 
     if errors:
         for error in errors:

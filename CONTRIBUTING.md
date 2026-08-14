@@ -4,7 +4,7 @@ Thanks for improving `codex-skills`.
 
 ## Development Principles
 
-- Keep shipped skill source under `skills/` synchronized with the plugin mirror under `plugins/codex-skills/skills/`.
+- Keep shipped skill source under `skills/` synchronized with both plugin mirrors: `plugins/codex-skills/skills/` and `plugins/cursor-skills/skills/`.
 - Preserve research-only non-mutation boundaries, primary-source verification, contradiction handling, and explicit uncertainty.
 - Treat PR review comments as hypotheses and verify them against current code before recommending action.
 - Keep Swift reviews focused on risk. Use the active toolchain and the changed execution paths as evidence.
@@ -22,6 +22,8 @@ Thanks for improving `codex-skills`.
 | `skills/swift-code-review/` | Swift and Apple-platform review workflow and reference files |
 | `skills/triage-review-comments/` | PR review feedback triage skill and references |
 | `plugins/codex-skills/skills/` | Installable plugin mirror of shipped skills |
+| `.cursor-plugin/marketplace.json` | Cursor marketplace entry |
+| `plugins/cursor-skills/` | Native Cursor Plugin package |
 | `scripts/` | Repo-level installer, mirror checker, and install tests |
 | `docs/` | User-facing documentation |
 
@@ -38,9 +40,19 @@ python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
 python3 scripts/check_skill_mirror.py research-repo-technology
 python3 scripts/check_skill_mirror.py swift-code-review
+python3 scripts/check_skill_mirror.py appstore-readiness-audit cursor-skills
+python3 scripts/check_skill_mirror.py deep-code-review cursor-skills
+python3 scripts/check_skill_mirror.py engineering-advisor cursor-skills
+python3 scripts/check_skill_mirror.py git-clean-merged-branch cursor-skills
+python3 scripts/check_skill_mirror.py triage-review-comments cursor-skills
+python3 scripts/check_skill_mirror.py continue-deep-research cursor-skills
+python3 scripts/check_skill_mirror.py research-repo-technology cursor-skills
+python3 scripts/check_skill_mirror.py swift-code-review cursor-skills
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool .cursor-plugin/marketplace.json >/dev/null
+python3 -m json.tool plugins/cursor-skills/.cursor-plugin/plugin.json >/dev/null
 git diff --check
 ```
 
@@ -60,7 +72,7 @@ When changing shipped behavior, update the relevant source skill, plugin mirror,
 
 ## Pull Request Checklist
 
-- [ ] Source and plugin mirror copies match for changed shipped skills.
+- [ ] Source, Codex plugin, and Cursor plugin copies match for changed shipped skills.
 - [ ] Review findings are verified against current code.
 - [ ] Branch cleanup retains dirty-worktree and unmerged-branch safeguards.
 - [ ] No private paths, credentials, or local workflow assumptions were introduced.

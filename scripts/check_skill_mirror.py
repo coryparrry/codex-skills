@@ -22,14 +22,18 @@ def iter_files(root: Path) -> list[Path]:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: check_skill_mirror.py <skill-name>", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print(
+            "usage: check_skill_mirror.py <skill-name> [plugin-name]",
+            file=sys.stderr,
+        )
         return 2
 
     skill_name = sys.argv[1]
+    plugin_name = sys.argv[2] if len(sys.argv) == 3 else "codex-skills"
     repo = Path.cwd()
     source = repo / "skills" / skill_name
-    mirror = repo / "plugins" / "codex-skills" / "skills" / skill_name
+    mirror = repo / "plugins" / plugin_name / "skills" / skill_name
 
     if not source.is_dir():
         print(f"missing source skill: {source}", file=sys.stderr)
