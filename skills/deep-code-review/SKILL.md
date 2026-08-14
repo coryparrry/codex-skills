@@ -7,7 +7,7 @@ description: Perform deep, language-agnostic review of a whole repository snapsh
 
 Review the requested state as a connected system, not as isolated files or edited lines. Establish the review mode, intended behavior, reachable flows, invariants, evidence for each conclusion, and what remains unknown.
 
-Treat review as read-only. Do not edit, stage, commit, push, post comments, or resolve threads unless the user separately asks for changes. An explicitly requested review ledger authorizes writing only that artifact; it does not authorize source or product edits. If the request includes fixes, finish and report the review before starting a clearly separated repair phase.
+Treat review as read-only. Do not edit, stage, commit, push, post comments, or resolve threads unless the user separately asks for changes. Durable review-state files are review artifacts, not product edits: use a user-requested tracked location when supplied, otherwise use writable scratch space outside the repository and never stage it. If no such location is writable, ask before adding review state to the repository. If the request includes fixes, finish and report the review before starting a clearly separated repair phase.
 
 ## 1. Bind the review to an exact state
 
@@ -61,9 +61,11 @@ For a snapshot audit, reconstruct the repository's supported behaviors from entr
 
 For a change review, read [impact-and-negative-space.md](references/impact-and-negative-space.md) and build its typed impact model. For a snapshot audit, read [whole-repository-audit.md](references/whole-repository-audit.md) and maintain its required evidence ledgers. Do not load both references unless cross-mode guidance is genuinely needed.
 
+For every snapshot audit, multi-agent review, or review likely to exceed one context window, also read [durable-review-state.md](references/durable-review-state.md) before semantic review. Create the root index and lane checkpoints before broad exploration. Resume from those artifacts after compaction instead of reconstructing progress from conversation history.
+
 Label every relationship by provenance: verified static, verified runtime, verified configuration, verified history, inferred semantic, or unresolved. Stop expansion only when a boundary is demonstrated safe. Do not flatten the entire repository into context merely because it fits.
 
-Maintain the applicable reference's coverage ledger. If the user requests a tracked review file, update evidence rows as work completes and before context compaction; do not replace them with summary checkboxes.
+Maintain the applicable reference's coverage ledger. Checkpoint after every bounded evidence slice and before long-running validation, delegation, or waiting; context compaction is not predictable enough to be the checkpoint trigger. Keep source text and full logs out of the ledger: record precise evidence pointers, conclusions, unresolved edges, and the next slice.
 
 ## 5. Route review depth by risk
 
@@ -71,9 +73,9 @@ Run the core correctness and integration lane for every review. Read [risk-lanes
 
 Inspect every changed slice in a change review or every assigned production area in a snapshot audit, then perform an integration pass across shared contracts and cross-cutting state. A file-by-file checklist without path reconstruction is not a complete review.
 
-When independent subagents are available, use them only for genuinely non-overlapping, read-only lanes after the primary reviewer has inventoried the full scope and identified shared contracts. Give them raw scope and artifacts, not suspected answers. They may also perform the single bounded omission pass in section 8. Recheck every candidate against the complete exact reviewed state before reporting it.
+When independent subagents are available, actively fan out genuinely non-overlapping, read-only lanes after the primary reviewer has inventoried the full scope and identified shared contracts. Use enough agents that the root does not become the semantic reader for multiple independent production areas; add agents only while each has exclusive scope and useful work. If one lane still spans multiple independent areas or would exceed repeated checkpoint slices, its owner should subdivide it among nested agents. Give agents raw scope and artifacts, not suspected answers. Give every agent and nested agent one exclusively owned checkpoint file; never let multiple agents append to a shared ledger. Require a compact handoff plus the checkpoint path instead of returning raw exploration or streaming progress into the root context. They may also perform the single bounded omission pass in section 8. Recheck every candidate against the exact reviewed state before reporting it.
 
-For a snapshot audit, assign every in-scope production area to exactly one primary lane, then run a root-owned integration pass across lane boundaries. Record returned coverage and unreviewed edges, not merely that a lane was launched. A timed-out, interrupted, or missing lane result remains uncovered.
+For a snapshot audit, assign every in-scope production area to exactly one primary lane, then run a root-owned integration pass across lane boundaries. When agents are available, delegate independent lanes in parallel waves sized to the available capacity; do not keep them on the root merely because the root can read them. The root owns only the index, shared-contract integration, candidate validation, and final disposition; it should read a lane's narrow evidence slices only when validating that lane's handoff and must not repeat the lane's general review. Record returned coverage and unreviewed edges, not merely that a lane was launched. A timed-out, interrupted, or missing lane result remains uncovered.
 
 ## 6. Collect deterministic and behavioral evidence
 
