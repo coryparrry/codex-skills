@@ -10,7 +10,7 @@ plugins/
     .codex-plugin/
     skills/
   cursor-skills/
-    .cursor-plugin/
+    plugin.json
     skills/
 scripts/
 skills.sh.json
@@ -45,9 +45,8 @@ The source skill folders under `skills/` must match their copies under both `plu
 | Surface | Path |
 |---|---|
 | Codex marketplace | `.agents/plugins/marketplace.json` |
-| Cursor marketplace | `.cursor-plugin/marketplace.json` |
 | Codex plugin manifest | `plugins/codex-skills/.codex-plugin/plugin.json` |
-| Cursor plugin manifest | `plugins/cursor-skills/.cursor-plugin/plugin.json` |
+| Cursor Agent Plugin manifest | `plugins/cursor-skills/plugin.json` |
 | skills.sh grouping | `skills.sh.json` |
 
 The plugin manifests expose all skill folders under their respective plugin directories. The skills.sh group names and entries must stay aligned with the source skill names.
@@ -111,8 +110,7 @@ python3 scripts/check_skill_mirror.py swift-code-review cursor-skills
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
-python3 -m json.tool .cursor-plugin/marketplace.json >/dev/null
-python3 -m json.tool plugins/cursor-skills/.cursor-plugin/plugin.json >/dev/null
+python3 -m json.tool plugins/cursor-skills/plugin.json >/dev/null
 npx skills add . --list
 git diff --check
 ```

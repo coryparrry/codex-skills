@@ -20,7 +20,6 @@ from validate_release_contract import (  # noqa: E402
     changed_paths,
     cursor_plugin_change,
     shipped_plugin_change,
-    validate_cursor_marketplace,
     validate_cursor_plugin_manifest,
     validate_skills_sh,
     validate_plugin_manifest,
@@ -192,8 +191,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_cursor_plugin_manifest_requires_metadata(self) -> None:
         manifest = {
+            "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
             "name": "cursor-skills",
-            "displayName": "Cursor Skills",
             "version": "1.0.0",
             "description": "Portable skills.",
             "author": {"name": "Maintainer"},
@@ -202,35 +201,11 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(version, "1.0.0")
 
-        manifest["displayName"] = ""
+        manifest["$schema"] = ""
         errors, _ = validate_cursor_plugin_manifest(manifest)
         self.assertIn(
-            "Cursor plugin manifest displayName must be a non-empty string",
+            "Cursor Agent Plugin manifest must declare the Agent Plugins schema",
             errors,
-        )
-
-    def test_cursor_marketplace_references_cursor_skills(self) -> None:
-        marketplace = {
-            "name": "codex-skills",
-            "owner": {"name": "Maintainer"},
-            "metadata": {
-                "description": "Skills.",
-                "version": "1.0.0",
-                "pluginRoot": "plugins",
-            },
-            "plugins": [
-                {
-                    "name": "cursor-skills",
-                    "source": "cursor-skills",
-                    "description": "Skills.",
-                }
-            ],
-        }
-        self.assertEqual(validate_cursor_marketplace(marketplace), [])
-        marketplace["plugins"][0]["source"] = "./cursor-skills"
-        self.assertIn(
-            "Cursor marketplace plugin source must be cursor-skills",
-            validate_cursor_marketplace(marketplace),
         )
 
     def test_changed_paths_includes_non_ignored_untracked_files(self) -> None:

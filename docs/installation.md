@@ -32,11 +32,18 @@ The Cursor package contains skills only; it does not add MCP servers, hooks, rul
 
 To use the version in a trusted local checkout:
 
-1. Open **Customize** in Cursor, choose **Plugins**, then select **Add** > **From Local Repo**.
-2. Choose the root of this checkout, not `plugins/cursor-skills`.
-3. Cursor discovers `.cursor-plugin/marketplace.json`; choose **Add** on **Cursor Skills** to install it for your user or the intended workspace.
+1. Do not use **Add** > **From Local Repo**. That flow is for a Cursor marketplace, while this package is an Agent Plugin loaded directly from Cursor's local-plugin directory.
+2. Copy the package into Cursor's durable local-plugin directory:
 
-Open **Customize** > **Skills**. The bundle's skills appear under **Agent Decides**. Invoke one directly with `/deep-code-review`, or describe the matching task and let Cursor select it.
+   ```bash
+   mkdir -p ~/.cursor/plugins/local
+   ditto "$(pwd)/plugins/cursor-skills" ~/.cursor/plugins/local/cursor-skills
+   ```
+
+3. Quit and reopen Cursor, or run **Developer: Reload Window**.
+4. Open **Customize** > **Skills** and invoke a skill such as `/deep-code-review`.
+
+Cursor reads the Agent Plugin manifest from `plugins/cursor-skills/plugin.json`; its skills live immediately below `plugins/cursor-skills/skills/`.
 
 The public Cursor Marketplace requires a separate submission and manual review. After this package is merged to the default branch, submit `https://github.com/coryparrry/codex-skills` at [Cursor Marketplace publishing](https://cursor.com/marketplace/publish). Until Cursor approves it, use the local-plugin flow above.
 
@@ -102,7 +109,7 @@ If Codex does not show an installed skill, restart Codex and verify that its `SK
 
 If the marketplace itself does not appear, verify that `.agents/plugins/marketplace.json` and `plugins/codex-skills/.codex-plugin/plugin.json` exist on the repository's default branch, then remove and re-add the marketplace. If the marketplace appears but reports an older installed version, upgrade the marketplace snapshot, remove the installed plugin, reinstall it, and start a new task.
 
-If Cursor cannot add the local source, confirm you selected the repository root. Cursor expects `.cursor-plugin/marketplace.json` at that location and the package at `plugins/cursor-skills/.cursor-plugin/plugin.json`.
+If Cursor does not load the local package, remove a stale **Cursor Skills** entry from **Customize** > **Plugins**, confirm `~/.cursor/plugins/local/cursor-skills/plugin.json` exists, then fully quit and reopen Cursor. Do not install this repository through **Add** > **From Local Repo**.
 
 ## Related Docs
 

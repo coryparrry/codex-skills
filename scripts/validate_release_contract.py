@@ -18,8 +18,7 @@ import yaml
 
 
 PLUGIN_MANIFEST = Path("plugins/codex-skills/.codex-plugin/plugin.json")
-CURSOR_PLUGIN_MANIFEST = Path("plugins/cursor-skills/.cursor-plugin/plugin.json")
-CURSOR_MARKETPLACE_MANIFEST = Path(".cursor-plugin/marketplace.json")
+CURSOR_PLUGIN_MANIFEST = Path("plugins/cursor-skills/plugin.json")
 MARKETPLACE_MANIFEST = Path(".agents/plugins/marketplace.json")
 SKILLS_SH_MANIFEST = Path("skills.sh.json")
 PLUGIN_ROOT = Path("plugins/codex-skills")
@@ -157,7 +156,7 @@ def shipped_plugin_change(changed_paths: set[str]) -> bool:
 
 
 def cursor_plugin_change(changed_paths: set[str]) -> bool:
-    prefixes = ("skills/", "plugins/cursor-skills/", ".cursor-plugin/")
+    prefixes = ("skills/", "plugins/cursor-skills/")
     return any(path.startswith(prefixes) for path in changed_paths)
 
 
@@ -242,8 +241,8 @@ def validate_plugin_manifest(repo: Path, data: dict[str, Any]) -> tuple[list[str
 def validate_cursor_plugin_manifest(data: dict[str, Any]) -> tuple[list[str], str]:
     errors: list[str] = []
     allowed_fields = {
+        "$schema",
         "name",
-        "displayName",
         "version",
         "description",
         "author",
@@ -253,13 +252,19 @@ def validate_cursor_plugin_manifest(data: dict[str, Any]) -> tuple[list[str], st
         "keywords",
     }
     for field in sorted(set(data) - allowed_fields):
-        errors.append(f"Cursor plugin manifest has unsupported field: {field}")
+        errors.append(f"Cursor Agent Plugin manifest has unsupported field: {field}")
 
     if data.get("name") != CURSOR_PLUGIN_ROOT.name:
-        errors.append(f"Cursor plugin manifest name must be {CURSOR_PLUGIN_ROOT.name}")
-    for field in ("displayName", "version", "description"):
+        errors.append(
+            f"Cursor Agent Plugin manifest name must be {CURSOR_PLUGIN_ROOT.name}"
+        )
+    if data.get("$schema") != "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json":
+        errors.append("Cursor Agent Plugin manifest must declare the Agent Plugins schema")
+    for field in ("version", "description"):
         if not isinstance(data.get(field), str) or not data[field].strip():
-            errors.append(f"Cursor plugin manifest {field} must be a non-empty string")
+            errors.append(
+                f"Cursor Agent Plugin manifest {field} must be a non-empty string"
+            )
 
     version = str(data.get("version", ""))
     try:
@@ -269,10 +274,10 @@ def validate_cursor_plugin_manifest(data: dict[str, Any]) -> tuple[list[str], st
 
     author = data.get("author")
     if not isinstance(author, dict) or not str(author.get("name", "")).strip():
-        errors.append("Cursor plugin manifest author.name is required")
+        errors.append("Cursor Agent Plugin manifest author.name is required")
     for field in ("homepage", "repository", "license"):
         if field in data and not isinstance(data[field], str):
-            errors.append(f"Cursor plugin manifest {field} must be a string")
+            errors.append(f"Cursor Agent Plugin manifest {field} must be a string")
     if "keywords" in data and (
         not isinstance(data["keywords"], list)
         or not all(
@@ -280,44 +285,8 @@ def validate_cursor_plugin_manifest(data: dict[str, Any]) -> tuple[list[str], st
             for keyword in data["keywords"]
         )
     ):
-        errors.append("Cursor plugin manifest keywords must contain strings")
+        errors.append("Cursor Agent Plugin manifest keywords must contain strings")
     return errors, version
-
-
-def validate_cursor_marketplace(data: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    owner = data.get("owner")
-    metadata = data.get("metadata")
-    plugins = data.get("plugins")
-    if data.get("name") != "codex-skills":
-        errors.append("Cursor marketplace name must be codex-skills")
-    if not isinstance(owner, dict) or not str(owner.get("name", "")).strip():
-        errors.append("Cursor marketplace owner.name is required")
-    if not isinstance(metadata, dict):
-        return [*errors, "Cursor marketplace metadata is required"]
-    if metadata.get("pluginRoot") != "plugins":
-        errors.append("Cursor marketplace metadata.pluginRoot must be plugins")
-    if not isinstance(metadata.get("version"), str) or not metadata["version"].strip():
-        errors.append("Cursor marketplace metadata.version is required")
-    else:
-        try:
-            parse_semver(metadata["version"])
-        except ValueError as error:
-            errors.append(str(error))
-    if not isinstance(metadata.get("description"), str) or not metadata["description"].strip():
-        errors.append("Cursor marketplace metadata.description is required")
-    if not isinstance(plugins, list) or len(plugins) != 1:
-        return [*errors, "Cursor marketplace must contain exactly one plugin"]
-    plugin = plugins[0]
-    if not isinstance(plugin, dict):
-        return [*errors, "Cursor marketplace plugin entry must be an object"]
-    if plugin.get("name") != CURSOR_PLUGIN_ROOT.name:
-        errors.append(f"Cursor marketplace plugin name must be {CURSOR_PLUGIN_ROOT.name}")
-    if plugin.get("source") != CURSOR_PLUGIN_ROOT.name:
-        errors.append(f"Cursor marketplace plugin source must be {CURSOR_PLUGIN_ROOT.name}")
-    if not isinstance(plugin.get("description"), str) or not plugin["description"].strip():
-        errors.append("Cursor marketplace plugin description is required")
-    return errors
 
 
 def load_json(path: Path) -> tuple[dict[str, Any], list[str]]:
@@ -429,19 +398,6 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     if not cursor_json_errors:
         cursor_plugin_errors, _ = validate_cursor_plugin_manifest(cursor_plugin_data)
         errors.extend(cursor_plugin_errors)
-
-    cursor_marketplace_data, cursor_marketplace_json_errors = load_json(
-        repo / CURSOR_MARKETPLACE_MANIFEST
-    )
-    errors.extend(cursor_marketplace_json_errors)
-    if not cursor_marketplace_json_errors:
-        errors.extend(validate_cursor_marketplace(cursor_marketplace_data))
-        if (
-            not cursor_json_errors
-            and cursor_plugin_data.get("version")
-            != cursor_marketplace_data.get("metadata", {}).get("version")
-        ):
-            errors.append("Cursor plugin and marketplace versions must match")
 
     marketplace, json_errors = load_json(repo / MARKETPLACE_MANIFEST)
     errors.extend(json_errors)
