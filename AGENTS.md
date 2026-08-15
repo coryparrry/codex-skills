@@ -10,7 +10,7 @@ The installable plugin copies live under `plugins/codex-skills/skills/` and `plu
 
 When adding, renaming, or removing a shipped skill, update the README in the same change. Keep its skill count, Skills table, documentation links, installation examples where relevant, and validation commands aligned with `skills/`. Also update the source skill, plugin mirror, plugin manifest, `skills.sh.json`, and any affected pages in `docs/`.
 
-When adding, renaming, or removing a subagent profile, update the README Agent Profiles table, `docs/agent-profiles.md`, the standalone TOML file, the plugin Markdown copy, the installer tests, the release-contract tests, and the plugin manifest. Custom profiles must omit `model` and `model_reasoning_effort` unless the user explicitly requests a pin.
+When adding, renaming, or removing a subagent profile, update the README Agent Profiles table, `docs/agent-profiles.md`, the standalone TOML file, the plugin Markdown copy, the installer tests, the release-contract tests, and the plugin manifest. Keep each profile's model and reasoning-effort pins consistent across its source, plugin copy, documentation, and validation contract. Change a pin only when the user explicitly requests it or representative evaluation evidence supports the change.
 
 Use the `$humanizer:humanizer` skill only for README files and repository instruction documents such as `AGENTS.md`. Never use it for skill writing, including `SKILL.md`, skill references, prompts, or skill metadata. Keep frontmatter, code blocks, commands, data, and link targets unchanged unless the task requires a functional change.
 

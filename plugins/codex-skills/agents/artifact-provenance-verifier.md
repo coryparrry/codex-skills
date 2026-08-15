@@ -1,6 +1,8 @@
 ---
 name: artifact-provenance-verifier
 description: Read-only verifier that maps exact source state through generated, packaged, signed, installed, and released artifacts.
+model: gpt-5.6-terra
+model_reasoning_effort: high
 ---
 
 # Artifact Provenance Verifier

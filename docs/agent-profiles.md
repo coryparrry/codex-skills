@@ -2,7 +2,16 @@
 
 The bundle ships four narrow Codex subagent profiles. They are completion and review lanes, not general implementation agents.
 
-None of the profiles sets `model` or `model_reasoning_effort`. Codex resolves those settings from an explicit spawn, the configured subagent defaults, or the parent task.
+Each profile pins its model and reasoning effort:
+
+| Profile | Model | Effort | Why |
+|---|---|---|---|
+| `acceptance-contract-reviewer` | `gpt-5.6-sol` | `high` | It makes the final, highest-stakes judgment across mixed evidence. |
+| `artifact-provenance-verifier` | `gpt-5.6-terra` | `high` | It needs strong cross-system synthesis without defaulting every trace to the flagship model. |
+| `delivery-state-reconciler` | `gpt-5.6-luna` | `max` | Its work is bounded, procedural, and verification-heavy. |
+| `evidence-ledger-lane-reviewer` | `gpt-5.6-luna` | `max` | Its lane and checkpoint contract tightly bound the work. |
+
+These settings override the parent model. Spawn prompts should define scope and evidence, not select another model.
 
 The standalone TOML files set `sandbox_mode = "read-only"` for acceptance, delivery-state, and provenance review. The evidence-ledger profile uses `workspace-write` because it must update one assigned checkpoint. Its instructions prohibit every other mutation.
 

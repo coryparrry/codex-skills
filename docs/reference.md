@@ -43,14 +43,14 @@ The source skill folders under `skills/` must match their copies under `plugins/
 
 ## Published Agent Profiles
 
-| Profile | Purpose | Standalone sandbox |
-|---|---|---|
-| `acceptance-contract-reviewer` | Check a frozen acceptance contract against exact snapshot and runtime evidence | `read-only` |
-| `artifact-provenance-verifier` | Map source identity through generated, packaged, installed, and released artifacts | `read-only` |
-| `delivery-state-reconciler` | Reconcile local Git, fetched remote, pull-request, check, review-thread, and merge state | `read-only` |
-| `evidence-ledger-lane-reviewer` | Trace one disjoint review lane and maintain its assigned checkpoint | `workspace-write`, checkpoint only |
+| Profile | Model / effort | Purpose | Standalone sandbox |
+|---|---|---|---|
+| `acceptance-contract-reviewer` | `gpt-5.6-sol` / `high` | Check a frozen acceptance contract against exact snapshot and runtime evidence | `read-only` |
+| `artifact-provenance-verifier` | `gpt-5.6-terra` / `high` | Map source identity through generated, packaged, installed, and released artifacts | `read-only` |
+| `delivery-state-reconciler` | `gpt-5.6-luna` / `max` | Reconcile local Git, fetched remote, pull-request, check, review-thread, and merge state | `read-only` |
+| `evidence-ledger-lane-reviewer` | `gpt-5.6-luna` / `max` | Trace one disjoint review lane and maintain its assigned checkpoint | `workspace-write`, checkpoint only |
 
-The profiles omit `model` and `model_reasoning_effort`. Codex inherits them from explicit spawn settings, configured subagent defaults, or the parent task.
+The model and effort pins apply before the agent starts and override the parent runtime settings.
 
 ## Package Metadata
 

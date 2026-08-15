@@ -26,6 +26,14 @@ MIRROR_ROOT = PLUGIN_ROOT / "skills"
 SOURCE_ROOT = Path("skills")
 AGENT_SOURCE_ROOT = Path("agents")
 AGENT_PLUGIN_ROOT = PLUGIN_ROOT / "agents"
+AGENT_MODEL_ROUTING = {
+    "acceptance-contract-reviewer": ("gpt-5.6-sol", "high"),
+    "artifact-provenance-verifier": ("gpt-5.6-terra", "high"),
+    "delivery-state-reconciler": ("gpt-5.6-luna", "max"),
+    "evidence-ledger-lane-reviewer": ("gpt-5.6-luna", "max"),
+}
+SUPPORTED_AGENT_MODELS = {model for model, _ in AGENT_MODEL_ROUTING.values()}
+SUPPORTED_REASONING_EFFORTS = {"none", "low", "medium", "high", "xhigh", "max"}
 SEMVER_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 NUMBER_WORDS = {
@@ -127,7 +135,12 @@ def parse_agent_markdown(
     for field in fields:
         if not isinstance(field, str):
             errors.append("agent frontmatter field names must be strings")
-        elif field not in {"name", "description"}:
+        elif field not in {
+            "name",
+            "description",
+            "model",
+            "model_reasoning_effort",
+        }:
             errors.append(f"unexpected agent frontmatter field: {field}")
 
     actual_name = fields.get("name")
@@ -140,6 +153,12 @@ def parse_agent_markdown(
     description = fields.get("description")
     if not isinstance(description, str) or not description.strip():
         errors.append("agent frontmatter description is required")
+    model = fields.get("model")
+    if model is not None and not isinstance(model, str):
+        errors.append("agent frontmatter model must be a string")
+    reasoning_effort = fields.get("model_reasoning_effort")
+    if reasoning_effort is not None and not isinstance(reasoning_effort, str):
+        errors.append("agent frontmatter model_reasoning_effort must be a string")
 
     instructions = "\n".join(lines[end + 1 :]).strip()
     if not instructions:
@@ -181,6 +200,8 @@ def validate_agent_profiles(repo: Path) -> tuple[list[str], set[str]]:
         "name",
         "description",
         "developer_instructions",
+        "model",
+        "model_reasoning_effort",
         "sandbox_mode",
     }
     for name in sorted(source_agents | plugin_agents):
@@ -194,10 +215,26 @@ def validate_agent_profiles(repo: Path) -> tuple[list[str], set[str]]:
             errors.extend(load_errors)
             for field in sorted(set(source_data) - allowed_toml_fields):
                 errors.append(f"agents/{name}.toml: unsupported field: {field}")
-            if "model" in source_data or "model_reasoning_effort" in source_data:
+            model = source_data.get("model")
+            if model not in SUPPORTED_AGENT_MODELS:
                 errors.append(
-                    f"agents/{name}.toml: model settings must inherit from the parent"
+                    f"agents/{name}.toml: model must be one of "
+                    f"{', '.join(sorted(SUPPORTED_AGENT_MODELS))}"
                 )
+            reasoning_effort = source_data.get("model_reasoning_effort")
+            if reasoning_effort not in SUPPORTED_REASONING_EFFORTS:
+                errors.append(
+                    f"agents/{name}.toml: model_reasoning_effort must be one of "
+                    f"{', '.join(sorted(SUPPORTED_REASONING_EFFORTS))}"
+                )
+            expected_routing = AGENT_MODEL_ROUTING.get(name)
+            if expected_routing is not None:
+                expected_model, expected_effort = expected_routing
+                if model != expected_model or reasoning_effort != expected_effort:
+                    errors.append(
+                        f"agents/{name}.toml: expected model routing "
+                        f"{expected_model}/{expected_effort}"
+                    )
             if source_data.get("name") != name:
                 errors.append(f"agents/{name}.toml: name must be {name}")
             for field in ("description", "developer_instructions"):
@@ -224,6 +261,14 @@ def validate_agent_profiles(repo: Path) -> tuple[list[str], set[str]]:
         if source_data and plugin_fields:
             if source_data.get("description") != plugin_fields.get("description"):
                 errors.append(f"agent {name}: plugin description differs from source")
+            if source_data.get("model") != plugin_fields.get("model"):
+                errors.append(f"agent {name}: plugin model differs from source")
+            if source_data.get("model_reasoning_effort") != plugin_fields.get(
+                "model_reasoning_effort"
+            ):
+                errors.append(
+                    f"agent {name}: plugin model reasoning effort differs from source"
+                )
             source_instructions = str(source_data.get("developer_instructions", "")).strip()
             if source_instructions != plugin_instructions:
                 errors.append(f"agent {name}: plugin instructions differ from source")

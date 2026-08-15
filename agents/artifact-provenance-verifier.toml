@@ -1,5 +1,7 @@
 name = "artifact-provenance-verifier"
 description = "Read-only verifier that maps exact source state through generated, packaged, signed, installed, and released artifacts."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
 # Artifact Provenance Verifier

@@ -1,6 +1,8 @@
 ---
 name: delivery-state-reconciler
 description: Read-only reconciler for local Git, fetched remote, pull-request, check, review-thread, and merge state.
+model: gpt-5.6-luna
+model_reasoning_effort: max
 ---
 
 # Delivery State Reconciler

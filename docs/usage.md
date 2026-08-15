@@ -20,14 +20,14 @@ Both research workflows begin from the available runtime. They use independent l
 
 The marketplace and trusted-checkout bundle also provide four Codex agent profiles:
 
-| Goal | Profile |
-|---|---|
-| Check a completed change against frozen acceptance criteria | `acceptance-contract-reviewer` |
-| Reconcile local Git, fetched refs, pull requests, checks, threads, and merge state | `delivery-state-reconciler` |
-| Review one disjoint audit lane and maintain one checkpoint | `evidence-ledger-lane-reviewer` |
-| Trace source identity through generated, packaged, installed, and released artifacts | `artifact-provenance-verifier` |
+| Goal | Profile | Runtime |
+|---|---|---|
+| Check a completed change against frozen acceptance criteria | `acceptance-contract-reviewer` | Sol High |
+| Reconcile local Git, fetched refs, pull requests, checks, threads, and merge state | `delivery-state-reconciler` | Luna Max |
+| Review one disjoint audit lane and maintain one checkpoint | `evidence-ledger-lane-reviewer` | Luna Max |
+| Trace source identity through generated, packaged, installed, and released artifacts | `artifact-provenance-verifier` | Terra High |
 
-Spawn only the profile that matches an independent lane and give it an exact snapshot plus bounded inputs. The profiles do not pin a model or reasoning effort. See [Codex Agent Profiles](agent-profiles.md) for their input, output, and mutation contracts.
+Spawn only the profile that matches an independent lane and give it an exact snapshot plus bounded inputs. Each profile pins its own runtime instead of inheriting the parent model. See [Codex Agent Profiles](agent-profiles.md) for their input, output, and mutation contracts.
 
 ## Audit App Store readiness
 

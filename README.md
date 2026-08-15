@@ -55,14 +55,14 @@ The research skills work with the runtime that is available. They use independen
 
 ## 🤖 Agent Profiles
 
-| Profile | Use it for |
-|---|---|
-| [`acceptance-contract-reviewer`](agents/acceptance-contract-reviewer.toml) | Check a frozen acceptance contract against the exact source, artifact, runtime, and validation evidence. |
-| [`delivery-state-reconciler`](agents/delivery-state-reconciler.toml) | Reconcile local Git, fetched refs, pull requests, checks, review threads, and merge state. |
-| [`evidence-ledger-lane-reviewer`](agents/evidence-ledger-lane-reviewer.toml) | Review one disjoint audit lane and maintain its assigned Markdown checkpoint. |
-| [`artifact-provenance-verifier`](agents/artifact-provenance-verifier.toml) | Trace source state through generated, packaged, signed, installed, and released artifacts. |
+| Profile | Model | Effort | Use it for |
+|---|---|---|---|
+| [`acceptance-contract-reviewer`](agents/acceptance-contract-reviewer.toml) | `gpt-5.6-sol` | `high` | Check a frozen acceptance contract against the exact source, artifact, runtime, and validation evidence. |
+| [`delivery-state-reconciler`](agents/delivery-state-reconciler.toml) | `gpt-5.6-luna` | `max` | Reconcile local Git, fetched refs, pull requests, checks, review threads, and merge state. |
+| [`evidence-ledger-lane-reviewer`](agents/evidence-ledger-lane-reviewer.toml) | `gpt-5.6-luna` | `max` | Review one disjoint audit lane and maintain its assigned Markdown checkpoint. |
+| [`artifact-provenance-verifier`](agents/artifact-provenance-verifier.toml) | `gpt-5.6-terra` | `high` | Trace source state through generated, packaged, signed, installed, and released artifacts. |
 
-The profiles do not pin a model or reasoning effort. Codex uses the explicit spawn settings, configured subagent defaults, or the parent task settings. Three profiles are read-only. The evidence-ledger profile can write only its assigned checkpoint.
+Each profile pins the model suited to its work instead of inheriting the parent model. Three profiles are read-only. The evidence-ledger profile can write only its assigned checkpoint.
 
 Marketplace and trusted-checkout installs include the profiles. skills.sh installs only the skills.
 

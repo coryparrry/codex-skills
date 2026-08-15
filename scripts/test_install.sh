@@ -10,6 +10,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+assert_agent_route() {
+  local profile="$1"
+  local model="$2"
+  local effort="$3"
+
+  grep -Fxq "model = \"$model\"" "$profile"
+  grep -Fxq "model_reasoning_effort = \"$effort\"" "$profile"
+}
+
 assert_installed() {
   local codex_home="$1"
   local installed_agents
@@ -62,10 +71,10 @@ assert_installed() {
   test "$installed_skills" = "$(printf '%s\n' appstore-readiness-audit continue-deep-research deep-code-review git-clean-merged-branch research-repo-technology swift-code-review triage-review-comments)"
   installed_agents="$(find "$codex_home/agents/codex-skills" -mindepth 1 -maxdepth 1 -type f -name '*.toml' -exec basename {} \; | sort)"
   test "$installed_agents" = "$(printf '%s\n' acceptance-contract-reviewer.toml artifact-provenance-verifier.toml delivery-state-reconciler.toml evidence-ledger-lane-reviewer.toml)"
-  if grep -Eq '^(model|model_reasoning_effort)[[:space:]]*=' "$codex_home"/agents/codex-skills/*.toml; then
-    echo "installed agent profile unexpectedly pins a model" >&2
-    exit 1
-  fi
+  assert_agent_route "$codex_home/agents/codex-skills/acceptance-contract-reviewer.toml" "gpt-5.6-sol" "high"
+  assert_agent_route "$codex_home/agents/codex-skills/artifact-provenance-verifier.toml" "gpt-5.6-terra" "high"
+  assert_agent_route "$codex_home/agents/codex-skills/delivery-state-reconciler.toml" "gpt-5.6-luna" "max"
+  assert_agent_route "$codex_home/agents/codex-skills/evidence-ledger-lane-reviewer.toml" "gpt-5.6-luna" "max"
 }
 
 LOCAL_HOME="$TMP_DIR/codex-local"

@@ -64,7 +64,7 @@ When changing shipped behavior, update the relevant source skill or agent profil
 ## Pull Request Checklist
 
 - [ ] Source and plugin mirror copies match for changed shipped skills.
-- [ ] Standalone and plugin copies match for changed agent profiles, with no model pins.
+- [ ] Standalone and plugin copies match for changed agent profiles, including their model and reasoning-effort pins.
 - [ ] Review findings are verified against current code.
 - [ ] Branch cleanup retains dirty-worktree and unmerged-branch safeguards.
 - [ ] No private paths, credentials, or local workflow assumptions were introduced.

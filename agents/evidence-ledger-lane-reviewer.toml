@@ -1,5 +1,7 @@
 name = "evidence-ledger-lane-reviewer"
 description = "Bounded review-lane specialist that may write only one assigned Markdown checkpoint while tracing a disjoint scope."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 # Evidence Ledger Lane Reviewer

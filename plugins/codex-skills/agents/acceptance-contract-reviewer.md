@@ -1,6 +1,8 @@
 ---
 name: acceptance-contract-reviewer
 description: Read-only completion reviewer that checks a frozen acceptance contract against exact snapshot and runtime evidence.
+model: gpt-5.6-sol
+model_reasoning_effort: high
 ---
 
 # Acceptance Contract Reviewer

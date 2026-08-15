@@ -32,7 +32,7 @@ It also exposes four Codex subagent profiles:
 - `delivery-state-reconciler`
 - `evidence-ledger-lane-reviewer`
 
-Start a new task after installation so Codex loads the profiles. The profiles omit `model` and `model_reasoning_effort`, so they inherit explicit spawn settings, configured subagent defaults, or the parent task settings.
+Start a new task after installation so Codex loads the profiles. The profiles pin their own runtime: Sol High for acceptance review, Terra High for artifact provenance, and Luna Max for delivery reconciliation and evidence-ledger lanes. They do not inherit the parent model.
 
 ## Install Through skills.sh
 

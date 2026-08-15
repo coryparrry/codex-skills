@@ -1,6 +1,8 @@
 ---
 name: evidence-ledger-lane-reviewer
 description: Bounded review-lane specialist that may write only one assigned Markdown checkpoint while tracing a disjoint scope.
+model: gpt-5.6-luna
+model_reasoning_effort: max
 ---
 
 # Evidence Ledger Lane Reviewer
