@@ -3,13 +3,14 @@ set -euo pipefail
 
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 SKILLS_DIR="$CODEX_HOME/skills"
-TEMP_DIRS=()
+AGENTS_DIR="$CODEX_HOME/agents/codex-skills"
+TEMP_PATHS=()
 
 cleanup() {
-  local dir
-  for dir in "${TEMP_DIRS[@]}"; do
-    if [ -n "$dir" ] && [ -d "$dir" ]; then
-      rm -rf "$dir"
+  local path
+  for path in "${TEMP_PATHS[@]}"; do
+    if [ -n "$path" ] && [ -e "$path" ]; then
+      rm -rf "$path"
     fi
   done
 }
@@ -29,7 +30,7 @@ replace_skill_dir() {
 
   if [ -e "$skill_dir" ]; then
     backup_dir="$(mktemp -d "$SKILLS_DIR/.${skill_name}.backup.XXXXXX")"
-    TEMP_DIRS+=("$backup_dir")
+    TEMP_PATHS+=("$backup_dir")
     rmdir "$backup_dir"
     mv "$skill_dir" "$backup_dir"
   fi
@@ -59,12 +60,25 @@ install_skill_dir() {
 
   skill_name="$(basename "$source_dir")"
   staging_dir="$(mktemp -d "$SKILLS_DIR/.${skill_name}.tmp.XXXXXX")"
-  TEMP_DIRS+=("$staging_dir")
+  TEMP_PATHS+=("$staging_dir")
 
   cp -R "$source_dir"/. "$staging_dir"/
   rm -rf "$staging_dir/.git" "$staging_dir/docs/solutions"
   validate_skill_dir "$staging_dir"
   replace_skill_dir "$skill_name" "$staging_dir"
+}
+
+install_agent_file() {
+  local source_file="$1"
+  local agent_name
+  local staging_file
+
+  agent_name="$(basename "$source_file")"
+  staging_file="$(mktemp "$AGENTS_DIR/.${agent_name}.tmp.XXXXXX")"
+  TEMP_PATHS+=("$staging_file")
+  cp "$source_file" "$staging_file"
+  test -s "$staging_file"
+  mv -f "$staging_file" "$AGENTS_DIR/$agent_name"
 }
 
 trap cleanup EXIT
@@ -81,18 +95,27 @@ EOF
 fi
 
 ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
-if [ ! -d "$ROOT_DIR/skills" ]; then
-  echo "skills directory not found under trusted checkout: $ROOT_DIR" >&2
+if [ ! -d "$ROOT_DIR/skills" ] || [ ! -d "$ROOT_DIR/agents" ]; then
+  echo "skills or agents directory not found under trusted checkout: $ROOT_DIR" >&2
   exit 1
 fi
 
-mkdir -p "$SKILLS_DIR"
+mkdir -p "$SKILLS_DIR" "$AGENTS_DIR"
 
 for source_dir in "$ROOT_DIR"/skills/*; do
   if [ -f "$source_dir/SKILL.md" ]; then
     install_skill_dir "$source_dir"
   fi
 done
+
+for source_file in "$ROOT_DIR"/agents/*.toml; do
+  if [ -f "$source_file" ]; then
+    install_agent_file "$source_file"
+  fi
+done
+
+# Remove the retired bundle-owned skill only after the replacement bundle is valid.
+rm -rf -- "$SKILLS_DIR/engineering-advisor"
 
 cat <<EOF
 Installed codex-skills bundle
@@ -102,5 +125,15 @@ EOF
 for source_dir in "$ROOT_DIR"/skills/*; do
   if [ -f "$source_dir/SKILL.md" ]; then
     printf '  %s\n' "$SKILLS_DIR/$(basename "$source_dir")"
+  fi
+done
+
+cat <<EOF
+
+Agent profiles:
+EOF
+for source_file in "$ROOT_DIR"/agents/*.toml; do
+  if [ -f "$source_file" ]; then
+    printf '  %s\n' "$AGENTS_DIR/$(basename "$source_file")"
   fi
 done

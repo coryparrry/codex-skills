@@ -9,13 +9,25 @@ This guide explains when and how to invoke the skills in this repository.
 | Audit an Apple app before upload or submission to App Store Connect | `appstore-readiness-audit` |
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
-| Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
 | Audit a repository snapshot or review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
 | Review focused Swift or Apple-platform changes, or provide the specialist lane for a deep review | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
 | Classify PR review feedback | `triage-review-comments` |
 
 Both research workflows begin from the available runtime. They use independent lanes when that materially improves coverage and the runtime supports them; otherwise they complete a bounded root-only audit and disclose the reduced coverage.
+
+## Delegate A Focused Review Lane
+
+The marketplace and trusted-checkout bundle also provide four Codex agent profiles:
+
+| Goal | Profile |
+|---|---|
+| Check a completed change against frozen acceptance criteria | `acceptance-contract-reviewer` |
+| Reconcile local Git, fetched refs, pull requests, checks, threads, and merge state | `delivery-state-reconciler` |
+| Review one disjoint audit lane and maintain one checkpoint | `evidence-ledger-lane-reviewer` |
+| Trace source identity through generated, packaged, installed, and released artifacts | `artifact-provenance-verifier` |
+
+Spawn only the profile that matches an independent lane and give it an exact snapshot plus bounded inputs. The profiles do not pin a model or reasoning effort. See [Codex Agent Profiles](agent-profiles.md) for their input, output, and mutation contracts.
 
 ## Audit App Store readiness
 
@@ -28,16 +40,6 @@ Use $appstore-readiness-audit to audit this release candidate for App Store subm
 The skill refreshes current Apple sources, identifies the exact source and artifact under review, classifies product features, and runs separate project, release, privacy, policy, runtime, metadata, and reviewer-access gates. It distinguishes a candidate that is ready to upload from one with enough evidence to submit for review.
 
 The audit is read-only. Missing runtime or App Store Connect evidence remains `NOT_TESTED` or `UNKNOWN` and can hold the verdict. A successful build or archive does not become a submission-ready result by itself.
-
-## Run As An Engineering Advisor
-
-Use `engineering-advisor` when the root agent must investigate, scope, delegate, review, and validate without modifying repository files itself:
-
-```text
-Use $engineering-advisor to route verified fixes to capability-matched Terra workers. Remain the non-implementing advisor and reject unnecessary code or behavior drift.
-```
-
-The root proves findings before assigning them, selects the lowest sufficient Terra reasoning tier, gives workers non-overlapping ownership, reviews every resulting diff, and runs the final validation. All tracked-file changes and follow-up corrections remain with Terra workers. If that lane is unavailable, the skill reports implementation blocked instead of falling back to root edits.
 
 ## Continue Existing Deep Research
 
@@ -122,10 +124,10 @@ It does not implement fixes automatically. If current PR context is unavailable,
 ## Related Docs
 
 - [Installation](installation.md)
+- [Agent Profiles](agent-profiles.md)
 - [Reference](reference.md)
 - [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Deep Code Review](deep-code-review.md)
-- [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)

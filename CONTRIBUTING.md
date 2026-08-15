@@ -5,6 +5,7 @@ Thanks for improving `codex-skills`.
 ## Development Principles
 
 - Keep shipped skill source under `skills/` synchronized with the plugin mirror under `plugins/codex-skills/skills/`.
+- Keep standalone Codex profiles under `agents/` synchronized with the plugin profiles under `plugins/codex-skills/agents/`.
 - Preserve research-only non-mutation boundaries, primary-source verification, contradiction handling, and explicit uncertainty.
 - Treat PR review comments as hypotheses and verify them against current code before recommending action.
 - Keep Swift reviews focused on risk. Use the active toolchain and the changed execution paths as evidence.
@@ -21,6 +22,8 @@ Thanks for improving `codex-skills`.
 | `skills/research-repo-technology/` | Repository technology research skill and report contracts |
 | `skills/swift-code-review/` | Swift and Apple-platform review workflow and reference files |
 | `skills/triage-review-comments/` | PR review feedback triage skill and references |
+| `agents/` | Standalone Codex subagent profile source |
+| `plugins/codex-skills/agents/` | Installable Codex plugin profiles |
 | `plugins/codex-skills/skills/` | Installable plugin mirror of shipped skills |
 | `scripts/` | Repo-level installer, mirror checker, and install tests |
 | `docs/` | User-facing documentation |
@@ -56,11 +59,12 @@ python3 /path/to/skill-creator/scripts/quick_validate.py skills/swift-code-revie
 
 ## Documentation Changes
 
-When changing shipped behavior, update the relevant source skill, plugin mirror, user guide, reference documentation, and validation coverage.
+When changing shipped behavior, update the relevant source skill or agent profile, plugin mirror, user guide, reference documentation, and validation coverage.
 
 ## Pull Request Checklist
 
 - [ ] Source and plugin mirror copies match for changed shipped skills.
+- [ ] Standalone and plugin copies match for changed agent profiles, with no model pins.
 - [ ] Review findings are verified against current code.
 - [ ] Branch cleanup retains dirty-worktree and unmerged-branch safeguards.
 - [ ] No private paths, credentials, or local workflow assumptions were introduced.

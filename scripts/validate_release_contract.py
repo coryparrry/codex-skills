@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,8 @@ SKILLS_SH_MANIFEST = Path("skills.sh.json")
 PLUGIN_ROOT = Path("plugins/codex-skills")
 MIRROR_ROOT = PLUGIN_ROOT / "skills"
 SOURCE_ROOT = Path("skills")
+AGENT_SOURCE_ROOT = Path("agents")
+AGENT_PLUGIN_ROOT = PLUGIN_ROOT / "agents"
 SEMVER_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 NUMBER_WORDS = {
@@ -102,6 +105,132 @@ def parse_skill_frontmatter(text: str, expected_name: str) -> list[str]:
     return errors
 
 
+def parse_agent_markdown(
+    text: str, expected_name: str
+) -> tuple[dict[str, Any], str, list[str]]:
+    errors: list[str] = []
+    lines = text.splitlines()
+    if len(lines) < 4 or lines[0] != "---":
+        return {}, "", ["agent Markdown must start with YAML frontmatter"]
+    try:
+        end = lines.index("---", 1)
+    except ValueError:
+        return {}, "", ["agent Markdown frontmatter is not closed"]
+
+    try:
+        fields = yaml.safe_load("\n".join(lines[1:end]))
+    except yaml.YAMLError as error:
+        return {}, "", [f"agent Markdown frontmatter is invalid YAML: {error}"]
+    if not isinstance(fields, dict):
+        return {}, "", ["agent Markdown frontmatter must be a YAML mapping"]
+
+    for field in fields:
+        if not isinstance(field, str):
+            errors.append("agent frontmatter field names must be strings")
+        elif field not in {"name", "description"}:
+            errors.append(f"unexpected agent frontmatter field: {field}")
+
+    actual_name = fields.get("name")
+    if not isinstance(actual_name, str):
+        errors.append("agent frontmatter name must be a string")
+    elif actual_name != expected_name:
+        errors.append(
+            f"agent frontmatter name must be {expected_name}, got {actual_name}"
+        )
+    description = fields.get("description")
+    if not isinstance(description, str) or not description.strip():
+        errors.append("agent frontmatter description is required")
+
+    instructions = "\n".join(lines[end + 1 :]).strip()
+    if not instructions:
+        errors.append("agent Markdown instructions are required")
+    return fields, instructions, errors
+
+
+def load_agent_toml(path: Path) -> tuple[dict[str, Any], list[str]]:
+    try:
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        return {}, [f"{path}: {error}"]
+    if not isinstance(value, dict):
+        return {}, [f"{path}: root must be a table"]
+    return value, []
+
+
+def agent_names(root: Path, suffix: str) -> set[str]:
+    if not root.is_dir():
+        return set()
+    return {path.stem for path in root.glob(f"*{suffix}") if path.is_file()}
+
+
+def validate_agent_profiles(repo: Path) -> tuple[list[str], set[str]]:
+    errors: list[str] = []
+    source_root = repo / AGENT_SOURCE_ROOT
+    plugin_root = repo / AGENT_PLUGIN_ROOT
+    source_agents = agent_names(source_root, ".toml")
+    plugin_agents = agent_names(plugin_root, ".md")
+
+    if not source_agents:
+        errors.append("no Codex agent profiles discovered under agents/")
+    for name in sorted(source_agents - plugin_agents):
+        errors.append(f"Codex plugin mirror missing agent: {name}")
+    for name in sorted(plugin_agents - source_agents):
+        errors.append(f"Codex plugin mirror has stale agent: {name}")
+
+    allowed_toml_fields = {
+        "name",
+        "description",
+        "developer_instructions",
+        "sandbox_mode",
+    }
+    for name in sorted(source_agents | plugin_agents):
+        if not SKILL_NAME_PATTERN.fullmatch(name):
+            errors.append(f"invalid agent profile name: {name}")
+
+        source_data: dict[str, Any] = {}
+        if name in source_agents:
+            source_path = source_root / f"{name}.toml"
+            source_data, load_errors = load_agent_toml(source_path)
+            errors.extend(load_errors)
+            for field in sorted(set(source_data) - allowed_toml_fields):
+                errors.append(f"agents/{name}.toml: unsupported field: {field}")
+            if "model" in source_data or "model_reasoning_effort" in source_data:
+                errors.append(
+                    f"agents/{name}.toml: model settings must inherit from the parent"
+                )
+            if source_data.get("name") != name:
+                errors.append(f"agents/{name}.toml: name must be {name}")
+            for field in ("description", "developer_instructions"):
+                if not isinstance(source_data.get(field), str) or not source_data[field].strip():
+                    errors.append(f"agents/{name}.toml: {field} is required")
+            sandbox_mode = source_data.get("sandbox_mode")
+            if sandbox_mode not in {"read-only", "workspace-write"}:
+                errors.append(
+                    f"agents/{name}.toml: sandbox_mode must be read-only or workspace-write"
+                )
+
+        plugin_fields: dict[str, Any] = {}
+        plugin_instructions = ""
+        if name in plugin_agents:
+            plugin_path = plugin_root / f"{name}.md"
+            plugin_fields, plugin_instructions, markdown_errors = parse_agent_markdown(
+                plugin_path.read_text(encoding="utf-8"), name
+            )
+            errors.extend(
+                f"plugins/codex-skills/agents/{name}.md: {detail}"
+                for detail in markdown_errors
+            )
+
+        if source_data and plugin_fields:
+            if source_data.get("description") != plugin_fields.get("description"):
+                errors.append(f"agent {name}: plugin description differs from source")
+            source_instructions = str(source_data.get("developer_instructions", "")).strip()
+            if source_instructions != plugin_instructions:
+                errors.append(f"agent {name}: plugin instructions differ from source")
+
+    return errors, source_agents
+
+
 def validate_skills_sh(
     public_skills: set[str], data: dict[str, Any]
 ) -> list[str]:
@@ -138,7 +267,9 @@ def validate_skills_sh(
 
 def shipped_plugin_change(changed_paths: set[str]) -> bool:
     release_prefixes = (
+        "agents/",
         "skills/",
+        "plugins/codex-skills/agents/",
         "plugins/codex-skills/skills/",
         "plugins/codex-skills/assets/",
         "plugins/codex-skills/.codex-plugin/",
@@ -204,8 +335,17 @@ def validate_plugin_manifest(repo: Path, data: dict[str, Any]) -> tuple[list[str
     ):
         if not isinstance(interface.get(field), str) or not interface[field].strip():
             errors.append(f"plugin manifest interface.{field} is required")
-    if "defaultPrompt" not in interface and "default_prompt" not in interface:
+    default_prompt = interface.get("defaultPrompt", interface.get("default_prompt"))
+    if default_prompt is None:
         errors.append("plugin manifest interface.defaultPrompt is required")
+    elif not isinstance(default_prompt, list) or not default_prompt or not all(
+        isinstance(item, str) and item.strip() for item in default_prompt
+    ):
+        errors.append("plugin manifest interface.defaultPrompt must contain strings")
+    elif any(len(item) > 128 for item in default_prompt):
+        errors.append(
+            "plugin manifest interface.defaultPrompt entries must be at most 128 characters"
+        )
     capabilities = interface.get("capabilities")
     if not isinstance(capabilities, list) or not capabilities or not all(
         isinstance(item, str) and item.strip() for item in capabilities
@@ -276,6 +416,8 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     mirror_root = repo / MIRROR_ROOT
     public_skills = skill_names(source_root)
     mirrored_skills = skill_names(mirror_root)
+    agent_errors, public_agents = validate_agent_profiles(repo)
+    errors.extend(agent_errors)
 
     if not public_skills:
         errors.append("no public skills discovered under skills/")
@@ -352,6 +494,17 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
         rf"^> {re.escape(expected_count)} Codex skills\b", readme, re.MULTILINE | re.I
     ):
         errors.append(f"README skill count must be {expected_count}")
+
+    readme_agents = re.findall(
+        r"\[`([a-z0-9-]+)`\]\(agents/([a-z0-9-]+)\.toml\)",
+        section(readme, "🤖 Agent Profiles"),
+    )
+    readme_agent_names = [name for name, path_name in readme_agents if name == path_name]
+    if Counter(readme_agent_names) != Counter(public_agents):
+        errors.append("README Agent Profiles table must list every profile exactly once")
+
+    if not (repo / "docs/agent-profiles.md").is_file():
+        errors.append("missing docs/agent-profiles.md")
 
     installation = (repo / "docs/installation.md").read_text(encoding="utf-8")
     exposed = section(installation, "Install Through skills.sh")

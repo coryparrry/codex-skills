@@ -5,9 +5,15 @@
 ```text
 .agents/
   plugins/
+agents/
+  acceptance-contract-reviewer.toml
+  artifact-provenance-verifier.toml
+  delivery-state-reconciler.toml
+  evidence-ledger-lane-reviewer.toml
 plugins/
   codex-skills/
     .codex-plugin/
+    agents/
     skills/
 scripts/
 skills.sh.json
@@ -15,14 +21,13 @@ skills/
   appstore-readiness-audit/
   continue-deep-research/
   deep-code-review/
-  engineering-advisor/
   git-clean-merged-branch/
   research-repo-technology/
   swift-code-review/
   triage-review-comments/
 ```
 
-The source skill folders under `skills/` must match their copies under `plugins/codex-skills/skills/`.
+The source skill folders under `skills/` must match their copies under `plugins/codex-skills/skills/`. Each source TOML profile under `agents/` must match the corresponding Codex plugin Markdown profile under `plugins/codex-skills/agents/`.
 
 ## Published Skills
 
@@ -31,11 +36,21 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | `appstore-readiness-audit` | Audit an Apple release candidate before App Store upload or submission | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `deep-code-review` | Audit a repository snapshot or review affected behavior across a change, with validated defects, blockers, and auditable coverage | `SKILL.md`, `agents/openai.yaml`, `references/` |
-| `engineering-advisor` | Route edits to capability-matched Terra workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
 | `research-repo-technology` | Research which technologies a live repository should adopt, adapt, build, or reject | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `swift-code-review` | Review focused Swift and Apple-platform changes or provide their specialist lane in a deep review | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `triage-review-comments` | Classify PR review comments and recommend prevention checks | `SKILL.md`, `agents/openai.yaml`, `references/` |
+
+## Published Agent Profiles
+
+| Profile | Purpose | Standalone sandbox |
+|---|---|---|
+| `acceptance-contract-reviewer` | Check a frozen acceptance contract against exact snapshot and runtime evidence | `read-only` |
+| `artifact-provenance-verifier` | Map source identity through generated, packaged, installed, and released artifacts | `read-only` |
+| `delivery-state-reconciler` | Reconcile local Git, fetched remote, pull-request, check, review-thread, and merge state | `read-only` |
+| `evidence-ledger-lane-reviewer` | Trace one disjoint review lane and maintain its assigned checkpoint | `workspace-write`, checkpoint only |
+
+The profiles omit `model` and `model_reasoning_effort`. Codex inherits them from explicit spawn settings, configured subagent defaults, or the parent task.
 
 ## Package Metadata
 
@@ -43,16 +58,18 @@ The source skill folders under `skills/` must match their copies under `plugins/
 |---|---|
 | Codex marketplace | `.agents/plugins/marketplace.json` |
 | Plugin manifest | `plugins/codex-skills/.codex-plugin/plugin.json` |
+| Standalone profiles | `agents/*.toml` |
+| Plugin profiles | `plugins/codex-skills/agents/*.md` |
 | skills.sh grouping | `skills.sh.json` |
 
-The plugin manifest exposes all skill folders under `plugins/codex-skills/skills/`. The skills.sh group names and entries must stay aligned with the source skill names.
+The plugin contains all skill folders under `plugins/codex-skills/skills/` and all Codex profiles under `plugins/codex-skills/agents/`. The skills.sh group names and entries must stay aligned with the source skill names; skills.sh does not install agent profiles.
 
 ## Repo-Level Scripts
 
 | Script | Purpose |
 |---|---|
-| `scripts/install.sh` | Installs all top-level repo skills from a trusted checkout |
-| `scripts/test_install.sh` | Smoke-tests bundle installation, preservation, and curl-style rejection |
+| `scripts/install.sh` | Installs all top-level repo skills and Codex profiles from a trusted checkout |
+| `scripts/test_install.sh` | Smoke-tests skill and profile installation, preservation, retirement cleanup, and curl-style rejection |
 | `scripts/check_skill_mirror.py` | Confirms a source skill matches its plugin mirror |
 | `scripts/validate_release_contract.py` | Checks source, plugin, marketplace, docs, and skills.sh publication contracts |
 
@@ -89,7 +106,6 @@ python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
 python3 scripts/check_skill_mirror.py appstore-readiness-audit
 python3 scripts/check_skill_mirror.py deep-code-review
-python3 scripts/check_skill_mirror.py engineering-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
@@ -106,9 +122,9 @@ git diff --check
 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
+- [Agent Profiles](agent-profiles.md)
 - [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Deep Code Review](deep-code-review.md)
-- [Engineering Advisor](engineering-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)

@@ -14,11 +14,13 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from validate_release_contract import (  # noqa: E402
+    parse_agent_markdown,
     parse_semver,
     parse_skill_frontmatter,
     relative_files,
     changed_paths,
     shipped_plugin_change,
+    validate_agent_profiles,
     validate_skills_sh,
     validate_plugin_manifest,
     validate_version_change,
@@ -101,6 +103,62 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("frontmatter name must be a string", errors)
         self.assertIn("frontmatter description must be a string", errors)
 
+    def test_parse_agent_markdown_returns_frontmatter_and_instructions(self) -> None:
+        text = (
+            "---\n"
+            "name: example-reviewer\n"
+            "description: Review one bounded contract.\n"
+            "---\n\n"
+            "# Reviewer\n\nRemain read-only.\n"
+        )
+
+        fields, instructions, errors = parse_agent_markdown(
+            text, "example-reviewer"
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(fields["description"], "Review one bounded contract.")
+        self.assertEqual(instructions, "# Reviewer\n\nRemain read-only.")
+
+    def test_agent_profiles_must_match_plugin_and_inherit_model(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo = Path(temporary_directory)
+            source_root = repo / "agents"
+            plugin_root = repo / "plugins/codex-skills/agents"
+            source_root.mkdir(parents=True)
+            plugin_root.mkdir(parents=True)
+            (source_root / "example-reviewer.toml").write_text(
+                'name = "example-reviewer"\n'
+                'description = "Review one bounded contract."\n'
+                'sandbox_mode = "read-only"\n'
+                'developer_instructions = """# Reviewer\n\nRemain read-only.\n"""\n',
+                encoding="utf-8",
+            )
+            (plugin_root / "example-reviewer.md").write_text(
+                "---\n"
+                "name: example-reviewer\n"
+                "description: Review one bounded contract.\n"
+                "---\n\n"
+                "# Reviewer\n\nRemain read-only.\n",
+                encoding="utf-8",
+            )
+
+            errors, names = validate_agent_profiles(repo)
+
+            self.assertEqual(errors, [])
+            self.assertEqual(names, {"example-reviewer"})
+
+            source = source_root / "example-reviewer.toml"
+            source.write_text(
+                source.read_text(encoding="utf-8") + 'model = "pinned"\n',
+                encoding="utf-8",
+            )
+            errors, _ = validate_agent_profiles(repo)
+            self.assertIn(
+                "agents/example-reviewer.toml: model settings must inherit from the parent",
+                errors,
+            )
+
     def test_skills_sh_rejects_duplicate_and_stale_entries(self) -> None:
         data = {
             "groupings": [
@@ -117,7 +175,13 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("skills.sh missing skill: beta", errors)
 
     def test_shipped_plugin_change_detects_release_surfaces(self) -> None:
+        self.assertTrue(shipped_plugin_change({"agents/example-reviewer.toml"}))
         self.assertTrue(shipped_plugin_change({"skills/example/SKILL.md"}))
+        self.assertTrue(
+            shipped_plugin_change(
+                {"plugins/codex-skills/agents/example-reviewer.md"}
+            )
+        )
         self.assertTrue(
             shipped_plugin_change(
                 {"plugins/codex-skills/.codex-plugin/plugin.json"}
@@ -180,6 +244,13 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn("plugin manifest interface.defaultPrompt is required", errors)
             self.assertIn(
                 "plugin manifest logo does not exist: ./assets/logo.png", errors
+            )
+
+            manifest["interface"]["defaultPrompt"] = ["x" * 129]
+            errors, _ = validate_plugin_manifest(root, manifest)
+            self.assertIn(
+                "plugin manifest interface.defaultPrompt entries must be at most 128 characters",
+                errors,
             )
 
     def test_changed_paths_includes_non_ignored_untracked_files(self) -> None:
