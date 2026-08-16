@@ -8,12 +8,15 @@ Lead with results. Keep validated defects, unresolved risks, process blockers, a
 2. Pre-existing observations excluded from disposition for change reviews
 3. Material unresolved risks
 4. Process, policy, duplication, or merge blockers
-5. Validation performed
-6. Coverage and uncertainty ledger
-7. Review disposition
-8. Merge readiness when a pull request is in scope
+5. Active model/reasoning profile and any fallback or deviation
+6. Validation performed
+7. Coverage and uncertainty ledger
+8. Review disposition
+9. Merge readiness when a pull request is in scope
 
 If a section is empty, state `None.` Do not bury a blocker below the coverage narrative.
+
+Under the active profile, report the coordinator model, reasoning level, mixed-model policy, orchestration profile, concurrency and nesting limits, evidence-slice ceiling, candidate validation plan, checkpoint location, and any deviation forced by unavailable runtime capabilities. This is an execution record, not evidence that the conclusions are correct.
 
 ## Finding contracts
 
