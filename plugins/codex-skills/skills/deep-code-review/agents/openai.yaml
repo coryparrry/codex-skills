@@ -1,4 +1,4 @@
 interface:
   display_name: "Deep Code Review"
-  short_description: "Trace changes or audit a whole repository"
-  default_prompt: "Use $deep-code-review to select change-review or snapshot-audit mode, trace production behavior and shared contracts, accept no test or confirmation until independent evidence survives falsification, validate or disprove every reported claim, and disclose concrete validation blockers."
+  short_description: "Run a model-aware deep repository review"
+  default_prompt: "Use $deep-code-review to ask for the coordinator model and reasoning level, apply the full Luna/max audit state machine when selected, trace production behavior, validate every candidate, and disclose coverage gaps."
