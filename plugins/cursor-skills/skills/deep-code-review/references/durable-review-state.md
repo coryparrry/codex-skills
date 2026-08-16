@@ -2,6 +2,8 @@
 
 Use this protocol for every snapshot audit, multi-agent review, or review likely to exceed one context window. Its purpose is to preserve exact progress while preventing the root reviewer from accumulating every source file, tool result, and specialist thought in one context.
 
+For Luna at `max`, [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md) replaces the generic file layout below with a more explicit state machine. Preserve the ownership, bounded-context, and evidence-pointer rules from this file unless that Luna/max contract defines a stricter rule.
+
 Markdown is the canonical state format because agents can update and resume it reliably. JSON may be generated as a derived index for tooling, but it must not be the only resumable record.
 
 ## Create isolated state files

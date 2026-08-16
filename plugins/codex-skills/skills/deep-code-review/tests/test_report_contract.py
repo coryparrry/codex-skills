@@ -17,6 +17,10 @@ MODEL_PROFILES = (
     Path(__file__).resolve().parents[1]
     / "references/model-and-reasoning-profiles.md"
 )
+LUNA_MAX_PROTOCOL = (
+    Path(__file__).resolve().parents[1]
+    / "references/luna-max-whole-repository-audit.md"
+)
 
 
 class ReportContractTests(unittest.TestCase):
@@ -36,10 +40,46 @@ class ReportContractTests(unittest.TestCase):
 
         self.assertIn("Reasoning level changes scheduling and context control only", contract)
         self.assertIn("Strict Luna/max protocol", contract)
+        self.assertIn("[luna-max-whole-repository-audit.md]", contract)
+        self.assertIn("controlling orchestration contract", contract)
+
+    def test_luna_max_protocol_defines_exact_durable_state(self) -> None:
+        contract = LUNA_MAX_PROTOCOL.read_text(encoding="utf-8")
+
+        for state_file in (
+            "STATE.json",
+            "STATUS.md",
+            "COVERAGE.tsv",
+            "FINDINGS.md",
+            "CANDIDATES.md",
+            "REJECTED.md",
+            "FINAL_REPORT.md",
+        ):
+            self.assertIn(state_file, contract)
+        self.assertIn("path\tclassification\tprimary_lane\tstatus\tnotes", contract)
+        self.assertIn("Only the coordinator may edit the seven shared files", contract)
+        self.assertIn("Continue only from the recorded exact next action", contract)
+
+    def test_luna_max_protocol_is_a_phase_gated_state_machine(self) -> None:
+        contract = LUNA_MAX_PROTOCOL.read_text(encoding="utf-8")
+
+        phases = [
+            "## Phase 1: repository inventory",
+            "## Phase 2: discovery lanes",
+            "## Phase 3: cross-boundary investigation",
+            "## Phase 4: independent candidate validation",
+            "## Phase 5: final synthesis",
+        ]
+        positions = [contract.index(phase) for phase in phases]
+        self.assertEqual(positions, sorted(positions))
         self.assertIn("Run no more than four subagents concurrently", contract)
-        self.assertIn("Do not permit nested delegation", contract)
-        self.assertIn("Only the coordinator writes the root index", contract)
-        self.assertIn("independent validation pass", contract)
+        self.assertIn("Do not allow nested delegation", contract)
+        self.assertIn("Coordinator duties after every result", contract)
+        self.assertIn("Only then process another result", contract)
+        self.assertIn("Required validation return", contract)
+        self.assertIn("Checkpoint after at most eight newly opened files", contract)
+        self.assertIn("handoff of at most 300 words", contract)
+        self.assertIn("The audit is complete only when all conditions are true", contract)
 
     def test_large_reviews_load_the_durable_state_protocol(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")

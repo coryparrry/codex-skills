@@ -35,7 +35,7 @@ Treat model labels as orchestration inputs, not proof of quality.
 
 | Model family | Orchestration profile |
 |---|---|
-| Luna | Use phase gates, explicit schemas, small evidence packets, coordinator-owned shared state, and deterministic completion checks. For Luna at `max`, apply the strict protocol below. |
+| Luna | Use phase gates, explicit schemas, small evidence packets, coordinator-owned shared state, and deterministic completion checks. For Luna at `max`, load and follow [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md). |
 | Terra | Emphasize producer-to-consumer contracts, artifact provenance, configuration and release drift, and concise candidate packets. Use bounded parallel lanes for independent artifacts or flows. |
 | Sol | Emphasize cross-boundary synthesis, acceptance behavior, adversarial falsification, and integration of specialist evidence. Coherent lanes may be broader, but durable state and coverage gates still apply. |
 | Other or unknown | Use the strict fallback: phase-gated execution, coordinator-only shared state, no nested delegation, at most two concurrent lanes, and conservative evidence slices. |
@@ -65,77 +65,6 @@ Every lane still receives the exact frozen state, exclusive scope, output schema
 
 ## Strict Luna/max protocol
 
-Use this protocol for Luna at `max`, and for the strict fallback when the model is unknown.
+For Luna at `max`, read [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md) in full before repository inspection. It is the controlling orchestration contract for snapshot audits and repository-wide multi-agent reviews. Do not compress it into a generic lane plan or substitute the ordinary durable-state layout.
 
-### Freeze and initialize
-
-1. Verify the requested repository and ref before semantic inspection.
-2. Record the branch, exact commit, initial dirty state, comparison authority, and prohibited mutations.
-3. Create the durable state defined in [durable-review-state.md](durable-review-state.md).
-4. Add the active phase, completed lanes, active lanes, queued lanes, candidate states, blockers, last completed action, and exact next action to the root index.
-5. Reconcile every tracked first-party path to one production-area row or a reasoned exclusion. This path inventory is an accounting check, not a substitute for behavior tracing.
-
-Only the coordinator writes the root index, root integration record, and any shared candidate or finding ledger. Each lane writes only its own checkpoint.
-
-### Execute phase gates
-
-Run these phases in order:
-
-1. repository inventory and policy;
-2. discovery lanes;
-3. cross-boundary flow and shared-contract integration;
-4. independent candidate validation;
-5. final resnapshot, coverage reconciliation, and synthesis.
-
-Do not promote discovery candidates during discovery. Do not begin synthesis while a material lane or candidate remains active, queued, or unexplained.
-
-### Bound fanout and context
-
-- Run no more than four subagents concurrently.
-- Do not permit nested delegation. The coordinator alone schedules additional lanes and validation work.
-- Assign one exclusive primary lane and one checkpoint file to each agent.
-- Use the normal ceiling of eight newly opened files or about 2,000 newly loaded lines per evidence slice; reduce it for large or highly coupled files.
-- Persist a returned lane result and update root state before processing another result or doing further semantic investigation.
-- Keep full source, diffs, logs, and agent transcripts out of shared state. Store evidence pointers and discriminating output only.
-
-### Require structured lane returns
-
-Every discovery lane returns:
-
-```text
-Lane:
-Primary scope:
-Files or artifacts reviewed:
-Out-of-lane dependencies inspected:
-Commands and tests run:
-Coverage gaps:
-Candidate findings:
-Rejected hypotheses:
-Cross-lane edges:
-Next bounded slice:
-```
-
-Every candidate includes:
-
-```text
-Candidate ID:
-Provisional severity:
-Primary and related locations:
-Reachable trigger:
-Execution or data path:
-Expected behavior:
-Actual behavior:
-Concrete impact:
-Source and runtime evidence:
-Counter-evidence considered:
-Remaining uncertainty:
-Confidence:
-```
-
-Prefer no candidate over an unsupported candidate.
-
-### Validate and finish
-
-Assign material candidates to an independent validation pass that begins from the claimed trigger and attempts to disprove the defect. A candidate must end as `validated`, `disproved`, `unresolved`, `observation only`, or `stale at current head` before synthesis.
-
-Finish only when the target is re-snapshotted, every in-scope path is reconciled, every production area and critical flow satisfies the normal completeness gate or is explicitly uncovered, every lane returned, every candidate has a terminal state, duplicate root causes are merged, shared contracts are integrated, and the final working-tree state is recorded. Stop delegation after these conditions are met. Do not begin fixes during the audit.
+Use the strict fallback constraints in this file when the model is unknown. Use the complete Luna/max protocol only when Luna/max is selected or the user explicitly requests that structure.

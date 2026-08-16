@@ -32,7 +32,7 @@ Use $deep-code-review to audit this whole repository. Trace every production are
 
 Supply the pull request, branch, commit, diff, working tree, or explicit files in scope. Link the issue, specification, or incident when one exists. The skill remains read-only unless you separately request fixes.
 
-At startup, the skill asks which coordinator model and reasoning level are in use unless both were already supplied. It records that profile before repository inspection and tailors orchestration, lane size, checkpoint frequency, and validation scheduling. Luna at `max` uses a phase-gated coordinator protocol with structured lane returns, no nested delegation, at most four concurrent subagents, and deterministic completion checks. The selected profile never relaxes the evidence or completeness standard.
+At startup, the skill asks which coordinator model and reasoning level are in use unless both were already supplied. It records that profile before repository inspection and tailors orchestration, lane size, checkpoint frequency, and validation scheduling. Luna at `max` uses a complete audit state machine: exact shared files, valid JSON state, per-path TSV coverage, restart-safe next actions, five ordered phases, structured lane and candidate schemas, coordinator persistence after every result, independent validation, no nested delegation, at most four concurrent subagents, and a hard completion gate. The selected profile never relaxes the evidence or completeness standard.
 
 ## Review method
 
@@ -78,6 +78,7 @@ skills/deep-code-review/
     durable-review-state.md
     evidence-and-validation.md
     impact-and-negative-space.md
+    luna-max-whole-repository-audit.md
     model-and-reasoning-profiles.md
     report-format.md
     risk-lanes.md

@@ -1,4 +1,4 @@
 interface:
   display_name: "Deep Code Review"
   short_description: "Run a model-aware deep repository review"
-  default_prompt: "Use $deep-code-review to ask for the coordinator model and reasoning level, select change-review or snapshot-audit mode, trace production behavior, validate every candidate, and disclose coverage gaps."
+  default_prompt: "Use $deep-code-review to ask for the coordinator model and reasoning level, apply the full Luna/max audit state machine when selected, trace production behavior, validate every candidate, and disclose coverage gaps."

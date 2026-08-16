@@ -67,7 +67,7 @@ Use `deep-code-review` for a language-agnostic review of a pull request, branch,
 Use $deep-code-review as the repository-wide umbrella to review this change safely, validate only change-caused defects, and assess correctness, security, compatibility, and merge readiness.
 ```
 
-The skill first asks which coordinator model and reasoning level are in use unless both were supplied in the request. It records that profile and tailors orchestration, evidence slices, checkpoints, and validation scheduling without relaxing the review contract. Luna at `max` uses the strict phase-gated coordinator protocol; deliberate mixed-model lanes remain available when requested.
+The skill first asks which coordinator model and reasoning level are in use unless both were supplied in the request. It records that profile and tailors orchestration, evidence slices, checkpoints, and validation scheduling without relaxing the review contract. Luna at `max` uses an explicit five-phase audit state machine with `STATE.json`, `STATUS.md`, per-path `COVERAGE.tsv`, separate candidate/finding/rejection ledgers, structured lane returns, coordinator-only shared writes, independent validation, and a hard completion gate. Deliberate mixed-model lanes remain available when requested.
 
 It then binds the review to an exact state, resolves repository policy, reconstructs intent, traces affected behavior beyond the diff, activates only relevant specialist lanes, challenges verification, and checks missing companion changes. It inspects execution hooks before running proposed code, tries to disprove every candidate finding, runs one bounded omission pass, and re-snapshots the state before reporting.
 
