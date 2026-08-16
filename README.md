@@ -23,6 +23,16 @@ Supporting details stay in references, scripts, or tests.
 
 Read the [installation guide](docs/installation.md) for more information.
 
+### Agent Plugins v1
+
+Build a clean package that follows the [Agent Plugins Specification 1.0.0](https://github.com/agentplugins/agent-plugins-spec/blob/main/spec/1.0.0.md):
+
+```bash
+python3 scripts/build_agent_plugin.py --output dist/codex-skills
+```
+
+The output contains the portable manifest, the eight skills in the fixed `skills/` location, and the license. It excludes Codex-only manifests, agent profiles, and interface assets. If a portable `mcp.json` is present, the builder includes it. Load the output directory using your client's directory-based plugin flow. The standard does not define a shared install command or marketplace protocol.
+
 ### skills.sh
 
 Install the full bundle:
@@ -61,6 +71,7 @@ The research skills work with the runtime that is available. They use independen
 | [`skills/`](skills/) | Source skill folders for maintainers and skills.sh installations. |
 | [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/) | Plugin copies of the shipped skills. |
 | [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json) | Codex plugin metadata. |
+| [`plugins/codex-skills/plugin.json`](plugins/codex-skills/plugin.json) | Portable Agent Plugins v1 metadata. |
 | [`skills.sh.json`](skills.sh.json) | Skill groups for the skills.sh repository page. |
 | [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) | Codex marketplace entry. |
 | [`experimental/`](experimental/) | Unshipped experiments. The installer does not include them. |
@@ -72,6 +83,7 @@ Run these commands after a packaging change:
 ```bash
 python3 -m pip install -r requirements-release.txt
 python3 scripts/tests/test_validate_release_contract.py
+python3 scripts/tests/test_build_agent_plugin.py
 python3 scripts/validate_release_contract.py --base-ref origin/main
 bash -n scripts/install.sh
 bash scripts/test_install.sh
@@ -88,7 +100,9 @@ python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool plugins/codex-skills/plugin.json >/dev/null
 npx skills add . --list
+for skill in skills/*; do skills-ref validate "$skill"; done
 git diff --check
 ```
 

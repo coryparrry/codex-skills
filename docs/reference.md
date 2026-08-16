@@ -8,6 +8,7 @@
 plugins/
   codex-skills/
     .codex-plugin/
+    plugin.json
     skills/
 scripts/
 skills.sh.json
@@ -42,10 +43,11 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | Surface | Path |
 |---|---|
 | Codex marketplace | `.agents/plugins/marketplace.json` |
-| Plugin manifest | `plugins/codex-skills/.codex-plugin/plugin.json` |
+| Agent Plugins v1 manifest | `plugins/codex-skills/plugin.json` |
+| Codex manifest | `plugins/codex-skills/.codex-plugin/plugin.json` |
 | skills.sh grouping | `skills.sh.json` |
 
-The plugin manifest exposes all skill folders under `plugins/codex-skills/skills/`. The skills.sh group names and entries must stay aligned with the source skill names.
+Agent Plugins v1 clients discover immediate skill directories from `plugins/codex-skills/skills/`. Codex uses the same skill folders through its own manifest. Both manifests share one version, and the skills.sh group names and entries must stay aligned with the source skill names.
 
 ## Repo-Level Scripts
 
@@ -53,8 +55,9 @@ The plugin manifest exposes all skill folders under `plugins/codex-skills/skills
 |---|---|
 | `scripts/install.sh` | Installs all top-level repo skills from a trusted checkout |
 | `scripts/test_install.sh` | Smoke-tests bundle installation, preservation, and curl-style rejection |
+| `scripts/build_agent_plugin.py` | Builds a clean Agent Plugins v1 package without Codex-only files |
 | `scripts/check_skill_mirror.py` | Confirms a source skill matches its plugin mirror |
-| `scripts/validate_release_contract.py` | Checks source, plugin, marketplace, docs, and skills.sh publication contracts |
+| `scripts/validate_release_contract.py` | Checks source, manifests, the pinned Agent Plugins schema, marketplace, docs, and skills.sh publication contracts |
 
 ## Git Cleanup Script
 
@@ -82,6 +85,7 @@ The script refuses to run outside a Git repository, without an `origin` remote, 
 ```bash
 python3 -m pip install -r requirements-release.txt
 python3 scripts/tests/test_validate_release_contract.py
+python3 scripts/tests/test_build_agent_plugin.py
 python3 scripts/validate_release_contract.py --base-ref origin/main
 bash -n scripts/install.sh
 bash scripts/test_install.sh
@@ -98,7 +102,9 @@ python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool plugins/codex-skills/plugin.json >/dev/null
 npx skills add . --list
+for skill in skills/*; do skills-ref validate "$skill"; done
 git diff --check
 ```
 

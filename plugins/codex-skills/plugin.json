@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-skills",
+  "version": "0.17.0",
+  "description": "Agent skills for research, App Store readiness, advisor-led engineering, model-aware repository review, Swift review, PR feedback triage, and safe branch cleanup.",
+  "author": {
+    "name": "Cory Parry",
+    "url": "https://github.com/coryparrry"
+  },
+  "homepage": "https://github.com/coryparrry/codex-skills",
+  "repository": "https://github.com/coryparrry/codex-skills",
+  "license": "MIT",
+  "keywords": [
+    "agent-plugins",
+    "agent-skills",
+    "codex",
+    "research",
+    "review",
+    "code-review",
+    "repository",
+    "apple",
+    "app-store",
+    "orchestration",
+    "git"
+  ]
+}

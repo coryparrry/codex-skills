@@ -32,11 +32,13 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install plugin-validator dependency
+      - name: Install release dependencies
         run: python3 -m pip install --disable-pip-version-check -r requirements-release.txt
 
       - name: Test release-contract validator
-        run: python3 scripts/tests/test_validate_release_contract.py
+        run: |
+          python3 scripts/tests/test_validate_release_contract.py
+          python3 scripts/tests/test_build_agent_plugin.py
 
       - name: Validate release contract
         shell: bash
