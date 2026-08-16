@@ -55,7 +55,7 @@ Use a user-requested repository location when supplied. Otherwise use writable s
 
 Only the coordinator may edit the seven shared files. Each discovery or validation agent at every depth owns exactly one file under `agents/` and must not edit shared state.
 
-Nested delegation is permitted for genuinely independent subscopes when the runtime allows it. Before delegating, the parent must record the child lane ID, exclusive scope, exact checkpoint path, model, reasoning level, and expected return in its own lane file. Every descendant must be explicitly created as Luna at `max`; when explicit selectors are available, pass `model: gpt-5.6-luna` and `reasoning_effort: max` with a fork mode that permits overrides. Never inherit, infer, or substitute another model or effort. If Luna/max cannot be guaranteed, do not delegate that scope and return it as blocked or uncovered. The parent integrates each descendant into its own checkpoint and compact handoff; the coordinator alone integrates that handoff into shared state.
+Nested delegation is permitted for genuinely independent subscopes when the runtime allows it. Before delegating, the parent must record the child lane ID, exclusive scope, exact checkpoint path, selected model, reasoning level, routing reason, and expected return in its own lane file. Select every descendant independently from the risk-routing matrix in [model-and-reasoning-profiles.md](model-and-reasoning-profiles.md); a Luna coordinator may create Luna, Terra, or Sol descendants. When explicit selectors are available, pass the exact `model` and `reasoning_effort` with a fork mode that permits overrides. Never rely on inherited model identity as routing. The parent integrates each descendant into its own checkpoint and compact handoff; the coordinator alone integrates that handoff into shared state.
 
 ## Shared state contracts
 
@@ -159,9 +159,9 @@ Do not begin discovery lanes until inventory is complete.
 
 ## Phase 2: discovery lanes
 
-Use every worker slot available after reserving the coordinator. Do not impose a skill-level limit on concurrent lanes, total agents, lane count, or wave count. Continue creating disjoint Luna/max lanes, in parallel and in later waves, while useful uncovered work remains.
+Use every worker slot available after reserving the coordinator. Do not impose a skill-level limit on concurrent lanes, total agents, lane count, or wave count. Continue creating disjoint risk-routed lanes, in parallel and in later waves, while useful uncovered work remains.
 
-Permit nested Luna/max delegation when a lane contains genuinely independent subscopes or would otherwise combine multiple bounded evidence slices. Every nested lane must have exclusive scope and a unique checkpoint path. Runtime capacity and runtime nesting policy are the only fanout limits; never create work merely to occupy capacity.
+Permit nested delegation when a lane contains genuinely independent subscopes or would otherwise combine multiple bounded evidence slices. Route each nested lane to Luna, Terra, or Sol by its own dominant risk, not its parent's model. Every nested lane must have exclusive scope and a unique checkpoint path. Runtime capacity and runtime nesting policy are the only fanout limits; never create work merely to occupy capacity.
 
 Prefer coherent lanes such as these when the repository contains them:
 
