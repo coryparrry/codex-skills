@@ -26,6 +26,18 @@ The marketplace plugin exposes:
 - `swift-code-review`
 - `triage-review-comments`
 
+## Load Through an Agent Plugins v1 Client
+
+Build the portable package into a new output directory:
+
+```bash
+python3 scripts/build_agent_plugin.py --output dist/codex-skills
+```
+
+The builder copies the Agent Plugins 1.0.0 manifest, the `skills/` directory, the license, and `mcp.json` when present. It leaves out `.codex-plugin/`, Codex agent profiles, and interface assets. The output path must not already exist.
+
+Load `dist/codex-skills/` using the client's directory-based plugin flow. The Agent Plugins specification defines the package format, not a shared install command or marketplace protocol, so the final install step depends on the client.
+
 ## Install Through skills.sh
 
 Install the full bundle:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -15,17 +16,27 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from validate_release_contract import (  # noqa: E402
     parse_semver,
-    parse_skill_frontmatter,
     relative_files,
     changed_paths,
     shipped_plugin_change,
     validate_skills_sh,
+    validate_agent_plugin_policy,
+    validate_agent_plugin_manifest,
     validate_plugin_manifest,
+    validate_shared_plugin_identity,
     validate_version_change,
 )
 
 
 class ReleaseContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.agent_plugin_schema = json.loads(
+            (SCRIPTS_DIR / "schemas/agent-plugins/1.0.0/plugin.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
     def test_parse_semver_orders_numeric_components(self) -> None:
         self.assertLess(parse_semver("0.14.9"), parse_semver("0.15.0"))
         self.assertLess(parse_semver("1.9.9"), parse_semver("2.0.0"))
@@ -33,73 +44,6 @@ class ReleaseContractTests(unittest.TestCase):
     def test_parse_semver_rejects_non_semver(self) -> None:
         with self.assertRaises(ValueError):
             parse_semver("v1.2")
-
-    def test_parse_skill_frontmatter_requires_matching_name(self) -> None:
-        text = "---\nname: example-skill\ndescription: Example.\n---\n"
-        self.assertEqual(
-            parse_skill_frontmatter(text, expected_name="example-skill"),
-            [],
-        )
-        self.assertIn(
-            "frontmatter name must be other-skill, got example-skill",
-            parse_skill_frontmatter(text, expected_name="other-skill"),
-        )
-
-    def test_parse_skill_frontmatter_enforces_catalogue_limits(self) -> None:
-        text = (
-            "---\n"
-            f"name: {'a' * 65}\n"
-            "description: Do not use <placeholder> text.\n"
-            "unknown: value\n"
-            "---\n"
-        )
-        errors = parse_skill_frontmatter(text, expected_name="a" * 65)
-        self.assertIn("frontmatter name must be at most 64 characters", errors)
-        self.assertIn("frontmatter description cannot contain angle brackets", errors)
-        self.assertIn("unexpected frontmatter field: unknown", errors)
-
-    def test_parse_skill_frontmatter_resolves_folded_yaml_description(self) -> None:
-        text = (
-            "---\n"
-            "name: example-skill\n"
-            "description: >-\n"
-            "  A valid folded\n"
-            "  description.\n"
-            "---\n"
-        )
-        self.assertEqual(parse_skill_frontmatter(text, "example-skill"), [])
-
-    def test_parse_skill_frontmatter_checks_literal_yaml_description(self) -> None:
-        text = (
-            "---\n"
-            "name: example-skill\n"
-            "description: |\n"
-            "  Hidden <invalid> content.\n"
-            "---\n"
-        )
-        self.assertIn(
-            "frontmatter description cannot contain angle brackets",
-            parse_skill_frontmatter(text, "example-skill"),
-        )
-
-    def test_parse_skill_frontmatter_checks_resolved_description_length(self) -> None:
-        text = (
-            "---\n"
-            "name: example-skill\n"
-            "description: |\n"
-            f"  {'a' * 1025}\n"
-            "---\n"
-        )
-        self.assertIn(
-            "frontmatter description must be at most 1024 characters",
-            parse_skill_frontmatter(text, "example-skill"),
-        )
-
-    def test_parse_skill_frontmatter_rejects_non_string_values(self) -> None:
-        text = "---\nname: 123\ndescription: [not, text]\n---\n"
-        errors = parse_skill_frontmatter(text, "example-skill")
-        self.assertIn("frontmatter name must be a string", errors)
-        self.assertIn("frontmatter description must be a string", errors)
 
     def test_skills_sh_rejects_duplicate_and_stale_entries(self) -> None:
         data = {
@@ -124,10 +68,14 @@ class ReleaseContractTests(unittest.TestCase):
             )
         )
         self.assertTrue(
+            shipped_plugin_change({"plugins/codex-skills/plugin.json"})
+        )
+        self.assertTrue(
             shipped_plugin_change({"plugins/codex-skills/assets/logo.png"})
         )
         self.assertTrue(shipped_plugin_change({"plugins/codex-skills/.app.json"}))
         self.assertTrue(shipped_plugin_change({"plugins/codex-skills/.mcp.json"}))
+        self.assertTrue(shipped_plugin_change({"plugins/codex-skills/mcp.json"}))
         self.assertFalse(shipped_plugin_change({"docs/example.md"}))
 
     def test_shipped_change_requires_a_strict_version_increase(self) -> None:
@@ -181,6 +129,63 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(
                 "plugin manifest logo does not exist: ./assets/logo.png", errors
             )
+
+    def test_agent_plugin_manifest_accepts_official_minimal_shape(self) -> None:
+        manifest = {
+            "$schema": (
+                "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+            ),
+            "name": "codex-skills",
+        }
+
+        self.assertEqual(
+            validate_agent_plugin_manifest(manifest, self.agent_plugin_schema), []
+        )
+
+    def test_agent_plugin_manifest_uses_official_closed_schema(self) -> None:
+        manifest = {
+            "$schema": "https://example.com/plugin.schema.json",
+            "name": "Codex--Skills",
+            "version": "v1",
+            "skills": "./skills/",
+            "author": {"organization": "Example", "name": 42},
+            "keywords": "agent-skills",
+            "extensions": {"com.example.client": True},
+        }
+
+        errors = validate_agent_plugin_manifest(manifest, self.agent_plugin_schema)
+
+        self.assertTrue(any("skills" in error for error in errors))
+        self.assertTrue(any("Codex--Skills" in error for error in errors))
+        self.assertFalse(any("SemVer" in error for error in errors))
+
+    def test_agent_plugin_release_policy_requires_matching_semver(self) -> None:
+        errors, version = validate_agent_plugin_policy(
+            {"name": "codex-skills", "version": "v1"}
+        )
+        self.assertEqual(version, "v1")
+        self.assertEqual(errors, ["invalid SemVer: v1"])
+
+        errors, version = validate_agent_plugin_policy({"name": "codex-skills"})
+        self.assertEqual(version, "")
+        self.assertEqual(errors, ["Agent Plugins manifest version is required"])
+
+    def test_shared_plugin_identity_detects_manifest_drift(self) -> None:
+        shared = {
+            "name": "codex-skills",
+            "version": "1.2.3",
+            "author": {"name": "Maintainer"},
+            "homepage": "https://example.com",
+            "repository": "https://example.com/repo",
+            "license": "MIT",
+        }
+        agent = dict(shared)
+        agent["repository"] = "https://example.com/other"
+
+        self.assertEqual(
+            validate_shared_plugin_identity(shared, agent),
+            ["Codex and Agent Plugins manifest repository must match"],
+        )
 
     def test_changed_paths_includes_non_ignored_untracked_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -14,10 +14,16 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import yaml
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
+from skills_ref import validate as validate_agent_skill
 
 
-PLUGIN_MANIFEST = Path("plugins/codex-skills/.codex-plugin/plugin.json")
+CODEX_PLUGIN_MANIFEST = Path("plugins/codex-skills/.codex-plugin/plugin.json")
+AGENT_PLUGIN_MANIFEST = Path("plugins/codex-skills/plugin.json")
+AGENT_PLUGIN_SCHEMA_FILE = Path(
+    "scripts/schemas/agent-plugins/1.0.0/plugin.schema.json"
+)
 MARKETPLACE_MANIFEST = Path(".agents/plugins/marketplace.json")
 SKILLS_SH_MANIFEST = Path("skills.sh.json")
 PLUGIN_ROOT = Path("plugins/codex-skills")
@@ -55,51 +61,6 @@ def parse_semver(value: str) -> tuple[int, int, int]:
     if not match:
         raise ValueError(f"invalid SemVer: {value}")
     return tuple(int(component) for component in match.groups())
-
-
-def parse_skill_frontmatter(text: str, expected_name: str) -> list[str]:
-    errors: list[str] = []
-    lines = text.splitlines()
-    if len(lines) < 4 or lines[0] != "---":
-        return ["SKILL.md must start with YAML frontmatter"]
-    try:
-        end = lines.index("---", 1)
-    except ValueError:
-        return ["SKILL.md frontmatter is not closed"]
-
-    allowed_fields = {"name", "description", "license", "allowed-tools", "metadata"}
-    try:
-        fields = yaml.safe_load("\n".join(lines[1:end]))
-    except yaml.YAMLError as error:
-        return [f"SKILL.md frontmatter is invalid YAML: {error}"]
-    if not isinstance(fields, dict):
-        return ["SKILL.md frontmatter must be a YAML mapping"]
-
-    for field in fields:
-        if not isinstance(field, str):
-            errors.append("frontmatter field names must be strings")
-        elif field not in allowed_fields:
-            errors.append(f"unexpected frontmatter field: {field}")
-
-    actual_name = fields.get("name")
-    if not isinstance(actual_name, str):
-        errors.append("frontmatter name must be a string")
-    elif actual_name != expected_name:
-        errors.append(
-            f"frontmatter name must be {expected_name}, got {actual_name}"
-        )
-    if isinstance(actual_name, str) and len(actual_name) > 64:
-        errors.append("frontmatter name must be at most 64 characters")
-    description = fields.get("description")
-    if not isinstance(description, str):
-        errors.append("frontmatter description must be a string")
-    elif not description.strip():
-        errors.append("frontmatter description is required")
-    elif len(description) > 1024:
-        errors.append("frontmatter description must be at most 1024 characters")
-    elif "<" in description or ">" in description:
-        errors.append("frontmatter description cannot contain angle brackets")
-    return errors
 
 
 def validate_skills_sh(
@@ -144,6 +105,8 @@ def shipped_plugin_change(changed_paths: set[str]) -> bool:
         "plugins/codex-skills/.codex-plugin/",
     )
     release_files = {
+        "plugins/codex-skills/plugin.json",
+        "plugins/codex-skills/mcp.json",
         "plugins/codex-skills/.app.json",
         "plugins/codex-skills/.mcp.json",
     }
@@ -230,6 +193,48 @@ def validate_plugin_manifest(repo: Path, data: dict[str, Any]) -> tuple[list[str
     return errors, version
 
 
+def validate_agent_plugin_manifest(
+    data: dict[str, Any], schema: dict[str, Any]
+) -> list[str]:
+    """Validate a manifest against the pinned Agent Plugins v1 schema."""
+    errors: list[str] = []
+    try:
+        Draft202012Validator.check_schema(schema)
+    except SchemaError as error:
+        return [f"Agent Plugins schema is invalid: {error.message}"]
+
+    validator = Draft202012Validator(schema)
+    for error in sorted(validator.iter_errors(data), key=lambda item: list(item.path)):
+        location = ".".join(str(part) for part in error.path) or "$"
+        errors.append(f"Agent Plugins manifest {location}: {error.message}")
+    return errors
+
+
+def validate_agent_plugin_policy(data: dict[str, Any]) -> tuple[list[str], str]:
+    """Apply this repository's stricter identity and release-version policy."""
+    errors: list[str] = []
+    if data.get("name") != PLUGIN_ROOT.name:
+        errors.append(f"Agent Plugins manifest name must be {PLUGIN_ROOT.name}")
+    version = data.get("version")
+    if not isinstance(version, str):
+        return errors + ["Agent Plugins manifest version is required"], ""
+    try:
+        parse_semver(version)
+    except ValueError as error:
+        errors.append(str(error))
+    return errors, version
+
+
+def validate_shared_plugin_identity(
+    codex_data: dict[str, Any], agent_data: dict[str, Any]
+) -> list[str]:
+    errors: list[str] = []
+    for field in ("name", "version", "author", "homepage", "repository", "license"):
+        if codex_data.get(field) != agent_data.get(field):
+            errors.append(f"Codex and Agent Plugins manifest {field} must match")
+    return errors
+
+
 def load_json(path: Path) -> tuple[dict[str, Any], list[str]]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -290,9 +295,7 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
             errors.append(f"invalid skill directory name: {skill}")
         source = source_root / skill
         mirror = mirror_root / skill
-        for detail in parse_skill_frontmatter(
-            (source / "SKILL.md").read_text(encoding="utf-8"), skill
-        ):
+        for detail in validate_agent_skill(source):
             errors.append(f"skills/{skill}/SKILL.md: {detail}")
         if not (source / "agents/openai.yaml").is_file():
             errors.append(f"skills/{skill}: missing agents/openai.yaml")
@@ -313,12 +316,28 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     if not json_errors:
         errors.extend(validate_skills_sh(public_skills, skills_data))
 
-    plugin_data, json_errors = load_json(repo / PLUGIN_MANIFEST)
+    plugin_data, json_errors = load_json(repo / CODEX_PLUGIN_MANIFEST)
     errors.extend(json_errors)
     plugin_version = ""
     if not json_errors:
         plugin_errors, plugin_version = validate_plugin_manifest(repo, plugin_data)
         errors.extend(plugin_errors)
+
+    agent_plugin_data, json_errors = load_json(repo / AGENT_PLUGIN_MANIFEST)
+    errors.extend(json_errors)
+    if not json_errors:
+        schema, schema_errors = load_json(repo / AGENT_PLUGIN_SCHEMA_FILE)
+        errors.extend(schema_errors)
+        if not schema_errors:
+            errors.extend(validate_agent_plugin_manifest(agent_plugin_data, schema))
+        policy_errors, _ = validate_agent_plugin_policy(agent_plugin_data)
+        errors.extend(policy_errors)
+        if not plugin_data:
+            errors.append("Codex plugin manifest is required for identity checks")
+        else:
+            errors.extend(
+                validate_shared_plugin_identity(plugin_data, agent_plugin_data)
+            )
 
     marketplace, json_errors = load_json(repo / MARKETPLACE_MANIFEST)
     errors.extend(json_errors)
@@ -413,7 +432,7 @@ def changed_paths(repo: Path, base_ref: str) -> tuple[set[str], list[str]]:
 
 def version_at_ref(repo: Path, base_ref: str) -> tuple[str, list[str]]:
     try:
-        raw = git_output(repo, "show", f"{base_ref}:{PLUGIN_MANIFEST}")
+        raw = git_output(repo, "show", f"{base_ref}:{CODEX_PLUGIN_MANIFEST}")
         data = json.loads(raw)
         return str(data.get("version", "")), []
     except (subprocess.CalledProcessError, json.JSONDecodeError) as error:

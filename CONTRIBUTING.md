@@ -22,6 +22,8 @@ Thanks for improving `codex-skills`.
 | `skills/swift-code-review/` | Swift and Apple-platform review workflow and reference files |
 | `skills/triage-review-comments/` | PR review feedback triage skill and references |
 | `plugins/codex-skills/skills/` | Installable plugin mirror of shipped skills |
+| `plugins/codex-skills/plugin.json` | Portable Agent Plugins v1 manifest |
+| `plugins/codex-skills/.codex-plugin/plugin.json` | Codex manifest and interface metadata |
 | `scripts/` | Repo-level installer, mirror checker, and install tests |
 | `docs/` | User-facing documentation |
 
@@ -32,6 +34,8 @@ Run:
 ```bash
 bash -n scripts/install.sh
 bash scripts/test_install.sh
+python3 scripts/tests/test_build_agent_plugin.py
+python3 scripts/tests/test_validate_release_contract.py
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
@@ -41,6 +45,8 @@ python3 scripts/check_skill_mirror.py swift-code-review
 python3 -m json.tool skills.sh.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/codex-skills/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool plugins/codex-skills/plugin.json >/dev/null
+skills-ref validate skills/deep-code-review
 git diff --check
 ```
 

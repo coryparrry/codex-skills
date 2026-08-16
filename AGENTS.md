@@ -4,7 +4,7 @@
 
 This repository packages a small Codex skill bundle. Source skills live under `skills/`, with one directory per skill, including research, review-triage, and branch-cleanup workflows. Each skill keeps its entrypoint in `SKILL.md`; supporting files belong in local `agents/`, `references/`, `scripts/`, or `tests/` subdirectories.
 
-The installable plugin mirror lives under `plugins/codex-skills/skills/`, and plugin metadata is in `plugins/codex-skills/.codex-plugin/plugin.json`. Keep mirrored skill files synchronized when changing shipped skill behavior. User-facing documentation belongs in `docs/`; repository install helpers live in `scripts/`.
+The installable plugin mirror lives under `plugins/codex-skills/skills/`. Portable Agent Plugins v1 metadata is in `plugins/codex-skills/plugin.json`, while Codex-specific metadata is in `plugins/codex-skills/.codex-plugin/plugin.json`. Keep mirrored skill files synchronized when changing shipped skill behavior. User-facing documentation belongs in `docs/`; repository install helpers live in `scripts/`.
 
 ## Skill catalogue and documentation
 
@@ -19,9 +19,9 @@ Treat the Git-backed marketplace on GitHub `main` as the only durable installed 
 For every shipped plugin update, complete this release sequence:
 
 1. Update the canonical skill under `skills/` and its copy under `plugins/codex-skills/skills/`. Keep the two copies byte-identical.
-2. Update `plugins/codex-skills/.codex-plugin/plugin.json` in the same change. Increment its `version` for every change to shipped skills, plugin metadata, or plugin assets because Codex uses that SemVer value as the installed-cache key. Use a minor version for a new capability and a patch version for a compatible fix or metadata refresh. Update descriptions, prompts, capabilities, and asset paths when the shipped surface changes, and verify every referenced file exists.
-3. Keep `.agents/plugins/marketplace.json` valid and ensure the `codex-skills` entry retains `source.path: "./plugins/codex-skills"`, `policy.installation: "AVAILABLE"`, `policy.authentication: "ON_INSTALL"`, and a category. Do not put the release version in the marketplace entry; the authoritative version is in `plugin.json`.
-4. Validate the source and mirrored skills, run `python3 scripts/check_skill_mirror.py <skill>`, validate the plugin with the system `plugin-creator` validator, parse `plugin.json`, `marketplace.json`, and `skills.sh.json` with `python3 -m json.tool`, run `bash scripts/test_install.sh`, and run `git diff --check`.
+2. Update `plugins/codex-skills/plugin.json` and `plugins/codex-skills/.codex-plugin/plugin.json` in the same change. Keep their versions equal. Increment the version for every change to shipped skills, plugin metadata, or plugin assets because Codex uses that SemVer value as the installed-cache key. Use a minor version for a new capability and a patch version for a compatible fix or metadata refresh. Keep portable metadata within the closed Agent Plugins v1 schema. Update Codex descriptions, prompts, capabilities, and asset paths when the shipped surface changes, and verify every referenced file exists.
+3. Keep `.agents/plugins/marketplace.json` valid and ensure the `codex-skills` entry retains `source.path: "./plugins/codex-skills"`, `policy.installation: "AVAILABLE"`, `policy.authentication: "ON_INSTALL"`, and a category. Do not put the release version in the marketplace entry; both plugin manifests carry the matching release version.
+4. Validate the source and mirrored skills, run `python3 scripts/check_skill_mirror.py <skill>`, validate the Codex plugin with the system `plugin-creator` validator, run the release-contract validator against the pinned Agent Plugins v1 schema, build a clean portable package with `scripts/build_agent_plugin.py`, validate every portable skill with `skills-ref`, parse both plugin manifests, `marketplace.json`, and `skills.sh.json` with `python3 -m json.tool`, run `bash scripts/test_install.sh`, and run `git diff --check`.
 5. Commit and push the complete update, merge it to GitHub `main`, and verify the marketplace checkout revision equals `origin/main` before installing. Never release from an unmerged feature branch.
 6. For a registered Git marketplace, run `codex plugin marketplace upgrade codex-skills`, then remove and reinstall `codex-skills@codex-skills` so the new version creates a fresh cache directory. If the marketplace is not registered, add `https://github.com/coryparrry/codex-skills.git` without a feature-branch `--ref`, then install the plugin.
 7. Verify `codex plugin list --marketplace codex-skills --available --json` reports the expected version, enabled state, and Git marketplace source. Confirm the installed manifest matches the Git-backed `main` snapshot, the previous version cache is absent, and no standalone copy exists under `${CODEX_HOME:-$HOME/.codex}/skills/`.
@@ -44,6 +44,7 @@ For every skills.sh release:
 
 - `python3 -m pip install -r requirements-release.txt`: installs the pinned dependency used by release validation.
 - `python3 scripts/tests/test_validate_release_contract.py`: tests the release-contract checker.
+- `python3 scripts/tests/test_build_agent_plugin.py`: tests the clean portable package builder.
 - `python3 scripts/validate_release_contract.py --base-ref origin/main`: validates the public catalogue and requires a plugin version increase when shipped plugin content changed.
 - `bash scripts/test_install.sh`: runs the install smoke test against temporary Codex homes.
 - `bash -n scripts/install.sh`: syntax-checks the repo installer.
@@ -56,6 +57,7 @@ For every skills.sh release:
 - `python3 scripts/check_skill_mirror.py research-repo-technology`: verifies source/plugin mirror parity.
 - `python3 scripts/check_skill_mirror.py swift-code-review`: verifies source/plugin mirror parity.
 - `python3 -m json.tool skills.sh.json >/dev/null`: validates package metadata JSON.
+- `python3 -m json.tool plugins/codex-skills/plugin.json >/dev/null`: validates portable Agent Plugins metadata JSON.
 - `git diff --check`: catches trailing whitespace and patch formatting issues.
 
 ## Coding Style & Naming Conventions
