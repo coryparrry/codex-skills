@@ -32,7 +32,7 @@ Use $deep-code-review to audit this whole repository. Trace every production are
 
 Supply the pull request, branch, commit, diff, working tree, or explicit files in scope. Link the issue, specification, or incident when one exists. The skill remains read-only unless you separately request fixes.
 
-At startup, the skill asks which coordinator model and reasoning level are in use unless both were already supplied. It records that profile before repository inspection and tailors orchestration, lane size, checkpoint frequency, and validation scheduling. Luna at `max` uses a complete audit state machine: exact shared files, valid JSON state, per-path TSV coverage, restart-safe next actions, five ordered phases, structured lane and candidate schemas, coordinator persistence after every result, independent validation, no nested delegation, at most four concurrent subagents, and a hard completion gate. The selected profile never relaxes the evidence or completeness standard.
+At startup, the skill asks which coordinator model and reasoning level are in use unless both were already supplied. It records that profile before repository inspection and tailors orchestration, lane size, checkpoint frequency, and validation scheduling. Luna at `max` uses a complete audit state machine: exact shared files, valid JSON state, per-path TSV coverage, restart-safe next actions, five ordered phases, structured lane and candidate schemas, coordinator persistence after every result, independent validation, Luna/max-only descendants, nested delegation for disjoint subscopes, no skill-imposed fanout cap within runtime capacity, and a hard completion gate. The selected profile never relaxes the evidence or completeness standard.
 
 ## Review method
 
@@ -50,7 +50,7 @@ The skill:
 - routes security, privacy, concurrency, data, compatibility, accessibility, internationalization, native interoperability, dependency, performance, reliability, test, platform, and operations review only when triggered;
 - composes with `swift-code-review` for affected Swift and Apple-platform paths while retaining repository-wide integration and disposition;
 - uses deterministic tools and behavioral execution before model speculation;
-- supports deliberate mixed-model specialist lanes when the user requests them, without treating model agreement as independent evidence;
+- risk-routes mixed-model specialist lanes under Terra and Sol coordinators by default, while Luna coordinators remain Luna/max-only;
 - accepts no test, confirmation, documentation claim, prior review, or reviewer conclusion until independent evidence survives a falsification attempt;
 - inspects command hooks and requires an isolation, credential, network, and side-effect boundary before executing proposed code;
 - checks required-but-missing companion changes and established repository abstractions;
