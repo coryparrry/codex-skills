@@ -1,6 +1,6 @@
 ---
 name: deep-code-review
-description: Perform model-aware, language-agnostic review of a whole repository snapshot or of a pull request, branch, commit, diff, working tree, or AI-generated change. Use for deep, exhaustive, repo-wide, whole-codebase, adversarial, or AI-code review; calibrate the workflow to the coordinator model and reasoning level, select snapshot-audit mode for existing repository behavior and change-review mode for a delta, use as the umbrella review for mixed-language repositories, and compose with `swift-code-review` when Swift or Apple-platform paths are affected.
+description: Review a repository snapshot or code change for evidence-backed correctness, security, compatibility, and regression risks. Use for deep, exhaustive, repository-wide, adversarial, or AI-generated code review.
 ---
 
 # Deep code review
