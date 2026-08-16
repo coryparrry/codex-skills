@@ -33,18 +33,18 @@ Checkpoint location:
 
 Treat model and reasoning labels as orchestration inputs, not proof of quality. Resolve every recorded field from the two tables below before semantic review.
 
-| Model family | Family lane cap | Family nesting policy | Orchestration emphasis |
-|---|---:|---|---|
-| Luna | 4 | prohibited | Use phase gates, explicit schemas, small evidence packets, coordinator-owned shared state, and deterministic completion checks. |
-| Terra | 4 | prohibited | Emphasize producer-to-consumer contracts, artifact provenance, configuration and release drift, and concise candidate packets. |
-| Sol | 6 | one child generation when runtime policy permits | Emphasize cross-boundary synthesis, acceptance behavior, adversarial falsification, and integration of specialist evidence. |
-| Other or unknown | 2 | prohibited | Use phase-gated execution, coordinator-only shared state, and conservative evidence slices. |
+| Model family | Family fanout policy | Family nesting policy | Required subagent profile | Orchestration emphasis |
+|---|---|---|---|---|
+| Luna | No skill-imposed cap; use every available worker slot and additional waves while disjoint work remains. | Permitted for independent nested subscopes within runtime policy. | Luna at `max` for every descendant; no model or effort fallback. | Use phase gates, explicit schemas, small evidence packets, coordinator-owned shared state, and deterministic completion checks. |
+| Terra | At most 4 concurrent lanes. | Prohibited. | Selected model and reasoning unless an explicitly requested mixed-model lane overrides it. | Emphasize producer-to-consumer contracts, artifact provenance, configuration and release drift, and concise candidate packets. |
+| Sol | At most 6 concurrent lanes. | One child generation when runtime policy permits. | Selected model and reasoning unless an explicitly requested mixed-model lane overrides it. | Emphasize cross-boundary synthesis, acceptance behavior, adversarial falsification, and integration of specialist evidence. |
+| Other or unknown | At most 2 concurrent lanes. | Prohibited. | Exact selected model and reasoning when controllable; otherwise record the runtime identity. | Use phase-gated execution, coordinator-only shared state, and conservative evidence slices. |
 
 When the runtime exposes different model names, map only a clearly equivalent family. Otherwise retain the exact name and use `Other or unknown`.
 
 Normalize the reasoning label to lowercase. Recognize only `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`; retain any other exact label and use the `unknown or unrecognized` row.
 
-| Reasoning level | Reasoning lane cap | Reasoning nesting policy | Evidence-slice ceiling | Candidate validation plan |
+| Reasoning level | Non-Luna lane cap | Reasoning nesting policy | Evidence-slice ceiling | Candidate validation plan |
 |---|---:|---|---|---|
 | `low` | 1 | prohibited | 3 files or 600 lines | Neutral coordinator re-check of every material candidate. |
 | `medium` | 2 | prohibited | 4 files or 1,000 lines | Independent material-candidate validation when available; otherwise neutral coordinator re-check. |
@@ -56,13 +56,14 @@ Normalize the reasoning label to lowercase. Recognize only `low`, `medium`, `hig
 
 Resolve and record the effective profile as follows:
 
-1. Set maximum concurrent lanes to the minimum of the family lane cap, reasoning lane cap, and available worker slots after reserving the coordinator. Record `0` when independent workers are unavailable.
-2. Permit one child generation only when both tables permit it and governing runtime policy allows it. Otherwise prohibit nesting. Never exceed one child generation through this profile.
-3. Use the reasoning row's evidence-slice ceiling as a maximum, not a target. Reduce it for large or highly coupled files.
-4. Copy the reasoning row's candidate validation plan into the review profile. If the requested validator is unavailable, use the stated coordinator fallback and record the evidence gap.
-5. For explicitly requested mixed-model lanes, resolve each lane from its actual model and reasoning values. The coordinator still follows its own selected profile and owns final integration.
+1. For Luna, set maximum concurrent lanes to every available worker slot after reserving the coordinator. Do not impose a numeric concurrency, total-agent, lane-count, or wave-count cap in the skill. Continue scheduling disjoint work while useful uncovered scope remains. Every delegated agent at every depth must use Luna at `max`; if the runtime accepts explicit selectors, pass `model: gpt-5.6-luna` and `reasoning_effort: max` with a fork mode that permits overrides instead of relying on inheritance. If the runtime cannot guarantee that exact profile, do not substitute another model or effort and record the scope as blocked or uncovered.
+2. For Terra, Sol, and other models, set maximum concurrent lanes to the minimum of the numeric family policy, non-Luna reasoning lane cap, and available worker slots after reserving the coordinator. Record `0` when independent workers are unavailable.
+3. Permit nested Luna delegation for genuinely independent subscopes when runtime policy allows it. For other models, permit nesting only when both tables allow it. Preserve exclusive lane ownership at every depth.
+4. Use the reasoning row's evidence-slice ceiling as a maximum, not a target. Reduce it for large or highly coupled files.
+5. Copy the reasoning row's candidate validation plan into the review profile. If the requested validator is unavailable, use the stated coordinator fallback and record the evidence gap.
+6. For explicitly requested mixed-model lanes, resolve each lane from its actual model and reasoning values. Do not use mixed-model descendants under a Luna coordinator because its delegated work is Luna/max-only. The coordinator still owns final integration.
 
-For Luna at `max`, these rules resolve to at most four concurrent lanes, prohibited nesting, and an eight-file or 2,000-line evidence ceiling. Load and follow [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md); it is the controlling contract and may impose stricter limits.
+For Luna at `max`, these rules resolve to all currently available worker slots, permitted nesting within runtime policy, Luna/max-only descendants, and an eight-file or 2,000-line evidence ceiling. Load and follow [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md); it is the controlling contract and may impose stricter evidence or ownership rules, but it must not add an arbitrary lane or agent cap.
 
 Reasoning level changes scheduling and context control only. It does not permit speculative findings, weaker validation, broader mutation authority, or a false completeness claim.
 

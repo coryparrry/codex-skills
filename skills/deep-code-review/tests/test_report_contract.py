@@ -48,12 +48,13 @@ class ReportContractTests(unittest.TestCase):
 
         family_rows = {
             match.group("family"): {
-                "lane_cap": int(match.group("lane_cap")),
+                "fanout": match.group("fanout").strip(),
                 "nesting": match.group("nesting").strip(),
+                "subagents": match.group("subagents").strip(),
             }
             for match in re.finditer(
-                r"^\| (?P<family>Luna|Terra|Sol) \| (?P<lane_cap>\d+) \| "
-                r"(?P<nesting>[^|]+) \|",
+                r"^\| (?P<family>Luna|Terra|Sol) \| (?P<fanout>[^|]+) \| "
+                r"(?P<nesting>[^|]+) \| (?P<subagents>[^|]+) \|",
                 contract,
                 re.MULTILINE,
             )
@@ -88,22 +89,25 @@ class ReportContractTests(unittest.TestCase):
             for reasoning in reasoning_levels:
                 with self.subTest(family=family, reasoning=reasoning):
                     profile = reasoning_rows[reasoning]
-                    self.assertGreater(
-                        min(family_rows[family]["lane_cap"], profile["lane_cap"]),
-                        0,
-                    )
+                    self.assertTrue(family_rows[family]["fanout"])
                     self.assertTrue(family_rows[family]["nesting"])
+                    self.assertTrue(family_rows[family]["subagents"])
+                    if family != "Luna":
+                        self.assertGreater(profile["lane_cap"], 0)
                     self.assertTrue(profile["nesting"])
                     self.assertGreater(profile["files"], 0)
                     self.assertGreater(profile["lines"], 0)
                     self.assertTrue(profile["validation"])
 
-        self.assertEqual(family_rows["Luna"]["lane_cap"], 4)
-        self.assertEqual(family_rows["Luna"]["nesting"], "prohibited")
+        self.assertIn("No skill-imposed cap", family_rows["Luna"]["fanout"])
+        self.assertIn("Permitted", family_rows["Luna"]["nesting"])
+        self.assertIn("Luna at `max`", family_rows["Luna"]["subagents"])
         self.assertEqual(reasoning_rows["max"]["files"], 8)
         self.assertEqual(reasoning_rows["max"]["lines"], 2000)
-        self.assertIn("minimum of the family lane cap", contract)
-        self.assertIn("available worker slots after reserving the coordinator", contract)
+        self.assertIn("every available worker slot after reserving the coordinator", contract)
+        self.assertIn("Every delegated agent at every depth must use Luna at `max`", contract)
+        self.assertIn("model: gpt-5.6-luna", contract)
+        self.assertIn("reasoning_effort: max", contract)
 
     def test_luna_max_protocol_defines_exact_durable_state(self) -> None:
         contract = LUNA_MAX_PROTOCOL.read_text(encoding="utf-8")
@@ -134,8 +138,13 @@ class ReportContractTests(unittest.TestCase):
         ]
         positions = [contract.index(phase) for phase in phases]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("Run no more than four subagents concurrently", contract)
-        self.assertIn("Do not allow nested delegation", contract)
+        self.assertIn("Do not impose a skill-level limit", contract)
+        self.assertIn("Permit nested Luna/max delegation", contract)
+        self.assertIn("Every descendant must be explicitly created as Luna at `max`", contract)
+        self.assertIn("model: gpt-5.6-luna", contract)
+        self.assertIn("reasoning_effort: max", contract)
+        self.assertNotIn("Run no more than four subagents concurrently", contract)
+        self.assertNotIn("Do not allow nested delegation", contract)
         self.assertIn("Coordinator duties after every result", contract)
         self.assertIn("Only then process another result", contract)
         self.assertIn("Required validation return", contract)

@@ -53,7 +53,9 @@ Create this exact structure before broad semantic reading:
 
 Use a user-requested repository location when supplied. Otherwise use writable scratch space outside the repository and never stage it. If neither is possible, ask before adding state to the repository.
 
-Only the coordinator may edit the seven shared files. Each discovery or validation agent owns exactly one file under `agents/` and must not edit shared state. No agent may delegate further; only the coordinator creates agents.
+Only the coordinator may edit the seven shared files. Each discovery or validation agent at every depth owns exactly one file under `agents/` and must not edit shared state.
+
+Nested delegation is permitted for genuinely independent subscopes when the runtime allows it. Before delegating, the parent must record the child lane ID, exclusive scope, exact checkpoint path, model, reasoning level, and expected return in its own lane file. Every descendant must be explicitly created as Luna at `max`; when explicit selectors are available, pass `model: gpt-5.6-luna` and `reasoning_effort: max` with a fork mode that permits overrides. Never inherit, infer, or substitute another model or effort. If Luna/max cannot be guaranteed, do not delegate that scope and return it as blocked or uncovered. The parent integrates each descendant into its own checkpoint and compact handoff; the coordinator alone integrates that handoff into shared state.
 
 ## Shared state contracts
 
@@ -157,7 +159,9 @@ Do not begin discovery lanes until inventory is complete.
 
 ## Phase 2: discovery lanes
 
-Run no more than four subagents concurrently. Do not allow nested delegation. Run additional lanes in waves.
+Use every worker slot available after reserving the coordinator. Do not impose a skill-level limit on concurrent lanes, total agents, lane count, or wave count. Continue creating disjoint Luna/max lanes, in parallel and in later waves, while useful uncovered work remains.
+
+Permit nested Luna/max delegation when a lane contains genuinely independent subscopes or would otherwise combine multiple bounded evidence slices. Every nested lane must have exclusive scope and a unique checkpoint path. Runtime capacity and runtime nesting policy are the only fanout limits; never create work merely to occupy capacity.
 
 Prefer coherent lanes such as these when the repository contains them:
 
