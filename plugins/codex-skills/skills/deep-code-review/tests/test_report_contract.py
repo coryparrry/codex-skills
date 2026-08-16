@@ -97,6 +97,12 @@ class ReportContractTests(unittest.TestCase):
             with self.subTest(family=family):
                 self.assertIn("No skill-imposed cap", family_rows[family]["fanout"])
                 self.assertIn("Permitted", family_rows[family]["nesting"])
+        self.assertEqual(
+            family_rows["Luna"]["subagents"],
+            "Luna at `max` for every descendant; no model or effort fallback.",
+        )
+        for family in ("Terra", "Sol"):
+            with self.subTest(family=family):
                 self.assertIn(
                     "Risk-routed across Luna, Terra, and Sol",
                     family_rows[family]["subagents"],
@@ -105,7 +111,7 @@ class ReportContractTests(unittest.TestCase):
         self.assertEqual(reasoning_rows["max"]["lines"], 2000)
         self.assertIn("every available worker slot after reserving the coordinator", contract)
 
-    def test_specialists_are_risk_routed_independent_of_coordinator(self) -> None:
+    def test_luna_descendants_are_luna_max_only(self) -> None:
         contract = MODEL_PROFILES.read_text(encoding="utf-8")
 
         routes = {
@@ -129,7 +135,21 @@ class ReportContractTests(unittest.TestCase):
         self.assertEqual(routes["gpt-5.6-luna"]["effort"], "max")
         self.assertEqual(routes["gpt-5.6-terra"]["effort"], "high")
         self.assertEqual(routes["gpt-5.6-sol"]["effort"], "high")
-        self.assertIn("do not restrict which model may own a specialist lane", contract)
+        policy_rule = next(
+            line for line in contract.splitlines() if line.startswith("For any Luna coordinator")
+        )
+        self.assertIn("Mixed-model policy: prohibited; Luna/max descendants only", policy_rule)
+        self.assertIn("hard invariant, not a user-configurable default", policy_rule)
+        luna_rule = next(
+            line for line in contract.splitlines() if line.startswith("2. For every Luna coordinator")
+        )
+        self.assertIn("model: gpt-5.6-luna", luna_rule)
+        self.assertIn("reasoning_effort: max", luna_rule)
+        self.assertIn("Never inherit, infer, or substitute another model or effort", luna_rule)
+        self.assertNotIn("gpt-5.6-terra", luna_rule)
+        self.assertNotIn("gpt-5.6-sol", luna_rule)
+        self.assertIn("Do not apply this mixed-model rule to a Luna coordinator", contract)
+        self.assertIn("This matrix never applies to a Luna coordinator", contract)
         self.assertIn("preserve the family selected by the risk matrix", contract)
         self.assertIn("elevate a routed Terra or Sol specialist to `ultra`", contract)
         critical_rule = next(
@@ -140,7 +160,26 @@ class ReportContractTests(unittest.TestCase):
             fallback_rule.index(label) for label in ("`max`", "`xhigh`", "`high`")
         ]
         self.assertEqual(fallback, sorted(fallback))
-        self.assertIn("not its parent's model", LUNA_MAX_PROTOCOL.read_text(encoding="utf-8"))
+        skill_routing = next(
+            line for line in SKILL.read_text(encoding="utf-8").splitlines()
+            if line.startswith("When independent subagents are available")
+        )
+        self.assertIn("For a Luna coordinator", skill_routing)
+        self.assertIn("`gpt-5.6-luna` at `max`", skill_routing)
+        self.assertIn("never substitute another model or effort", skill_routing)
+
+        luna_protocol = LUNA_MAX_PROTOCOL.read_text(encoding="utf-8")
+        descendant_rule = next(
+            line for line in luna_protocol.splitlines()
+            if line.startswith("Nested delegation is permitted")
+        )
+        self.assertIn("Every descendant must be explicitly created as Luna at `max`", descendant_rule)
+        self.assertIn("model: gpt-5.6-luna", descendant_rule)
+        self.assertIn("reasoning_effort: max", descendant_rule)
+        self.assertNotIn("gpt-5.6-terra", descendant_rule)
+        self.assertNotIn("gpt-5.6-sol", descendant_rule)
+        self.assertIn("mixed-model policy fixed to `prohibited; Luna/max descendants only`", luna_protocol)
+        self.assertNotIn("a Luna coordinator may create Luna, Terra, or Sol descendants", luna_protocol)
 
     def test_luna_max_protocol_defines_exact_durable_state(self) -> None:
         contract = LUNA_MAX_PROTOCOL.read_text(encoding="utf-8")
@@ -172,11 +211,8 @@ class ReportContractTests(unittest.TestCase):
         positions = [contract.index(phase) for phase in phases]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("Do not impose a skill-level limit", contract)
-        self.assertIn("Permit nested delegation", contract)
-        self.assertIn("a Luna coordinator may create Luna, Terra, or Sol descendants", contract)
-        self.assertIn("Route each nested lane to Luna, Terra, or Sol", contract)
-        self.assertNotIn("Every descendant must be explicitly created as Luna at `max`", contract)
-        self.assertNotIn("Luna/max-only descendants", contract)
+        self.assertIn("Permit nested Luna/max delegation", contract)
+        self.assertIn("Continue creating disjoint Luna/max lanes", contract)
         self.assertNotIn("Run no more than four subagents concurrently", contract)
         self.assertNotIn("Do not allow nested delegation", contract)
         self.assertIn("Coordinator duties after every result", contract)
