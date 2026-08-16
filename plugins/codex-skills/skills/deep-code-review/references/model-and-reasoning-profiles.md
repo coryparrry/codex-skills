@@ -29,25 +29,40 @@ Candidate validation plan:
 Checkpoint location:
 ```
 
-## Select the model profile
+## Resolve the orchestration profile
 
-Treat model labels as orchestration inputs, not proof of quality.
+Treat model and reasoning labels as orchestration inputs, not proof of quality. Resolve every recorded field from the two tables below before semantic review.
 
-| Model family | Orchestration profile |
-|---|---|
-| Luna | Use phase gates, explicit schemas, small evidence packets, coordinator-owned shared state, and deterministic completion checks. For Luna at `max`, load and follow [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md). |
-| Terra | Emphasize producer-to-consumer contracts, artifact provenance, configuration and release drift, and concise candidate packets. Use bounded parallel lanes for independent artifacts or flows. |
-| Sol | Emphasize cross-boundary synthesis, acceptance behavior, adversarial falsification, and integration of specialist evidence. Coherent lanes may be broader, but durable state and coverage gates still apply. |
-| Other or unknown | Use the strict fallback: phase-gated execution, coordinator-only shared state, no nested delegation, at most two concurrent lanes, and conservative evidence slices. |
+| Model family | Family lane cap | Family nesting policy | Orchestration emphasis |
+|---|---:|---|---|
+| Luna | 4 | prohibited | Use phase gates, explicit schemas, small evidence packets, coordinator-owned shared state, and deterministic completion checks. |
+| Terra | 4 | prohibited | Emphasize producer-to-consumer contracts, artifact provenance, configuration and release drift, and concise candidate packets. |
+| Sol | 6 | one child generation when runtime policy permits | Emphasize cross-boundary synthesis, acceptance behavior, adversarial falsification, and integration of specialist evidence. |
+| Other or unknown | 2 | prohibited | Use phase-gated execution, coordinator-only shared state, and conservative evidence slices. |
 
-When the runtime exposes different model names, map only a clearly equivalent family. Otherwise retain the exact name and use the strict fallback.
+When the runtime exposes different model names, map only a clearly equivalent family. Otherwise retain the exact name and use `Other or unknown`.
 
-## Apply the reasoning profile
+Normalize the reasoning label to lowercase. Recognize only `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`; retain any other exact label and use the `unknown or unrecognized` row.
 
-- **Low or medium:** reduce concurrent lanes and evidence-slice size. Run large scopes in durable waves. Do not summarize unreviewed work as complete; return `partial` if the requested scope cannot pass the normal completeness gate.
-- **High or xhigh:** use the normal bounded-slice protocol, independent non-overlapping lanes when available, neutral validation for material candidates, and the omission pass.
-- **Max:** use explicit phase entry and exit checks, deterministic coverage reconciliation, independent candidate validation when available, and a final completion checklist. Prefer more disjoint lanes over larger context packets.
-- **Unknown or another label:** use the strict fallback and record the unrecognized value without translating it silently.
+| Reasoning level | Reasoning lane cap | Reasoning nesting policy | Evidence-slice ceiling | Candidate validation plan |
+|---|---:|---|---|---|
+| `low` | 1 | prohibited | 3 files or 600 lines | Neutral coordinator re-check of every material candidate. |
+| `medium` | 2 | prohibited | 4 files or 1,000 lines | Independent material-candidate validation when available; otherwise neutral coordinator re-check. |
+| `high` | 4 | one child generation when the family permits | 6 files or 1,500 lines | Independent material-candidate validation plus one bounded omission pass. |
+| `xhigh` | 5 | one child generation when the family permits | 8 files or 2,000 lines | Independent validation of every supported candidate plus one bounded omission pass. |
+| `max` | 6 | one child generation when the family permits | 8 files or 2,000 lines | Independent validation of every supported candidate, one bounded omission pass, and deterministic completion reconciliation. |
+| `ultra` | 6 | one child generation when the family permits | 8 files or 2,000 lines | Independent validation of every supported candidate, one bounded omission pass, and deterministic completion reconciliation. |
+| `unknown or unrecognized` | 2 | prohibited | 4 files or 1,000 lines | Independent material-candidate validation when available; otherwise neutral coordinator re-check. |
+
+Resolve and record the effective profile as follows:
+
+1. Set maximum concurrent lanes to the minimum of the family lane cap, reasoning lane cap, and available worker slots after reserving the coordinator. Record `0` when independent workers are unavailable.
+2. Permit one child generation only when both tables permit it and governing runtime policy allows it. Otherwise prohibit nesting. Never exceed one child generation through this profile.
+3. Use the reasoning row's evidence-slice ceiling as a maximum, not a target. Reduce it for large or highly coupled files.
+4. Copy the reasoning row's candidate validation plan into the review profile. If the requested validator is unavailable, use the stated coordinator fallback and record the evidence gap.
+5. For explicitly requested mixed-model lanes, resolve each lane from its actual model and reasoning values. The coordinator still follows its own selected profile and owns final integration.
+
+For Luna at `max`, these rules resolve to at most four concurrent lanes, prohibited nesting, and an eight-file or 2,000-line evidence ceiling. Load and follow [luna-max-whole-repository-audit.md](luna-max-whole-repository-audit.md); it is the controlling contract and may impose stricter limits.
 
 Reasoning level changes scheduling and context control only. It does not permit speculative findings, weaker validation, broader mutation authority, or a false completeness claim.
 

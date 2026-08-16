@@ -43,6 +43,68 @@ class ReportContractTests(unittest.TestCase):
         self.assertIn("[luna-max-whole-repository-audit.md]", contract)
         self.assertIn("controlling orchestration contract", contract)
 
+    def test_model_profiles_resolve_every_advertised_selection(self) -> None:
+        contract = MODEL_PROFILES.read_text(encoding="utf-8")
+
+        family_rows = {
+            match.group("family"): {
+                "lane_cap": int(match.group("lane_cap")),
+                "nesting": match.group("nesting").strip(),
+            }
+            for match in re.finditer(
+                r"^\| (?P<family>Luna|Terra|Sol) \| (?P<lane_cap>\d+) \| "
+                r"(?P<nesting>[^|]+) \|",
+                contract,
+                re.MULTILINE,
+            )
+        }
+        self.assertEqual(set(family_rows), {"Luna", "Terra", "Sol"})
+
+        reasoning_rows = {}
+        for match in re.finditer(
+            r"^\| `(?P<reasoning>low|medium|high|xhigh|max|ultra)` \| "
+            r"(?P<lane_cap>\d+) \| (?P<nesting>[^|]+) \| "
+            r"(?P<files>\d+) files or (?P<lines>[\d,]+) lines \| "
+            r"(?P<validation>[^|]+) \|$",
+            contract,
+            re.MULTILINE,
+        ):
+            reasoning_rows[match.group("reasoning")] = {
+                "lane_cap": int(match.group("lane_cap")),
+                "nesting": match.group("nesting").strip(),
+                "files": int(match.group("files")),
+                "lines": int(match.group("lines").replace(",", "")),
+                "validation": match.group("validation").strip(),
+            }
+
+        advertised = {
+            "Luna": {"low", "medium", "high", "xhigh", "max"},
+            "Terra": {"low", "medium", "high", "xhigh", "max", "ultra"},
+            "Sol": {"low", "medium", "high", "xhigh", "max", "ultra"},
+        }
+        self.assertEqual(set(reasoning_rows), set().union(*advertised.values()))
+
+        for family, reasoning_levels in advertised.items():
+            for reasoning in reasoning_levels:
+                with self.subTest(family=family, reasoning=reasoning):
+                    profile = reasoning_rows[reasoning]
+                    self.assertGreater(
+                        min(family_rows[family]["lane_cap"], profile["lane_cap"]),
+                        0,
+                    )
+                    self.assertTrue(family_rows[family]["nesting"])
+                    self.assertTrue(profile["nesting"])
+                    self.assertGreater(profile["files"], 0)
+                    self.assertGreater(profile["lines"], 0)
+                    self.assertTrue(profile["validation"])
+
+        self.assertEqual(family_rows["Luna"]["lane_cap"], 4)
+        self.assertEqual(family_rows["Luna"]["nesting"], "prohibited")
+        self.assertEqual(reasoning_rows["max"]["files"], 8)
+        self.assertEqual(reasoning_rows["max"]["lines"], 2000)
+        self.assertIn("minimum of the family lane cap", contract)
+        self.assertIn("available worker slots after reserving the coordinator", contract)
+
     def test_luna_max_protocol_defines_exact_durable_state(self) -> None:
         contract = LUNA_MAX_PROTOCOL.read_text(encoding="utf-8")
 
