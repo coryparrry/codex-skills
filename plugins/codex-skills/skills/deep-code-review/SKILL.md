@@ -1,6 +1,6 @@
 ---
 name: deep-code-review
-description: Perform deep, language-agnostic review of a whole repository snapshot or of a pull request, branch, commit, diff, working tree, or AI-generated change. Use for deep, exhaustive, repo-wide, whole-codebase, adversarial, or AI-code review; select snapshot-audit mode for existing repository behavior and change-review mode for a delta. Use as the umbrella review for mixed-language repositories and compose with `swift-code-review` when Swift or Apple-platform paths are affected.
+description: Perform model-aware, language-agnostic review of a whole repository snapshot or of a pull request, branch, commit, diff, working tree, or AI-generated change. Use for deep, exhaustive, repo-wide, whole-codebase, adversarial, or AI-code review; calibrate the workflow to the coordinator model and reasoning level, select snapshot-audit mode for existing repository behavior and change-review mode for a delta, use as the umbrella review for mixed-language repositories, and compose with `swift-code-review` when Swift or Apple-platform paths are affected.
 ---
 
 # Deep code review
@@ -8,6 +8,14 @@ description: Perform deep, language-agnostic review of a whole repository snapsh
 Review the requested state as a connected system, not as isolated files or edited lines. Establish the review mode, intended behavior, reachable flows, invariants, evidence for each conclusion, and what remains unknown.
 
 Treat review as read-only. Do not edit, stage, commit, push, post comments, or resolve threads unless the user separately asks for changes. Durable review-state files are review artifacts, not product edits: use a user-requested tracked location when supplied, otherwise use writable scratch space outside the repository and never stage it. If no such location is writable, ask before adding review state to the repository. If the request includes fixes, finish and report the review before starting a clearly separated repair phase.
+
+## 0. Calibrate the active reviewer
+
+Before inspecting the repository or running repository commands, read [model-and-reasoning-profiles.md](references/model-and-reasoning-profiles.md). Unless the current request already states both the coordinator model and reasoning level, ask one concise blocking question for the missing values. Ask which model and reasoning level should coordinate the review and whether explicitly requested mixed-model lanes should be used. Do not infer either value from prior tasks, model availability, or a model name without an effort suffix.
+
+Record the selected model, reasoning level, mixed-model policy, orchestration profile, concurrency and nesting limits, evidence-slice ceiling, and validation plan. Apply the matching profile throughout the review. If an interactive answer is impossible, record `unknown`, use the strict fallback profile, and disclose the fallback; do not silently choose a model identity.
+
+Model and reasoning calibration changes orchestration, checkpoint frequency, lane size, and validation scheduling. It never weakens the finding contract, read-only boundary, exact-state requirement, or completeness gate.
 
 ## 1. Bind the review to an exact state
 
@@ -73,7 +81,7 @@ Run the core correctness and integration lane for every review. Read [risk-lanes
 
 Inspect every changed slice in a change review or every assigned production area in a snapshot audit, then perform an integration pass across shared contracts and cross-cutting state. A file-by-file checklist without path reconstruction is not a complete review.
 
-When independent subagents are available, actively fan out genuinely non-overlapping, read-only lanes after the primary reviewer has inventoried the full scope and identified shared contracts. Use enough agents that the root does not become the semantic reader for multiple independent production areas; add agents only while each has exclusive scope and useful work. If one lane still spans multiple independent areas or would exceed repeated checkpoint slices, its owner should subdivide it among nested agents. Give agents raw scope and artifacts, not suspected answers. Give every agent and nested agent one exclusively owned checkpoint file; never let multiple agents append to a shared ledger. Require a compact handoff plus the checkpoint path instead of returning raw exploration or streaming progress into the root context. They may also perform the single bounded omission pass in section 8. Recheck every candidate against the exact reviewed state before reporting it.
+When independent subagents are available, actively fan out genuinely non-overlapping, read-only lanes after the primary reviewer has inventoried the full scope and identified shared contracts. Follow the selected model profile's concurrency, nesting, lane schema, and persistence rules. Use enough agents that the root does not become the semantic reader for multiple independent production areas; add agents only while each has exclusive scope and useful work. If the profile permits nesting and one lane still spans multiple independent areas or would exceed repeated checkpoint slices, its owner may subdivide it among nested agents; otherwise the coordinator schedules the extra slices. Give agents raw scope and artifacts, not suspected answers. Give every agent and nested agent one exclusively owned checkpoint file; never let multiple agents append to a shared ledger. Require a compact handoff plus the checkpoint path instead of returning raw exploration or streaming progress into the root context. They may also perform the single bounded omission pass in section 8. Recheck every candidate against the exact reviewed state before reporting it.
 
 For a snapshot audit, assign every in-scope production area to exactly one primary lane, then run a root-owned integration pass across lane boundaries. When agents are available, delegate independent lanes in parallel waves sized to the available capacity; do not keep them on the root merely because the root can read them. The root owns only the index, shared-contract integration, candidate validation, and final disposition; it should read a lane's narrow evidence slices only when validating that lane's handoff and must not repeat the lane's general review. Record returned coverage and unreviewed edges, not merely that a lane was launched. A timed-out, interrupted, or missing lane result remains uncovered.
 
@@ -117,7 +125,7 @@ After primary candidate validation, run one bounded omission pass when an indepe
 
 Read [report-format.md](references/report-format.md). Lead with validated findings, ordered by priority. Keep severity, confidence, and validation status separate. Give each finding a concrete trigger, affected execution or data path, violated invariant, impact, exact evidence, false-positive check, and smallest fix direction.
 
-Then report material unresolved risks, process or merge blockers, validation performed, coverage, exclusions, unavailable evidence, and disposition. A coverage ledger proves what was investigated, not that the conclusions are correct.
+Then report the active model/reasoning profile, material unresolved risks, process or merge blockers, validation performed, coverage, exclusions, unavailable evidence, and disposition. A coverage ledger proves what was investigated, not that the conclusions are correct.
 
 For a snapshot audit, apply the completeness gate in [whole-repository-audit.md](references/whole-repository-audit.md). Finding count never establishes review quality or completeness.
 
@@ -126,6 +134,8 @@ If no material finding survives, say so directly. Do not invent a comment to mak
 ## Non-negotiables
 
 - Bind every conclusion to the exact reviewed state.
+- Ask for and record the coordinator model and reasoning level before repository inspection unless both were supplied in the request.
+- Never let model or reasoning calibration weaken evidence, safety, coverage, or completion requirements.
 - In change-review mode, require every disposition-affecting defect to be introduced, worsened, newly exposed, or newly depended upon by the change. In snapshot-audit mode, report any validated reachable defect in the reviewed state.
 - Review affected behavior and required missing changes, not only the diff.
 - Never equate file inventory, symbol lists, searches, or passing tests with end-to-end trace coverage.

@@ -67,7 +67,9 @@ Use `deep-code-review` for a language-agnostic review of a pull request, branch,
 Use $deep-code-review as the repository-wide umbrella to review this change safely, validate only change-caused defects, and assess correctness, security, compatibility, and merge readiness.
 ```
 
-The skill binds the review to an exact state, resolves repository policy, reconstructs intent, traces affected behavior beyond the diff, activates only relevant specialist lanes, challenges verification, and checks missing companion changes. It inspects execution hooks before running proposed code, tries to disprove every candidate finding, runs one bounded omission pass, and re-snapshots the state before reporting.
+The skill first asks which coordinator model and reasoning level are in use unless both were supplied in the request. It records that profile and tailors orchestration, evidence slices, checkpoints, and validation scheduling without relaxing the review contract. Luna at `max` uses the strict phase-gated coordinator protocol; deliberate mixed-model lanes remain available when requested.
+
+It then binds the review to an exact state, resolves repository policy, reconstructs intent, traces affected behavior beyond the diff, activates only relevant specialist lanes, challenges verification, and checks missing companion changes. It inspects execution hooks before running proposed code, tries to disprove every candidate finding, runs one bounded omission pass, and re-snapshots the state before reporting.
 
 In snapshot-audit mode, the skill records each production area, supported entry point, and shared contract in an evidence ledger. File inventories, searches, and passing test counts do not count as end-to-end trace coverage. If a material path, lane, or runtime boundary remains unreviewed, the result stays partial.
 

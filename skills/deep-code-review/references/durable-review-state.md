@@ -19,7 +19,7 @@ Create one review directory in the user-requested location or writable scratch s
 
 The root reviewer alone owns `INDEX.md` and `root-integration.md`. Each agent or nested agent owns exactly one lane file. Never allow concurrent writers on one file. A parent integrates a child's compact handoff; it does not copy the child's entire checkpoint into its own.
 
-Use parallel agents as a context boundary, not as a finding multiplier. After the root builds the denominator and shared-contract map, assign independent production areas or flows to separate agents up to the available capacity. If a lane still contains multiple independent areas or needs repeated evidence slices, its owner should create nested lane files and delegate those slices when more agents are available. Run additional lanes in waves when capacity is smaller than the coverage denominator.
+Use parallel agents as a context boundary, not as a finding multiplier. After the root builds the denominator and shared-contract map, assign independent production areas or flows to separate agents within the selected model profile's concurrency limit. If the profile permits nested delegation and a lane still contains multiple independent areas or needs repeated evidence slices, its owner may create nested lane files and delegate those slices. If nesting is prohibited, the coordinator schedules those slices in later waves.
 
 Do not delegate overlapping scopes, launch duplicate reviewers on the same area, or have the root repeat a lane's semantic review. Those patterns increase total context without isolating it. Keep integration, cross-lane validation, and final disposition with the root.
 
@@ -27,7 +27,7 @@ Do not stage or commit scratch review state. If the user explicitly asks for a t
 
 ## Initialize before broad reading
 
-Put the exact review state, authority, dirty state, scope denominator, lane ownership, shared contracts, and exclusions in `INDEX.md`. Assign coherent production areas, flows, or contracts rather than arbitrary file ranges. Every in-scope area must have one primary owner.
+Put the exact review state, authority, dirty state, active model/reasoning profile, scope denominator, lane ownership, shared contracts, and exclusions in `INDEX.md`. Assign coherent production areas, flows, or contracts rather than arbitrary file ranges. Every in-scope area must have one primary owner.
 
 Start each lane file with:
 

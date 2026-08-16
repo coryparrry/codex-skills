@@ -13,9 +13,34 @@ SKILL = Path(__file__).resolve().parents[1] / "SKILL.md"
 DURABLE_STATE = (
     Path(__file__).resolve().parents[1] / "references/durable-review-state.md"
 )
+MODEL_PROFILES = (
+    Path(__file__).resolve().parents[1]
+    / "references/model-and-reasoning-profiles.md"
+)
 
 
 class ReportContractTests(unittest.TestCase):
+    def test_review_starts_with_model_and_reasoning_calibration(self) -> None:
+        skill = SKILL.read_text(encoding="utf-8")
+
+        calibration = skill.index("## 0. Calibrate the active reviewer")
+        state_binding = skill.index("## 1. Bind the review to an exact state")
+        self.assertLess(calibration, state_binding)
+        self.assertIn("Before inspecting the repository", skill)
+        self.assertIn("ask one concise blocking question", skill)
+        self.assertIn("coordinator model and reasoning level", skill)
+        self.assertIn("[model-and-reasoning-profiles.md]", skill)
+
+    def test_model_profiles_preserve_review_standards(self) -> None:
+        contract = MODEL_PROFILES.read_text(encoding="utf-8")
+
+        self.assertIn("Reasoning level changes scheduling and context control only", contract)
+        self.assertIn("Strict Luna/max protocol", contract)
+        self.assertIn("Run no more than four subagents concurrently", contract)
+        self.assertIn("Do not permit nested delegation", contract)
+        self.assertIn("Only the coordinator writes the root index", contract)
+        self.assertIn("independent validation pass", contract)
+
     def test_large_reviews_load_the_durable_state_protocol(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
 
@@ -34,7 +59,7 @@ class ReportContractTests(unittest.TestCase):
         self.assertIn("must not read all lane checkpoints", contract)
         self.assertIn("at most 300 words", contract)
         self.assertIn("Use parallel agents as a context boundary", contract)
-        self.assertIn("should create nested lane files", contract)
+        self.assertIn("may create nested lane files", contract)
 
     def test_every_audit_effect_has_a_snapshot_risk_state(self) -> None:
         report = REPORT_FORMAT.read_text(encoding="utf-8")
