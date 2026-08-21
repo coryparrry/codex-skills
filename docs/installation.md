@@ -15,6 +15,23 @@ You need Codex with local skills enabled and `skills` CLI support through `npx`.
 
 After installation, Codex lists the plugin with installed plugins rather than in the marketplace's available-only results. Start a new task after installing or updating so the task loads the current plugin version and skills.
 
+### Marketplace release evidence
+
+The release-contract workflow emits a machine-readable marketplace receipt for pull requests and pushes to `main`. A pull-request receipt proves that the repository candidate has consistent manifests, marketplace metadata, skill mirrors, and catalogue entries. Its `tested_commit` is the exact checkout tested by CI; for a pull request, GitHub may make that a synthetic merge commit, so the receipt also records the optional source `pull_request_head_commit`. A `main` receipt binds the evidence to the exact merged Git commit and ref. Neither receipt updates Codex on a developer Mac or proves that its local marketplace and plugin cache are current.
+
+After a shipped plugin change is merged, refresh and verify the local installation separately:
+
+```bash
+codex plugin marketplace upgrade codex-skills
+codex plugin remove codex-skills@codex-skills
+codex plugin add codex-skills@codex-skills --json
+codex plugin list --marketplace codex-skills --available --json
+```
+
+Confirm the installed manifest and cache provenance point to the merged `main` snapshot, then start a new Codex task.
+
+Verify that the previous plugin cache is absent after removal, that the newly installed cache points to the merged snapshot, and that no standalone `${CODEX_HOME:-$HOME/.codex}/skills/` copy (including `luna-advisor`) is masking the marketplace installation.
+
 The marketplace plugin exposes:
 
 - `appstore-readiness-audit`

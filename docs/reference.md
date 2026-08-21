@@ -59,6 +59,7 @@ Agent Plugins v1 clients discover immediate skill directories from `plugins/code
 | `scripts/test_install.sh` | Smoke-tests bundle installation, preservation, and curl-style rejection |
 | `scripts/build_agent_plugin.py` | Builds a clean Agent Plugins v1 package without Codex-only files |
 | `scripts/check_skill_mirror.py` | Confirms a source skill matches its plugin mirror |
+| `scripts/marketplace_release_evidence.py` | Emits repository-only marketplace candidate evidence; it never claims local Codex refresh |
 | `scripts/validate_release_contract.py` | Checks source, manifests, the pinned Agent Plugins schema, marketplace, docs, and skills.sh publication contracts |
 
 ## Git Cleanup Script
@@ -86,9 +87,11 @@ The script refuses to run outside a Git repository, without an `origin` remote, 
 
 ```bash
 python3 -m pip install -r requirements-release.txt
+python3 scripts/tests/test_marketplace_release_evidence.py
 python3 scripts/tests/test_validate_release_contract.py
 python3 scripts/tests/test_build_agent_plugin.py
 python3 scripts/validate_release_contract.py --base-ref origin/main
+python3 scripts/marketplace_release_evidence.py --event pull_request --base-ref origin/main
 bash -n scripts/install.sh
 bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
