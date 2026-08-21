@@ -22,9 +22,10 @@
     },
     {
       "title": "Orchestration",
-      "description": "Skills for strict advisor-led delegation and validation.",
+      "description": "Skills for conditional Luna-led advice, strict advisor delegation, and validation.",
       "skills": [
-        "engineering-advisor"
+        "engineering-advisor",
+        "luna-advisor"
       ]
     },
     {

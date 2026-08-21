@@ -10,6 +10,7 @@ This guide explains when and how to invoke the skills in this repository.
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
 | Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
+| Route Luna tasks that exceed a clear Luna-only lane through one bounded Sol advisory packet | `luna-advisor` |
 | Audit a repository snapshot or review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
 | Review focused Swift or Apple-platform changes, or provide the specialist lane for a deep review | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
@@ -38,6 +39,30 @@ Use $engineering-advisor to route verified fixes to capability-matched Terra wor
 ```
 
 The root proves findings before assigning them, selects the lowest sufficient Terra reasoning tier, gives workers non-overlapping ownership, reviews every resulting diff, and runs the final validation. All tracked-file changes and follow-up corrections remain with Terra workers. If that lane is unavailable, the skill reports implementation blocked instead of falling back to root edits.
+
+## Run Luna with a Sol advisor
+
+Use `luna-advisor` when Luna should implement an authorized change after one
+read-only Sol subagent has reviewed the current evidence and returned bounded
+instructions because the task exceeds a clear Luna-only lane:
+
+```text
+Use $luna-advisor to have Luna get one bounded Sol execution packet before implementing this change.
+```
+
+The skill first verifies that Luna is the active root model and routes clear,
+local, reversible work with strong checks through Luna alone. It spawns
+exactly one `gpt-5.6-sol` advisor with `fork_turns: "none"` only for material
+ambiguity, complexity, weak verification, consequential mistakes, or an
+explicit request. Sol Low is limited to one narrow choice in known, local,
+reversible work with complete evidence, deterministic checks, and no material
+design, security, cross-system, state, lifecycle, compatibility, or
+reliability judgment. Sol Medium is for unresolved diagnosis or approach,
+multi-concern ambiguity, or meaningful consequences. Luna gathers the prompt
+evidence, checks the complete execution packet, implements it within scope,
+reviews the diff, and owns final validation. An incomplete packet or
+contradictory implementation evidence triggers at most one bounded follow-up
+on the same advisor. A non-Luna root stops and reports the mismatch.
 
 ## Continue Existing Deep Research
 
@@ -128,6 +153,7 @@ It does not implement fixes automatically. If current PR context is unavailable,
 - [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
+- [Luna Advisor](luna-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)

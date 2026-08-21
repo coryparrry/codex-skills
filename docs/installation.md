@@ -21,6 +21,7 @@ The marketplace plugin exposes:
 - `continue-deep-research`
 - `deep-code-review`
 - `engineering-advisor`
+- `luna-advisor`
 - `git-clean-merged-branch`
 - `research-repo-technology`
 - `swift-code-review`
@@ -62,6 +63,10 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-
 
 ```bash
 npx skills add coryparrry/codex-skills --global --agent codex --skill engineering-advisor
+```
+
+```bash
+npx skills add coryparrry/codex-skills --global --agent codex --skill luna-advisor
 ```
 
 ```bash
@@ -107,6 +112,7 @@ If the marketplace itself does not appear, verify that `.agents/plugins/marketpl
 - [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
+- [Luna Advisor](luna-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)
