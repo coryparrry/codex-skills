@@ -23,6 +23,7 @@ from validate_release_contract import (  # noqa: E402
     validate_agent_plugin_policy,
     validate_agent_plugin_manifest,
     validate_plugin_manifest,
+    validate_marketplace_manifest,
     validate_shared_plugin_identity,
     validate_version_change,
 )
@@ -186,6 +187,34 @@ class ReleaseContractTests(unittest.TestCase):
             validate_shared_plugin_identity(shared, agent),
             ["Codex and Agent Plugins manifest repository must match"],
         )
+
+    def test_marketplace_manifest_requires_canonical_identity_and_source(self) -> None:
+        marketplace = {
+            "name": "codex-skills",
+            "plugins": [
+                {
+                    "name": "codex-skills",
+                    "source": {
+                        "source": "local",
+                        "path": "./plugins/codex-skills",
+                    },
+                    "policy": {
+                        "installation": "AVAILABLE",
+                        "authentication": "ON_INSTALL",
+                    },
+                    "category": "Coding",
+                }
+            ],
+        }
+        self.assertEqual(validate_marketplace_manifest(marketplace), [])
+
+        marketplace["name"] = "wrong-marketplace"
+        marketplace["plugins"][0]["name"] = "wrong-plugin"
+        marketplace["plugins"][0]["source"]["source"] = "git"
+        errors = validate_marketplace_manifest(marketplace)
+        self.assertIn("marketplace name must be codex-skills", errors)
+        self.assertIn("marketplace plugin name must be codex-skills", errors)
+        self.assertIn("marketplace source.source must be local", errors)
 
     def test_changed_paths_includes_non_ignored_untracked_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

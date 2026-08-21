@@ -235,6 +235,40 @@ def validate_shared_plugin_identity(
     return errors
 
 
+def validate_marketplace_manifest(data: dict[str, Any]) -> list[str]:
+    """Validate the repository's marketplace identity and installation policy."""
+    errors: list[str] = []
+    if data.get("name") != PLUGIN_ROOT.name:
+        errors.append(f"marketplace name must be {PLUGIN_ROOT.name}")
+    plugins = data.get("plugins")
+    if not isinstance(plugins, list) or len(plugins) != 1:
+        return errors + ["marketplace must contain exactly one plugin"]
+    entry = plugins[0]
+    if not isinstance(entry, dict):
+        return errors + ["marketplace plugin entry must be an object"]
+    if entry.get("name") != PLUGIN_ROOT.name:
+        errors.append(f"marketplace plugin name must be {PLUGIN_ROOT.name}")
+    source = entry.get("source")
+    if not isinstance(source, dict):
+        errors.append("marketplace plugin source must be an object")
+    else:
+        if source.get("source") != "local":
+            errors.append("marketplace source.source must be local")
+        if source.get("path") != "./plugins/codex-skills":
+            errors.append("marketplace source.path must be ./plugins/codex-skills")
+    policy = entry.get("policy")
+    if not isinstance(policy, dict):
+        errors.append("marketplace plugin policy must be an object")
+    else:
+        if policy.get("installation") != "AVAILABLE":
+            errors.append("marketplace installation policy must be AVAILABLE")
+        if policy.get("authentication") != "ON_INSTALL":
+            errors.append("marketplace authentication policy must be ON_INSTALL")
+    if not entry.get("category"):
+        errors.append("marketplace plugin category is required")
+    return errors
+
+
 def load_json(path: Path) -> tuple[dict[str, Any], list[str]]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -342,21 +376,7 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     marketplace, json_errors = load_json(repo / MARKETPLACE_MANIFEST)
     errors.extend(json_errors)
     if not json_errors:
-        plugins = marketplace.get("plugins")
-        if not isinstance(plugins, list) or len(plugins) != 1:
-            errors.append("marketplace must contain exactly one plugin")
-        else:
-            entry = plugins[0]
-            source = entry.get("source", {})
-            policy = entry.get("policy", {})
-            if source.get("path") != "./plugins/codex-skills":
-                errors.append("marketplace source.path must be ./plugins/codex-skills")
-            if policy.get("installation") != "AVAILABLE":
-                errors.append("marketplace installation policy must be AVAILABLE")
-            if policy.get("authentication") != "ON_INSTALL":
-                errors.append("marketplace authentication policy must be ON_INSTALL")
-            if not entry.get("category"):
-                errors.append("marketplace plugin category is required")
+        errors.extend(validate_marketplace_manifest(marketplace))
 
     readme = (repo / "README.md").read_text(encoding="utf-8")
     readme_skills = re.findall(

@@ -39,6 +39,7 @@ jobs:
         run: |
           python3 scripts/tests/test_validate_release_contract.py
           python3 scripts/tests/test_build_agent_plugin.py
+          python3 scripts/tests/test_marketplace_release_evidence.py
 
       - name: Validate release contract
         shell: bash
@@ -85,3 +86,69 @@ jobs:
           else
             git diff --check
           fi
+
+  marketplace-evidence:
+    name: Marketplace release evidence
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+      TESTED_COMMIT: ${{ github.sha }}
+      REF_VALUE: ${{ github.ref }}
+      PULL_REQUEST_HEAD_COMMIT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install release dependencies
+        run: python3 -m pip install --disable-pip-version-check -r requirements-release.txt
+
+      - name: Generate marketplace release evidence
+        shell: bash
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/marketplace-release-evidence.json
+        run: |
+          args=(
+            --event "$EVENT_NAME"
+            --tested-commit "$TESTED_COMMIT"
+            --ref "$REF_VALUE"
+            --output "$RECEIPT_PATH"
+          )
+          if [[ "$EVENT_NAME" == "pull_request" || ( -n "${BASE_REF:-}" && ! "$BASE_REF" =~ ^0+$ ) ]]; then
+            args+=(--base-ref "$BASE_REF")
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" && -n "${PULL_REQUEST_HEAD_COMMIT:-}" ]]; then
+            args+=(--pull-request-head-commit "$PULL_REQUEST_HEAD_COMMIT")
+          fi
+          python3 scripts/marketplace_release_evidence.py "${args[@]}"
+          python3 -m json.tool "$RECEIPT_PATH" >/dev/null
+
+      - name: Publish marketplace release evidence summary
+        shell: bash
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/marketplace-release-evidence.json
+        run: |
+          {
+            echo "## Marketplace release evidence"
+            echo
+            echo "This check proves repository marketplace candidate readiness only; it does not verify a developer Mac's local Codex marketplace refresh, reinstall, or cache provenance."
+            echo
+            echo '```json'
+            cat "$RECEIPT_PATH"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload marketplace release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-release-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/marketplace-release-evidence.json
+          if-no-files-found: error
