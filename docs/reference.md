@@ -17,6 +17,7 @@ skills/
   continue-deep-research/
   deep-code-review/
   engineering-advisor/
+  luna-advisor/
   git-clean-merged-branch/
   research-repo-technology/
   swift-code-review/
@@ -33,6 +34,7 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `deep-code-review` | Audit a repository snapshot or review affected behavior across a change, with validated defects, blockers, and auditable coverage | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `engineering-advisor` | Route edits to capability-matched Terra workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
+| `luna-advisor` | Route tasks that exceed a clear Luna-only lane through one bounded read-only Sol packet | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
 | `research-repo-technology` | Research which technologies a live repository should adopt, adapt, build, or reject | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `swift-code-review` | Review focused Swift and Apple-platform changes or provide their specialist lane in a deep review | `SKILL.md`, `agents/openai.yaml`, `references/` |
@@ -94,6 +96,7 @@ python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
 python3 scripts/check_skill_mirror.py appstore-readiness-audit
 python3 scripts/check_skill_mirror.py deep-code-review
 python3 scripts/check_skill_mirror.py engineering-advisor
+python3 scripts/check_skill_mirror.py luna-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
@@ -115,6 +118,7 @@ git diff --check
 - [App Store Readiness Audit](appstore-readiness-audit.md)
 - [Deep Code Review](deep-code-review.md)
 - [Engineering Advisor](engineering-advisor.md)
+- [Luna Advisor](luna-advisor.md)
 - [Git Clean Merged Branch](git-clean-merged-branch.md)
 - [Triage Review Comments](triage-review-comments.md)
 - [Continue Deep Research](continue-deep-research.md)
