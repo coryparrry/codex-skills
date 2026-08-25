@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> Nine Codex skills for research, App Store readiness, conditional Luna-advised implementation, deep repository review, Swift review, PR feedback triage, and safe branch cleanup.
+> Eight Codex skills for research, App Store readiness, Sol and Luna task routing, repository and Swift review, PR feedback triage, and safe branch cleanup.
 
 Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
@@ -31,7 +31,7 @@ Build a clean package that follows the [Agent Plugins Specification 1.0.0](https
 python3 scripts/build_agent_plugin.py --output dist/codex-skills
 ```
 
-The output contains the portable manifest, the nine skills in the fixed `skills/` location, and the license. It excludes Codex-only manifests, agent profiles, and interface assets. If a portable `mcp.json` is present, the builder includes it. Load the output directory using your client's directory-based plugin flow. The standard does not define a shared install command or marketplace protocol.
+The output contains the portable manifest, the eight skills in the fixed `skills/` location, and the license. It excludes Codex-only manifests, agent profiles, and interface assets. If a portable `mcp.json` is present, the builder includes it. Load the output directory using your client's directory-based plugin flow. The standard does not define a shared install command or marketplace protocol.
 
 ### skills.sh
 
@@ -51,17 +51,16 @@ Replace the skill slug in the command.
 
 ## ✨ Skills
 
-| Need | Skill | What it does |
-|---|---|---|
-| 🔬 Continue an existing research packet. | [`continue-deep-research`](docs/continue-deep-research.md) | Checks the existing evidence, resolves contradictions, and reports the verified delta. |
-| 🔭 Assess technology options for a live repository. | [`research-repo-technology`](docs/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
-| 🍎 Audit an app before App Store submission. | [`appstore-readiness-audit`](docs/appstore-readiness-audit.md) | Reconciles the release candidate, Apple policy, runtime evidence, privacy, metadata, and reviewer access without changing the app. |
-| 🧠 Keep the root agent in an advisor role. | [`engineering-advisor`](docs/engineering-advisor.md) | Sends edits to matched workers while the root owns scope, review, and validation. |
-| Route Luna tasks that exceed a clear Luna-only lane through one Sol advisor. | [`luna-advisor`](docs/luna-advisor.md) | Gathers a bounded, read-only Sol execution packet only when ambiguity, complexity, verification weakness, consequence, or an explicit request requires it. |
-| 🔎 Audit a repository or review a change across it. | [`deep-code-review`](docs/deep-code-review.md) | Traces production flows, shared contracts, affected behavior, and explicit coverage gaps before reporting validated findings. |
-| 🧩 Review Swift and Apple-platform changes. | [`swift-code-review`](docs/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
-| 🧭 Triage pull-request feedback. | [`triage-review-comments`](docs/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |
-| 🧹 Remove a merged local branch. | [`git-clean-merged-branch`](docs/git-clean-merged-branch.md) | Checks the default branch, protects dirty worktrees and unmerged work, then removes the branch safely. |
+| Category | Need | Skill | What it does |
+|---|---|---|---|
+| Research | Continue an existing research packet. | [`continue-deep-research`](docs/research/continue-deep-research.md) | Checks the existing evidence, resolves contradictions, and reports the verified delta. |
+| Research | Assess technology options for a live repository. | [`research-repo-technology`](docs/research/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
+| App Review | Audit an app before App Store submission. | [`appstore-readiness-audit`](docs/app-review/appstore-readiness-audit.md) | Reconciles the release candidate, Apple policy, runtime evidence, privacy, metadata, and reviewer access without changing the app. |
+| Orchestration | Coordinate Sol advice and Luna execution. | [`codex-routing`](docs/orchestration/codex-routing.md) | Splits coding work into bounded Luna assignments while Sol plans, coordinates, and reviews. |
+| Code Review | Audit a repository or review a change across it. | [`deep-code-review`](docs/code-review/deep-code-review.md) | Traces production flows, shared contracts, affected behavior, and explicit coverage gaps before reporting validated findings. |
+| Code Review | Review Swift and Apple-platform changes. | [`swift-code-review`](docs/code-review/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
+| Code Review | Triage pull-request feedback. | [`triage-review-comments`](docs/code-review/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |
+| Git Workflow | Remove a merged local branch. | [`git-clean-merged-branch`](docs/git-workflow/git-clean-merged-branch.md) | Checks the default branch, protects dirty worktrees and unmerged work, then removes the branch safely. |
 
 The research skills work with the runtime that is available. They use independent lanes only when that improves coverage. Otherwise, they run a bounded root-only audit and say what was not covered.
 
@@ -71,6 +70,7 @@ The research skills work with the runtime that is available. They use independen
 |---|---|
 | [`skills/`](skills/) | Source skill folders for maintainers and skills.sh installations. |
 | [`plugins/codex-skills/skills/`](plugins/codex-skills/skills/) | Plugin copies of the shipped skills. |
+| [`docs/`](docs/) | Usage documentation grouped by workflow. |
 | [`plugins/codex-skills/.codex-plugin/plugin.json`](plugins/codex-skills/.codex-plugin/plugin.json) | Codex plugin metadata. |
 | [`plugins/codex-skills/plugin.json`](plugins/codex-skills/plugin.json) | Portable Agent Plugins v1 metadata. |
 | [`skills.sh.json`](skills.sh.json) | Skill groups for the skills.sh repository page. |
@@ -92,8 +92,7 @@ python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
 python3 scripts/check_skill_mirror.py appstore-readiness-audit
 python3 scripts/check_skill_mirror.py deep-code-review
-python3 scripts/check_skill_mirror.py engineering-advisor
-python3 scripts/check_skill_mirror.py luna-advisor
+python3 scripts/check_skill_mirror.py codex-routing
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
@@ -112,15 +111,11 @@ git diff --check
 
 - [Installation](docs/installation.md)
 - [Usage Guide](docs/usage.md)
-- [App Store Readiness Audit](docs/appstore-readiness-audit.md)
-- [Deep Code Review](docs/deep-code-review.md)
-- [Engineering Advisor](docs/engineering-advisor.md)
-- [Luna Advisor](docs/luna-advisor.md)
-- [Git Clean Merged Branch](docs/git-clean-merged-branch.md)
-- [Triage Review Comments](docs/triage-review-comments.md)
-- [Continue Deep Research](docs/continue-deep-research.md)
-- [Repository Technology Research](docs/research-repo-technology.md)
-- [Swift Code Review](docs/swift-code-review.md)
+- [App Review](docs/app-review/)
+- [Code Review](docs/code-review/)
+- [Git Workflow](docs/git-workflow/)
+- [Orchestration](docs/orchestration/)
+- [Research](docs/research/)
 - [Reference](docs/reference.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)

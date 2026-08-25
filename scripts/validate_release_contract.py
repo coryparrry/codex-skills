@@ -309,6 +309,19 @@ def section(text: str, heading: str) -> str:
     return text[start : end if end >= 0 else len(text)]
 
 
+def skill_document_paths(
+    repo: Path, public_skills: set[str]
+) -> dict[str, list[Path]]:
+    paths = {skill: [] for skill in public_skills}
+    docs_root = repo / "docs"
+    if not docs_root.is_dir():
+        return paths
+    for path in docs_root.rglob("*.md"):
+        if path.stem in paths:
+            paths[path.stem].append(path.relative_to(repo))
+    return paths
+
+
 def validate_catalogue(repo: Path) -> tuple[list[str], str]:
     errors: list[str] = []
     source_root = repo / SOURCE_ROOT
@@ -380,12 +393,17 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
 
     readme = (repo / "README.md").read_text(encoding="utf-8")
     readme_skills = re.findall(
-        r"\[`([a-z0-9-]+)`\]\(docs/([a-z0-9-]+)\.md\)",
+        r"\[`([a-z0-9-]+)`\]\((docs/(?:[a-z0-9-]+/)*([a-z0-9-]+)\.md)\)",
         section(readme, "✨ Skills"),
     )
-    readme_names = [name for name, doc_name in readme_skills if name == doc_name]
+    readme_names = [
+        name for name, _, doc_name in readme_skills if name == doc_name
+    ]
     if Counter(readme_names) != Counter(public_skills):
         errors.append("README Skills table must list every public skill exactly once")
+    for _, doc_path, _ in readme_skills:
+        if not (repo / doc_path).is_file():
+            errors.append(f"README skill link does not exist: {doc_path}")
     expected_count = NUMBER_WORDS.get(len(public_skills), str(len(public_skills)))
     if not re.search(
         rf"^> {re.escape(expected_count)} Codex skills\b", readme, re.MULTILINE | re.I
@@ -394,9 +412,14 @@ def validate_catalogue(repo: Path) -> tuple[list[str], str]:
 
     installation = (repo / "docs/installation.md").read_text(encoding="utf-8")
     exposed = section(installation, "Install Through skills.sh")
+    skill_docs = skill_document_paths(repo, public_skills)
     for skill in sorted(public_skills):
-        if not (repo / f"docs/{skill}.md").is_file():
-            errors.append(f"missing docs/{skill}.md")
+        documents = skill_docs[skill]
+        if not documents:
+            errors.append(f"missing documentation for {skill}")
+        elif len(documents) > 1:
+            locations = ", ".join(str(path) for path in sorted(documents))
+            errors.append(f"duplicate documentation for {skill}: {locations}")
         if f"--skill {skill}" not in exposed:
             errors.append(f"installation guide missing skills.sh command for {skill}")
 

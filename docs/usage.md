@@ -9,8 +9,7 @@ This guide explains when and how to invoke the skills in this repository.
 | Audit an Apple app before upload or submission to App Store Connect | `appstore-readiness-audit` |
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
-| Route implementation to capability-matched Terra workers while the root remains a non-implementing advisor | `engineering-advisor` |
-| Route Luna tasks that exceed a clear Luna-only lane through one bounded Sol advisory packet | `luna-advisor` |
+| Coordinate coding work with Sol advising and Luna workers executing | `codex-routing` |
 | Audit a repository snapshot or review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
 | Review focused Swift or Apple-platform changes, or provide the specialist lane for a deep review | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
@@ -30,39 +29,17 @@ The skill refreshes current Apple sources, identifies the exact source and artif
 
 The audit is read-only. Missing runtime or App Store Connect evidence remains `NOT_TESTED` or `UNKNOWN` and can hold the verdict. A successful build or archive does not become a submission-ready result by itself.
 
-## Run As An Engineering Advisor
+## Coordinate Sol and Luna
 
-Use `engineering-advisor` when the root agent must investigate, scope, delegate, review, and validate without modifying repository files itself:
-
-```text
-Use $engineering-advisor to route verified fixes to capability-matched Terra workers. Remain the non-implementing advisor and reject unnecessary code or behavior drift.
-```
-
-The root proves findings before assigning them, selects the lowest sufficient Terra reasoning tier, gives workers non-overlapping ownership, reviews every resulting diff, and runs the final validation. All tracked-file changes and follow-up corrections remain with Terra workers. If that lane is unavailable, the skill reports implementation blocked instead of falling back to root edits.
-
-## Run Luna with a Sol advisor
-
-Use `luna-advisor` when Luna should implement an authorized change after one
-read-only Sol subagent has reviewed the current evidence and returned bounded
-instructions because the task exceeds a clear Luna-only lane:
+Use `codex-routing` when Sol should plan and coordinate coding work while Luna workers investigate and implement it:
 
 ```text
-Use $luna-advisor to have Luna get one bounded Sol execution packet before implementing this change.
+Use $codex-routing to coordinate this coding task with Sol advising and Luna workers executing.
 ```
 
-The skill first verifies that Luna is the active root model and routes clear,
-local, reversible work with strong checks through Luna alone. It spawns
-exactly one `gpt-5.6-sol` advisor with `fork_turns: "none"` only for material
-ambiguity, complexity, weak verification, consequential mistakes, or an
-explicit request. Sol Low is limited to one narrow choice in known, local,
-reversible work with complete evidence, deterministic checks, and no material
-design, security, cross-system, state, lifecycle, compatibility, or
-reliability judgment. Sol Medium is for unresolved diagnosis or approach,
-multi-concern ambiguity, or meaningful consequences. Luna gathers the prompt
-evidence, checks the complete execution packet, implements it within scope,
-reviews the diff, and owns final validation. An incomplete packet or
-contradictory implementation evidence triggers at most one bounded follow-up
-on the same advisor. A non-Luna root stops and reports the mismatch.
+Sol splits the task into bounded assignments, chooses a Luna effort level for each lane, and reviews the integrated result. Independent work can run in parallel. Luna High handles clear work with strong checks, Luna xhigh handles harder work, and Luna Max is reserved for exceptionally difficult bounded assignments.
+
+The router keeps slow workers alive through ordinary wait timeouts. Sol sends focused corrections back to Luna and remains responsible for coordination, acceptance, and the final response.
 
 ## Continue Existing Deep Research
 
@@ -150,12 +127,11 @@ It does not implement fixes automatically. If current PR context is unavailable,
 
 - [Installation](installation.md)
 - [Reference](reference.md)
-- [App Store Readiness Audit](appstore-readiness-audit.md)
-- [Deep Code Review](deep-code-review.md)
-- [Engineering Advisor](engineering-advisor.md)
-- [Luna Advisor](luna-advisor.md)
-- [Git Clean Merged Branch](git-clean-merged-branch.md)
-- [Triage Review Comments](triage-review-comments.md)
-- [Continue Deep Research](continue-deep-research.md)
-- [Repository Technology Research](research-repo-technology.md)
-- [Swift Code Review](swift-code-review.md)
+- [App Store Readiness Audit](app-review/appstore-readiness-audit.md)
+- [Codex Routing](orchestration/codex-routing.md)
+- [Deep Code Review](code-review/deep-code-review.md)
+- [Git Clean Merged Branch](git-workflow/git-clean-merged-branch.md)
+- [Triage Review Comments](code-review/triage-review-comments.md)
+- [Continue Deep Research](research/continue-deep-research.md)
+- [Repository Technology Research](research/research-repo-technology.md)
+- [Swift Code Review](code-review/swift-code-review.md)

@@ -86,8 +86,8 @@ skills/swift-code-review/
 
 ## Related Docs
 
-- [Installation](installation.md)
-- [Usage Guide](usage.md)
-- [Reference](reference.md)
+- [Installation](../installation.md)
+- [Usage Guide](../usage.md)
+- [Reference](../reference.md)
 - [Deep Code Review](deep-code-review.md)
 - [Triage Review Comments](triage-review-comments.md)

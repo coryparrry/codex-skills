@@ -84,7 +84,7 @@ skills/appstore-readiness-audit/
 
 ## Related docs
 
-- [Installation](installation.md)
-- [Usage Guide](usage.md)
-- [Reference](reference.md)
-- [Swift Code Review](swift-code-review.md)
+- [Installation](../installation.md)
+- [Usage Guide](../usage.md)
+- [Reference](../reference.md)
+- [Swift Code Review](../code-review/swift-code-review.md)

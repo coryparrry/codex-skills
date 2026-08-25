@@ -30,15 +30,14 @@ codex plugin list --marketplace codex-skills --available --json
 
 Confirm the installed manifest and cache provenance point to the merged `main` snapshot, then start a new Codex task.
 
-Verify that the previous plugin cache is absent after removal, that the newly installed cache points to the merged snapshot, and that no standalone `${CODEX_HOME:-$HOME/.codex}/skills/` copy (including `luna-advisor`) is masking the marketplace installation.
+Verify that the previous plugin cache is absent after removal, that the newly installed cache points to the merged snapshot, and that no standalone `${CODEX_HOME:-$HOME/.codex}/skills/` copy is masking the marketplace installation.
 
 The marketplace plugin exposes:
 
 - `appstore-readiness-audit`
+- `codex-routing`
 - `continue-deep-research`
 - `deep-code-review`
-- `engineering-advisor`
-- `luna-advisor`
 - `git-clean-merged-branch`
 - `research-repo-technology`
 - `swift-code-review`
@@ -79,11 +78,7 @@ npx skills add coryparrry/codex-skills --global --agent codex --skill git-clean-
 ```
 
 ```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill engineering-advisor
-```
-
-```bash
-npx skills add coryparrry/codex-skills --global --agent codex --skill luna-advisor
+npx skills add coryparrry/codex-skills --global --agent codex --skill codex-routing
 ```
 
 ```bash
@@ -126,12 +121,11 @@ If the marketplace itself does not appear, verify that `.agents/plugins/marketpl
 
 - [Usage Guide](usage.md)
 - [Reference](reference.md)
-- [App Store Readiness Audit](appstore-readiness-audit.md)
-- [Deep Code Review](deep-code-review.md)
-- [Engineering Advisor](engineering-advisor.md)
-- [Luna Advisor](luna-advisor.md)
-- [Git Clean Merged Branch](git-clean-merged-branch.md)
-- [Triage Review Comments](triage-review-comments.md)
-- [Continue Deep Research](continue-deep-research.md)
-- [Repository Technology Research](research-repo-technology.md)
-- [Swift Code Review](swift-code-review.md)
+- [App Store Readiness Audit](app-review/appstore-readiness-audit.md)
+- [Codex Routing](orchestration/codex-routing.md)
+- [Deep Code Review](code-review/deep-code-review.md)
+- [Git Clean Merged Branch](git-workflow/git-clean-merged-branch.md)
+- [Triage Review Comments](code-review/triage-review-comments.md)
+- [Continue Deep Research](research/continue-deep-research.md)
+- [Repository Technology Research](research/research-repo-technology.md)
+- [Swift Code Review](code-review/swift-code-review.md)

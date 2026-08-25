@@ -29,7 +29,7 @@ Research-only runs remain read-only. Supplied material is preserved, current or 
 
 ## Related Docs
 
-- [Usage Guide](usage.md)
-- [Installation](installation.md)
-- [Reference](reference.md)
+- [Usage Guide](../usage.md)
+- [Installation](../installation.md)
+- [Reference](../reference.md)
 - [Repository Technology Research](research-repo-technology.md)

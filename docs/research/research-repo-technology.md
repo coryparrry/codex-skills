@@ -35,7 +35,7 @@ Research-only runs do not edit the repository, install dependencies, update task
 
 ## Related Docs
 
-- [Usage Guide](usage.md)
-- [Installation](installation.md)
-- [Reference](reference.md)
+- [Usage Guide](../usage.md)
+- [Installation](../installation.md)
+- [Reference](../reference.md)
 - [Continue Deep Research](continue-deep-research.md)
