@@ -14,10 +14,9 @@ scripts/
 skills.sh.json
 skills/
   appstore-readiness-audit/
+  codex-routing/
   continue-deep-research/
   deep-code-review/
-  engineering-advisor/
-  luna-advisor/
   git-clean-merged-branch/
   research-repo-technology/
   swift-code-review/
@@ -31,10 +30,9 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | Skill | Purpose | Main files |
 |---|---|---|
 | `appstore-readiness-audit` | Audit an Apple release candidate before App Store upload or submission | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
+| `codex-routing` | Coordinate Sol advice and Luna investigation and implementation | `SKILL.md`, `agents/openai.yaml` |
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `deep-code-review` | Audit a repository snapshot or review affected behavior across a change, with validated defects, blockers, and auditable coverage | `SKILL.md`, `agents/openai.yaml`, `references/` |
-| `engineering-advisor` | Route edits to capability-matched Terra workers while root remains the non-implementing advisor | `SKILL.md`, `agents/openai.yaml` |
-| `luna-advisor` | Route tasks that exceed a clear Luna-only lane through one bounded read-only Sol packet | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
 | `research-repo-technology` | Research which technologies a live repository should adopt, adapt, build, or reject | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `swift-code-review` | Review focused Swift and Apple-platform changes or provide their specialist lane in a deep review | `SKILL.md`, `agents/openai.yaml`, `references/` |
@@ -97,9 +95,8 @@ bash scripts/test_install.sh
 python3 skills/git-clean-merged-branch/tests/test_clean_merged_branch.py
 python3 skills/appstore-readiness-audit/tests/test_check_review_notes.py
 python3 scripts/check_skill_mirror.py appstore-readiness-audit
+python3 scripts/check_skill_mirror.py codex-routing
 python3 scripts/check_skill_mirror.py deep-code-review
-python3 scripts/check_skill_mirror.py engineering-advisor
-python3 scripts/check_skill_mirror.py luna-advisor
 python3 scripts/check_skill_mirror.py git-clean-merged-branch
 python3 scripts/check_skill_mirror.py triage-review-comments
 python3 scripts/check_skill_mirror.py continue-deep-research
@@ -118,12 +115,11 @@ git diff --check
 
 - [Installation](installation.md)
 - [Usage Guide](usage.md)
-- [App Store Readiness Audit](appstore-readiness-audit.md)
-- [Deep Code Review](deep-code-review.md)
-- [Engineering Advisor](engineering-advisor.md)
-- [Luna Advisor](luna-advisor.md)
-- [Git Clean Merged Branch](git-clean-merged-branch.md)
-- [Triage Review Comments](triage-review-comments.md)
-- [Continue Deep Research](continue-deep-research.md)
-- [Repository Technology Research](research-repo-technology.md)
-- [Swift Code Review](swift-code-review.md)
+- [App Store Readiness Audit](app-review/appstore-readiness-audit.md)
+- [Codex Routing](orchestration/codex-routing.md)
+- [Deep Code Review](code-review/deep-code-review.md)
+- [Git Clean Merged Branch](git-workflow/git-clean-merged-branch.md)
+- [Triage Review Comments](code-review/triage-review-comments.md)
+- [Continue Deep Research](research/continue-deep-research.md)
+- [Repository Technology Research](research/research-repo-technology.md)
+- [Swift Code Review](code-review/swift-code-review.md)

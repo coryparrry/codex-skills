@@ -17,6 +17,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from validate_release_contract import (  # noqa: E402
     parse_semver,
     relative_files,
+    skill_document_paths,
     changed_paths,
     shipped_plugin_change,
     validate_skills_sh,
@@ -102,6 +103,33 @@ class ReleaseContractTests(unittest.TestCase):
             (cache / "helper.cpython-312.pyc").write_bytes(b"cache")
 
             self.assertEqual(relative_files(root), {Path("SKILL.md")})
+
+    def test_skill_document_paths_supports_categories_and_finds_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo = Path(temporary_directory)
+            first = repo / "docs/code-review/deep-code-review.md"
+            second = repo / "docs/archive/deep-code-review.md"
+            routing = repo / "docs/orchestration/codex-routing.md"
+            for path in (first, second, routing):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("docs\n", encoding="utf-8")
+
+            paths = skill_document_paths(
+                repo, {"deep-code-review", "codex-routing", "missing-skill"}
+            )
+
+            self.assertEqual(
+                sorted(paths["deep-code-review"]),
+                [
+                    Path("docs/archive/deep-code-review.md"),
+                    Path("docs/code-review/deep-code-review.md"),
+                ],
+            )
+            self.assertEqual(
+                paths["codex-routing"],
+                [Path("docs/orchestration/codex-routing.md")],
+            )
+            self.assertEqual(paths["missing-skill"], [])
 
     def test_plugin_manifest_rejects_stale_or_incomplete_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

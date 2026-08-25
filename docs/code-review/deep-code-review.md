@@ -87,9 +87,9 @@ skills/deep-code-review/
 
 ## Related docs
 
-- [Research foundation](Code%20review%20research/README.md)
-- [Installation](installation.md)
-- [Usage guide](usage.md)
-- [Reference](reference.md)
+- [Research foundation](../Code%20review%20research/README.md)
+- [Installation](../installation.md)
+- [Usage guide](../usage.md)
+- [Reference](../reference.md)
 - [Swift code review](swift-code-review.md)
 - [Triage review comments](triage-review-comments.md)

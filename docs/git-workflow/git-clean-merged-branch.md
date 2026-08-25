@@ -103,7 +103,7 @@ skills/git-clean-merged-branch/
 
 ## Related Docs
 
-- [Installation](installation.md)
-- [Usage Guide](usage.md)
-- [Reference](reference.md)
-- [Triage Review Comments](triage-review-comments.md)
+- [Installation](../installation.md)
+- [Usage Guide](../usage.md)
+- [Reference](../reference.md)
+- [Triage Review Comments](../code-review/triage-review-comments.md)

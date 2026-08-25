@@ -93,7 +93,7 @@ skills/triage-review-comments/
 
 ## Related Docs
 
-- [Installation](installation.md)
-- [Usage Guide](usage.md)
-- [Reference](reference.md)
-- [Git Clean Merged Branch](git-clean-merged-branch.md)
+- [Installation](../installation.md)
+- [Usage Guide](../usage.md)
+- [Reference](../reference.md)
+- [Git Clean Merged Branch](../git-workflow/git-clean-merged-branch.md)

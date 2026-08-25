@@ -1,4 +1,0 @@
-interface:
-  display_name: "Luna Advisor"
-  short_description: "Route risky Luna tasks through one Sol packet"
-  default_prompt: "Use $luna-advisor when Luna should route a materially ambiguous or risky task through one bounded read-only Sol packet before implementing, while keeping clear Luna-only work local."

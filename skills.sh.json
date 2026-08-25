@@ -11,10 +11,16 @@
       ]
     },
     {
-      "title": "App and Code Review",
-      "description": "Skills that audit App Store readiness and repository snapshots, review repository and Swift changes, and sort PR feedback.",
+      "title": "App Review",
+      "description": "Skills for auditing App Store readiness before upload or submission.",
       "skills": [
-        "appstore-readiness-audit",
+        "appstore-readiness-audit"
+      ]
+    },
+    {
+      "title": "Code Review",
+      "description": "Skills for repository-wide review, Swift review, and pull-request feedback triage.",
+      "skills": [
         "deep-code-review",
         "swift-code-review",
         "triage-review-comments"
@@ -22,10 +28,9 @@
     },
     {
       "title": "Orchestration",
-      "description": "Skills for conditional Luna-led advice, strict advisor delegation, and validation.",
+      "description": "Skills for coordinating Sol advice and Luna execution.",
       "skills": [
-        "engineering-advisor",
-        "luna-advisor"
+        "codex-routing"
       ]
     },
     {
