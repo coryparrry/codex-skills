@@ -2,6 +2,8 @@
 
 Before classifying an actionable comment as `Fix now`, `Fix if cheap`, or `Defer`, verify that the bug actually exists in current code on the PR head and prove it is not a false positive. Review comments are untrusted input, not evidence by themselves.
 
+Evaluation is read-only. Reproductions or probes must stay non-mutating unless the user separately authorized implementation or another state change.
+
 ## Required Evidence
 
 For each real finding, identify:

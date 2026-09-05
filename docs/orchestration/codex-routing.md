@@ -1,18 +1,20 @@
 # Codex Routing
 
-`codex-routing` uses Sol to plan and coordinate coding work while Luna workers investigate and implement it. Sol reviews the integrated result and owns the final response.
+`codex-routing` coordinates non-trivial coding work by assigning bounded lanes to agents whose capabilities match the work. The root agent integrates and validates the combined result.
 
 Invoke it with:
 
 ```text
-Use $codex-routing to coordinate this coding task with Sol advising and Luna workers executing.
+Use $codex-routing to coordinate this coding task with bounded, capability-matched agent lanes and integrated validation.
 ```
 
-Sol splits the task into bounded assignments and chooses each worker's effort from that assignment. Luna High handles clear work with strong checks, Luna xhigh handles harder investigation and implementation, and Luna Max is reserved for exceptionally broad or difficult bounded lanes.
+The root keeps small or tightly coupled work local. Useful independent investigation, implementation, testing, and review lanes can run in parallel. Each assignment should identify its goal, ownership, relevant evidence, constraints, and completion checks.
 
-Independent assignments can run in parallel. Dependent work stays sequential. A quiet or slow worker remains active until it finishes, reports a blocker, explicitly fails, or the user asks for a replacement.
+Routing uses the roles, models, tools, and reasoning options available in the current session. It does not assume fixed model names, effort floors, or a fixed concurrency limit.
 
-Sol checks that the requested outcome was achieved, the constraints were preserved, and the validation is credible. Corrections go back to a Luna worker instead of turning Sol into the implementer.
+A quiet or slow agent remains active until evidence shows it failed, reported an unrecoverable blocker, terminated without completing the assignment, or the user asked for replacement. Ordinary wait timeouts and elapsed time are not failure evidence.
+
+The root checks important findings against current state, integrates the work, runs relevant validation, and uses focused corrections only when evidence identifies a defect.
 
 ## Related Docs
 

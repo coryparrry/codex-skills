@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge)
 [![skills.sh](https://skills.sh/b/coryparrry/codex-skills)](https://skills.sh/coryparrry/codex-skills)
 
-> Eight Codex skills for research, App Store readiness, Sol and Luna task routing, repository and Swift review, PR feedback triage, and safe branch cleanup.
+> Eight Codex skills for research, App Store readiness, capability-based task routing, repository and Swift review, PR feedback triage, and safe branch cleanup.
 
 Each skill solves one repeated workflow problem. Its `SKILL.md` contains the main instructions.
 
@@ -56,7 +56,7 @@ Replace the skill slug in the command.
 | Research | Continue an existing research packet. | [`continue-deep-research`](docs/research/continue-deep-research.md) | Checks the existing evidence, resolves contradictions, and reports the verified delta. |
 | Research | Assess technology options for a live repository. | [`research-repo-technology`](docs/research/research-repo-technology.md) | Uses repository evidence and primary sources to recommend whether to adopt, adapt, build, or reject an option. |
 | App Review | Audit an app before App Store submission. | [`appstore-readiness-audit`](docs/app-review/appstore-readiness-audit.md) | Reconciles the release candidate, Apple policy, runtime evidence, privacy, metadata, and reviewer access without changing the app. |
-| Orchestration | Coordinate Sol advice and Luna execution. | [`codex-routing`](docs/orchestration/codex-routing.md) | Splits coding work into bounded Luna assignments while Sol plans, coordinates, and reviews. |
+| Orchestration | Coordinate independent coding work. | [`codex-routing`](docs/orchestration/codex-routing.md) | Uses available agents for bounded independent work while the coordinator integrates and verifies results. |
 | Code Review | Audit a repository or review a change across it. | [`deep-code-review`](docs/code-review/deep-code-review.md) | Traces production flows, shared contracts, affected behavior, and explicit coverage gaps before reporting validated findings. |
 | Code Review | Review Swift and Apple-platform changes. | [`swift-code-review`](docs/code-review/swift-code-review.md) | Looks for reachable ownership, isolation, identity, lifetime, representation, and side-effect problems. |
 | Code Review | Triage pull-request feedback. | [`triage-review-comments`](docs/code-review/triage-review-comments.md) | Separates current, actionable findings from stale, duplicate, or unsupported comments. |

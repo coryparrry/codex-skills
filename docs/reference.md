@@ -30,7 +30,7 @@ The source skill folders under `skills/` must match their copies under `plugins/
 | Skill | Purpose | Main files |
 |---|---|---|
 | `appstore-readiness-audit` | Audit an Apple release candidate before App Store upload or submission | `SKILL.md`, `agents/openai.yaml`, `references/`, `scripts/`, `tests/` |
-| `codex-routing` | Coordinate Sol advice and Luna investigation and implementation | `SKILL.md`, `agents/openai.yaml` |
+| `codex-routing` | Coordinate bounded work across available agents | `SKILL.md`, `agents/openai.yaml` |
 | `continue-deep-research` | Continue an existing evidence base and report only the verified research delta | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `deep-code-review` | Audit a repository snapshot or review affected behavior across a change, with validated defects, blockers, and auditable coverage | `SKILL.md`, `agents/openai.yaml`, `references/` |
 | `git-clean-merged-branch` | Clean up one merged local Git branch safely | `SKILL.md`, `agents/openai.yaml`, `scripts/`, `tests/` |
@@ -67,7 +67,8 @@ Agent Plugins v1 clients discover immediate skill directories from `plugins/code
 | Option | Meaning |
 |---|---|
 | `--force-delete-unmerged` | Use `git branch -D` after safe deletion fails |
-| `--keep-remote` | Preserve the old remote branch |
+| `--keep-remote` | Preserve the old remote branch (default) |
+| `--delete-remote` | Delete the old remote branch only after verifying its fetched tip |
 | `-h`, `--help` | Print script usage |
 
 The script refuses to run outside a Git repository, without an `origin` remote, from detached `HEAD`, or with a dirty worktree.

@@ -28,7 +28,7 @@
     },
     {
       "title": "Orchestration",
-      "description": "Skills for coordinating Sol advice and Luna execution.",
+      "description": "Skills for coordinating independent work across available agents.",
       "skills": [
         "codex-routing"
       ]

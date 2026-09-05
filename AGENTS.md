@@ -12,18 +12,18 @@ When adding, renaming, or removing a shipped skill, update the README in the sam
 
 Use the `$humanizer:humanizer` skill only for README files and repository instruction documents such as `AGENTS.md`. Never use it for skill writing, including `SKILL.md`, skill references, prompts, or skill metadata. Keep frontmatter, code blocks, commands, data, and link targets unchanged unless the task requires a functional change.
 
-## Marketplace Installation Workflow
+## Marketplace Release and Installation Workflow
 
-Treat the Git-backed marketplace on GitHub `main` as the only durable installed source for these skills. During development, a skill may be installed from the local checkout only for bounded testing. After validation, remove that local installation, publish the completed change to `main`, repoint or refresh the marketplace against `main`, and verify the enabled plugin resolves from the Git-backed marketplace cache. Do not leave a standalone local skill, a local-path marketplace registration, or a marketplace pinned to a feature branch after testing is complete.
+Treat the Git-backed marketplace on GitHub `main` as the only durable installed source for these skills. During development, a skill may be installed from the local checkout only for bounded testing. A skill edit does not itself authorise merging, releasing, or replacing the user's installed plugin. Apply the publication and installation steps below only when the user's authorisation includes those actions.
 
-For every shipped plugin update, complete this release sequence:
+For an authorised shipped plugin release, complete this sequence:
 
 1. Update the canonical skill under `skills/` and its copy under `plugins/codex-skills/skills/`. Keep the two copies byte-identical.
 2. Update `plugins/codex-skills/plugin.json` and `plugins/codex-skills/.codex-plugin/plugin.json` in the same change. Keep their versions equal. Increment the version for every change to shipped skills, plugin metadata, or plugin assets because Codex uses that SemVer value as the installed-cache key. Use a minor version for a new capability and a patch version for a compatible fix or metadata refresh. Keep portable metadata within the closed Agent Plugins v1 schema. Update Codex descriptions, prompts, capabilities, and asset paths when the shipped surface changes, and verify every referenced file exists.
 3. Keep `.agents/plugins/marketplace.json` valid and ensure the `codex-skills` entry retains `source.path: "./plugins/codex-skills"`, `policy.installation: "AVAILABLE"`, `policy.authentication: "ON_INSTALL"`, and a category. Do not put the release version in the marketplace entry; both plugin manifests carry the matching release version.
 4. Validate the source and mirrored skills, run `python3 scripts/check_skill_mirror.py <skill>`, validate the Codex plugin with the system `plugin-creator` validator, run the release-contract validator against the pinned Agent Plugins v1 schema, build a clean portable package with `scripts/build_agent_plugin.py`, validate every portable skill with `skills-ref`, parse both plugin manifests, `marketplace.json`, and `skills.sh.json` with `python3 -m json.tool`, run `bash scripts/test_install.sh`, and run `git diff --check`.
-5. Commit and push the complete update, merge it to GitHub `main`, and verify the marketplace checkout revision equals `origin/main` before installing. Never release from an unmerged feature branch.
-6. For a registered Git marketplace, run `codex plugin marketplace upgrade codex-skills`, then remove and reinstall `codex-skills@codex-skills` so the new version creates a fresh cache directory. If the marketplace is not registered, add `https://github.com/coryparrry/codex-skills.git` without a feature-branch `--ref`, then install the plugin.
+5. Commit and push the complete update through the authorised delivery workflow. Merge it to GitHub `main` only when authorised. Never release from an unmerged feature branch; after merge, verify the marketplace checkout revision equals `origin/main` before installing.
+6. When installation is authorised, run `codex plugin marketplace upgrade codex-skills`, then remove and reinstall `codex-skills@codex-skills` so the new version creates a fresh cache directory. If the marketplace is not registered, add `https://github.com/coryparrry/codex-skills.git` without a feature-branch `--ref`, then install the plugin.
 7. Verify `codex plugin list --marketplace codex-skills --available --json` reports the expected version, enabled state, and Git marketplace source. Confirm the installed manifest matches the Git-backed `main` snapshot, the previous version cache is absent, and no standalone copy exists under `${CODEX_HOME:-$HOME/.codex}/skills/`.
 8. Start a new Codex task after installation so it loads the refreshed plugin catalog and skills. Remove any local testing installation when validation is complete.
 
@@ -31,7 +31,7 @@ For every shipped plugin update, complete this release sequence:
 
 Treat `skills.sh` as a separate GitHub-backed distribution surface from the Codex plugin marketplace. There is no `skills publish` command and `plugin.json` SemVer does not version skills.sh packages. The public `skills/` directories on GitHub `main` are the published source; skills.sh discovers them through the `skills` CLI and adds repositories to its directory automatically from install telemetry.
 
-For every skills.sh release:
+For an authorised skills.sh release:
 
 1. Keep each public skill under `skills/<skill-name>/SKILL.md` with valid YAML frontmatter whose `name` matches the directory. Do not publish experimental or internal skills through the public `skills/` tree.
 2. Add every new or renamed public skill to the appropriate grouping in `skills.sh.json`, remove stale names, and keep group labels and descriptions aligned with the current bundle. `skills.sh.json` controls repository-page grouping; it does not replace skill discovery from `SKILL.md`.

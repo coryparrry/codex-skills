@@ -18,7 +18,7 @@ class CleanMergedBranchTests(unittest.TestCase):
             capture_output=True,
         )
 
-    def test_verifies_squash_merge_by_diff_when_default_branch_advanced(self):
+    def test_default_preserves_remote_after_verified_squash_merge(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             origin = root / "origin.git"
@@ -77,10 +77,11 @@ class CleanMergedBranchTests(unittest.TestCase):
 
             self.assertIn("diff matches merged PR #1", result.stdout)
             self.assertIn("Deletion used verified merge diff equality.", result.stdout)
+            self.assertIn("Preserved old remote branch: origin/feature", result.stdout)
             self.assertNotIn("feature", self.run_git("branch", "--list", cwd=work).stdout)
-            self.assertEqual("", self.run_git("ls-remote", "--heads", "origin", "feature", cwd=work).stdout)
+            self.assertNotEqual("", self.run_git("ls-remote", "--heads", "origin", "feature", cwd=work).stdout)
 
-    def test_verifies_rebase_merge_range_for_multi_commit_pr(self):
+    def test_explicit_delete_remote_removes_verified_rebase_merge(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             origin = root / "origin.git"
@@ -134,7 +135,7 @@ class CleanMergedBranchTests(unittest.TestCase):
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
             result = subprocess.run(
-                ["bash", str(SCRIPT)],
+                ["bash", str(SCRIPT), "--delete-remote"],
                 cwd=work,
                 env=env,
                 check=True,
@@ -145,6 +146,7 @@ class CleanMergedBranchTests(unittest.TestCase):
             self.assertIn("Verified rebase-merged branch", result.stdout)
             self.assertIn("diff matches merged PR #2", result.stdout)
             self.assertIn("Deletion used verified merge diff equality.", result.stdout)
+            self.assertIn("Deleted old remote branch: origin/feature", result.stdout)
             self.assertNotIn("feature", self.run_git("branch", "--list", cwd=work).stdout)
             self.assertEqual("", self.run_git("ls-remote", "--heads", "origin", "feature", cwd=work).stdout)
 
@@ -204,7 +206,7 @@ class CleanMergedBranchTests(unittest.TestCase):
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
             result = subprocess.run(
-                ["bash", str(SCRIPT), "--force-delete-unmerged"],
+                ["bash", str(SCRIPT), "--force-delete-unmerged", "--delete-remote"],
                 cwd=work,
                 env=env,
                 check=True,
@@ -247,7 +249,7 @@ class CleanMergedBranchTests(unittest.TestCase):
             self.run_git("push", "-u", "origin", "feature", cwd=work)
 
             result = subprocess.run(
-                ["bash", str(SCRIPT), "--force-delete-unmerged"],
+                ["bash", str(SCRIPT), "--force-delete-unmerged", "--delete-remote"],
                 cwd=work,
                 check=True,
                 text=True,

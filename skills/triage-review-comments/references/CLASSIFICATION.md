@@ -2,6 +2,8 @@
 
 Use exactly one bucket per unique root cause.
 
+Buckets are recommendations in a read-only triage. They do not authorize implementation, thread mutation, or follow-up creation.
+
 ## Fix Now
 
 Use `Fix now` when the finding is verified true, reachable in current code, proven not to be a false positive, and meaningful enough to block merge.

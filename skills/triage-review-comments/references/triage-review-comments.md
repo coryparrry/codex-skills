@@ -6,6 +6,8 @@ This reference holds the fuller workflow for the `triage-review-comments` skill.
 
 Use it to separate real review blockers from bot noise. Every review comment should be treated as a hypothesis that must be checked against the code.
 
+Triage is read-only by default. Only implement fixes, reply to or resolve threads, or create follow-up records when the user explicitly requests that action. Once a class of action is authorized, complete it without asking again for each item.
+
 ## Workflow
 
 1. Load the current PR review context first.
@@ -16,8 +18,8 @@ Use it to separate real review blockers from bot noise. Every review comment sho
    - review submissions that contain standalone findings
 3. Ignore formatting-only summaries, walkthrough notes, automation banners, and status boilerplate unless they contain actionable findings.
 4. Deduplicate by underlying issue.
-5. Resolve fixed inline review threads when the current code clearly addresses them and GitHub tooling is available.
-6. Track deferred items in Linear when the project is clear.
+5. Identify fixed inline review threads that could be resolved; mutate GitHub only when resolution or an encompassing fix workflow was explicitly requested.
+6. Recommend deferred tracking; create records only when the user asked to create or track them.
 7. Evaluate each comment on reachability, impact, evidence, urgency, and prevention.
 8. Classify each actionable comment into exactly one bucket:
    - `Fix now`
@@ -35,7 +37,7 @@ Use it to separate real review blockers from bot noise. Every review comment sho
 
 ## Thread resolution
 
-Resolve an inline review thread when all of these are true:
+When thread resolution is authorized, resolve an inline review thread only when all of these are true:
 
 - the thread is still open
 - the underlying concern is addressed by the current code
@@ -47,9 +49,9 @@ Do not resolve general PR conversation comments because GitHub does not treat th
 
 ## Linear follow-up
 
-For every item classified as `Defer`, decide whether it should become a Linear issue.
+For every item classified as `Defer`, decide whether it should become a Linear issue. In read-only mode, report that recommendation without creating it.
 
-Create or update a Linear issue when:
+When follow-up creation is authorized, create or update a Linear issue only when:
 
 - the deferred item is a real engineering concern
 - it is likely to matter after merge
@@ -74,7 +76,9 @@ The response should include:
 - inventory counts
 - each bucket with short reasons
 - review fix briefs for every `Fix now` item
-- resolved review threads
-- threads that should resolve but were not resolved remotely
+- threads that are already resolved or recommended for resolution
+- execution and refetch evidence only when thread mutation was authorized
 - prevention tests or checks
 - a short summary with next steps
+
+Do not include mutation claims in a read-only report.

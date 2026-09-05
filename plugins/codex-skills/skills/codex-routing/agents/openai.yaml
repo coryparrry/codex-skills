@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Routing"
-  short_description: "Coordinate Sol advice and Luna execution"
-  default_prompt: "Use $codex-routing to coordinate this coding task with Sol advising and Luna workers executing."
+  short_description: "Route coding lanes by agent capability"
+  default_prompt: "Use $codex-routing to coordinate this coding task with bounded, capability-matched agent lanes and integrated validation."

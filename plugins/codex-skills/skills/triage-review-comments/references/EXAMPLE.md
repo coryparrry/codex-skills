@@ -60,3 +60,5 @@ then access is denied
 ```
 
 Also add the positive case for a user with `project:read` so the fix does not break legitimate access.
+
+For a read-only triage request, stop after reporting this classification and fix brief. Implement the patch only when the user explicitly asks for fixes.

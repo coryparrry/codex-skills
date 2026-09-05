@@ -1,56 +1,46 @@
 ---
 name: codex-routing
-description: Use Sol as the advisor and coordinator for coding work, delegating investigation and implementation to Luna subagents.
+description: Coordinate independent coding work across available agents when delegation improves delivery.
 ---
 
-# Codex routing
+# Codex Routing
 
-Sol thinks and coordinates. Luna executes. Sol reviews.
+The root agent owns the task. It decides the approach, delegates useful independent work, integrates the results, validates the combined outcome, and produces the final response.
 
-Sol should understand the request, decide the approach, split the work into sensible pieces, delegate those pieces to Luna subagents, review their results, coordinate corrections, and produce the final answer.
+Keep small or tightly coupled tasks local. Delegate when separate investigation, implementation, testing, or review lanes can make useful progress independently.
 
-Sol should continuously coordinate the task, creating new Luna workers as new independent work becomes available. It should avoid taking over implementation work that can be delegated.
+## Route By Capability
 
-## Delegation and parallelism
+Choose each agent for the bounded assignment it will perform. Match the lane to available capabilities such as:
 
-Use **Luna High** for clear, straightforward, strongly verifiable work.
+- fast codebase exploration and call-path discovery
+- implementation in an owned file or module scope
+- platform or domain expertise
+- security, correctness, maintainability, or acceptance review
+- runtime, UI, or integration validation
 
-Use **Luna xhigh** for harder work that needs more investigation or reasoning, and as the default when the appropriate effort is uncertain.
+Use role-specific agents when their contract matches the work. Otherwise use a general worker with the model and reasoning effort appropriate to that lane's ambiguity, risk, and breadth. Do not route by a fixed model identity, minimum effort, or task-wide default when the available agents or assignment needs differ.
 
-Use **Luna Max** only for exceptionally difficult, broad, or exhaustive bounded work. Expect Max workers to take longer.
+Choose from the capabilities available in the current session. Do not assume a particular model, role, or concurrency limit exists.
 
-Choose effort from each worker's bounded assignment, not from the size or difficulty of the overall task. A large multi-stage plan does not make every lane a Luna Max lane. Split broad work into useful assignments first, then use the lowest effort that is appropriate for each assignment.
+## Delegate Bounded Lanes
 
-When a task has multiple meaningful independent pieces, fan the work out across several Luna workers. Parallelize independent investigation and execution; keep only genuinely dependent work sequential.
+Give each agent a concrete goal, owned files or responsibility, relevant code and evidence anchors, constraints, and observable completion checks. Tell code-writing workers that other agents may be editing the repository and that they must preserve unrelated changes.
 
-Look for natural workstreams such as separate code areas, implementation components, tests, regression checks, reviews, or unfamiliar dependencies.
+Launch ready, non-overlapping lanes in parallel. Keep dependent work sequential, and avoid duplicate investigation unless an independent opinion is the point of the assignment.
 
-Prefer a fresh worker for a distinct responsibility. Do not keep sending unrelated new work to the same worker merely because it already exists.
+The root may continue useful local work while agents run. It should not redo a delegated lane before collecting its result.
 
-Use available subagent capacity when it is useful. Do not force a small task into multiple workers when delegation would add no value.
+## Wait From Evidence
 
-## Waiting for workers
+Wait for an agent to finish or report that it needs attention. A wait timeout, elapsed time, silence, or the absence of a patch does not by itself show that the agent has failed or stalled.
 
-Once a worker is running, wait for it to finish or report that it needs attention. Use long wait intervals appropriate to Luna, especially Luna Max, and continue waiting after ordinary wait timeouts.
+Interrupt, replace, or duplicate a lane only when there is concrete evidence: explicit failure, an unrecoverable blocker, termination without completing the assignment, incompatible scope, or user direction. Handle actionable questions or blockers, then continue the original lane when possible.
 
-Elapsed time, silence, or the absence of a patch is not evidence that a worker has stalled. Do not interrupt, replace, or duplicate a running lane for those reasons.
+## Integrate And Review
 
-If a worker needs attention, handle or surface that need and then continue waiting. Replace a worker only when it explicitly fails, reports an unrecoverable blocker, terminates without completing the assignment, or the user directs a replacement. While waiting, Sol may coordinate other independent work, but it must preserve the original lane and eventually collect its result.
+Treat agent output as input to the root's judgment. Check important findings against the current workspace or external state, resolve overlapping edits, run relevant validation, and confirm that the requested outcome and constraints are satisfied.
 
-## Assignments
+Use one focused correction when evidence identifies a defect. Re-review corrected work when the change is material or the prior concern needs fresh proof; do not create review loops without new evidence.
 
-Give each worker a clear, bounded goal and enough context to complete it successfully, including relevant files or components, important constraints, useful implementation context, and how to validate the result.
-
-Let the worker reason about implementation details unless it must follow a specific design decision.
-
-## Review
-
-Sol reviews worker output before considering the task complete. Check that the requested outcome was achieved, important constraints were respected, validation is credible, and no obvious regressions were introduced.
-
-If work is wrong or incomplete, send a focused correction to a Luna worker. Sol remains the coordinator instead of taking over the implementation.
-
-## Principle
-
-Use Sol for judgement, decomposition, coordination, and review.
-
-Use Luna for execution.
+Report delegated results and material blockers when they help the user assess completion. Do not add a model census or coordination log unless the user asks for one.

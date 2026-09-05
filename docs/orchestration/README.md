@@ -1,3 +1,3 @@
 # Orchestration
 
-- [`codex-routing`](codex-routing.md) uses Sol for planning, coordination, and review while Luna workers investigate and implement.
+- [`codex-routing`](codex-routing.md) coordinates bounded work across available agents when delegation improves delivery.

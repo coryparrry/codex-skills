@@ -9,7 +9,7 @@ This guide explains when and how to invoke the skills in this repository.
 | Audit an Apple app before upload or submission to App Store Connect | `appstore-readiness-audit` |
 | Continue prior ChatGPT Deep Research or another existing research packet with live repository context | `continue-deep-research` |
 | Decide which technologies a live repository should adopt, adapt, build, or reject | `research-repo-technology` |
-| Coordinate coding work with Sol advising and Luna workers executing | `codex-routing` |
+| Coordinate independent coding work across available agents | `codex-routing` |
 | Audit a repository snapshot or review a pull request, branch, commit, diff, or working tree across repository boundaries | `deep-code-review` as the umbrella review |
 | Review focused Swift or Apple-platform changes, or provide the specialist lane for a deep review | `swift-code-review` |
 | Clean up one merged local Git branch | `git-clean-merged-branch` |
@@ -29,17 +29,17 @@ The skill refreshes current Apple sources, identifies the exact source and artif
 
 The audit is read-only. Missing runtime or App Store Connect evidence remains `NOT_TESTED` or `UNKNOWN` and can hold the verdict. A successful build or archive does not become a submission-ready result by itself.
 
-## Coordinate Sol and Luna
+## Coordinate coding work
 
-Use `codex-routing` when Sol should plan and coordinate coding work while Luna workers investigate and implement it:
+Use `codex-routing` when independent investigation, implementation, or review lanes can improve delivery:
 
 ```text
-Use $codex-routing to coordinate this coding task with Sol advising and Luna workers executing.
+Use $codex-routing to coordinate this coding task across available agents.
 ```
 
-Sol splits the task into bounded assignments, chooses a Luna effort level for each lane, and reviews the integrated result. Independent work can run in parallel. Luna High handles clear work with strong checks, Luna xhigh handles harder work, and Luna Max is reserved for exceptionally difficult bounded assignments.
+The coordinator gives each lane a bounded assignment and chooses an available model and effort for its uncertainty and validation needs. Small, tightly coupled work stays local. The coordinator integrates results and verifies the requested outcome.
 
-The router keeps slow workers alive through ordinary wait timeouts. Sol sends focused corrections back to Luna and remains responsible for coordination, acceptance, and the final response.
+Ordinary wait timeouts do not establish failure. Use reported progress and blockers to decide the next step, preserve ownership, and collect the results of delegated work.
 
 ## Continue Existing Deep Research
 
@@ -103,7 +103,7 @@ Ask Codex:
 Use $git-clean-merged-branch to clean up this merged local branch.
 ```
 
-The skill checks that the worktree is clean, fetches remote state, resolves and updates the default branch, and safely deletes the starting branch. It stops instead of stashing, resetting, or discarding local work.
+The skill checks that the worktree is clean, fetches remote state, resolves and updates the default branch, and safely deletes the starting branch. It stops instead of stashing, resetting, or discarding local work. Remote branches are preserved by default; use `--delete-remote` only when their deletion is explicitly requested.
 
 For a confirmed squash or rebase merge that Git does not recognize:
 

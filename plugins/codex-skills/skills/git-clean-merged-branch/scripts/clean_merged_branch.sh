@@ -3,7 +3,7 @@ set -euo pipefail
 
 force_delete_unmerged=false
 verify_squash_merge=true
-delete_remote=true
+delete_remote=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -21,7 +21,7 @@ for arg in "$@"; do
       ;;
     -h|--help)
       cat <<'USAGE'
-Usage: clean_merged_branch.sh [--force-delete-unmerged] [--no-verify-squash-merge] [--keep-remote]
+Usage: clean_merged_branch.sh [--force-delete-unmerged] [--no-verify-squash-merge] [--delete-remote|--keep-remote]
 
 Safely switch a Git repo back to its default branch, pull latest changes,
 and delete the branch that was active when the script started.
@@ -34,8 +34,9 @@ Use --force-delete-unmerged only when the user has clearly said the branch has
 already been merged or is no longer needed, even if squash-merge verification is
 unavailable.
 
-By default, the old origin branch is deleted after local cleanup succeeds. Use
---keep-remote only when the remote branch should remain.
+By default, the old origin branch is preserved. Use --delete-remote only when
+remote deletion was explicitly requested. --keep-remote is accepted for
+compatibility and makes the default behavior explicit.
 USAGE
       exit 0
       ;;
@@ -160,6 +161,11 @@ start_oid="$(git rev-parse "$start_branch")"
 
 start_upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
 
+remote_branch="$start_branch"
+if [[ "$start_upstream" == origin/* ]]; then
+  remote_branch="${start_upstream#origin/}"
+fi
+
 if ! git remote get-url origin >/dev/null 2>&1; then
   echo "Stopped: this repo has no 'origin' remote." >&2
   exit 1
@@ -212,11 +218,6 @@ fi
 
 deleted_remote=false
 if [[ "$delete_remote" == true && "$start_branch" != "$default_branch" ]]; then
-  remote_branch="$start_branch"
-  if [[ "$start_upstream" == origin/* ]]; then
-    remote_branch="${start_upstream#origin/}"
-  fi
-
   if git show-ref --verify --quiet "refs/remotes/origin/$remote_branch"; then
     remote_ref="refs/remotes/origin/$remote_branch"
     remote_tip="$(git rev-parse "$remote_ref")"
@@ -260,6 +261,12 @@ if [[ "$delete_remote" == true ]]; then
     echo "Deleted old remote branch: origin/$remote_branch"
   else
     echo "Old remote branch was not deleted."
+  fi
+elif [[ "$start_branch" != "$default_branch" ]]; then
+  if git show-ref --verify --quiet "refs/remotes/origin/$remote_branch"; then
+    echo "Preserved old remote branch: origin/$remote_branch"
+  else
+    echo "Old remote branch was already absent: origin/$remote_branch"
   fi
 fi
 echo

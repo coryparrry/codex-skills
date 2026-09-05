@@ -27,7 +27,7 @@ Treat those as shorthand for: fetch GitHub, update the default branch, and remov
 - Prefer safe branch deletion with `git branch -d`.
 - If safe deletion fails because GitHub used squash or rebase merge, verify the merged GitHub PR and compare the branch diff against the merged PR diff before deleting the local branch with `git branch -D`.
 - Use forced branch deletion without merge verification only when the user has clearly said the branch is merged or no longer needed, and after the repo is clean and the default branch is updated.
-- Delete the old remote branch only after verifying the fetched remote tip is safe; use `--keep-remote` when the user explicitly asks to preserve it.
+- Preserve the old remote branch by default. Delete it only when the user explicitly asks, and only after verifying the fetched remote tip is safe.
 - Never run `git reset --hard`, `git clean`, or other broad destructive cleanup for this workflow.
 
 ## Recommended Workflow
@@ -41,9 +41,8 @@ Treat those as shorthand for: fetch GitHub, update the default branch, and remov
 7. Pull the default branch with fast-forward-only.
 8. If the starting branch was not the default branch, delete the local starting branch.
 9. If normal deletion fails, let the script verify a merged GitHub PR and exact diff equality before using `git branch -D`.
-10. Delete the old remote branch after local cleanup succeeds and the fetched remote tip is verified safe.
+10. Preserve the old remote branch unless the user explicitly requested remote deletion. For an authorized deletion, verify the fetched remote tip before deleting it.
 11. Show the final `git status --short --branch`.
-12. Update relevant documents as when this prompt is sent, it means the end of a phase/slice.
 
 ## Script
 
@@ -63,10 +62,16 @@ bash /path/to/skill/scripts/clean_merged_branch.sh --force-delete-unmerged
 
 The script now verifies squash-merged branches by default before force-deleting locally. Use `--force-delete-unmerged` only when GitHub verification is unavailable or insufficient and the user has clearly accepted local branch deletion.
 
-The script deletes the old remote branch by default after local cleanup succeeds. To preserve the old remote branch, run:
+The script preserves the old remote branch by default. `--keep-remote` remains available as an explicit compatibility flag:
 
 ```bash
 bash /path/to/skill/scripts/clean_merged_branch.sh --keep-remote
+```
+
+Delete the old remote branch only when the user explicitly requests it:
+
+```bash
+bash /path/to/skill/scripts/clean_merged_branch.sh --delete-remote
 ```
 
 Do not use `--force-delete-unmerged` when the user only asks for a status check or is unsure whether the branch was merged.
@@ -79,6 +84,6 @@ Tell the user:
 - which default branch was updated
 - whether the old local branch was deleted
 - whether deletion used merge diff verification
-- whether the old remote branch was deleted
+- whether the old remote branch was preserved, absent, or explicitly deleted
 - whether the final repo state is clean
 - any action still needed if cleanup stopped

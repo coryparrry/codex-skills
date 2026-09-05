@@ -2,6 +2,8 @@
 
 Use this reference for GitHub review-thread handling, Linear follow-up tracking, and Binder deferred-bug checklist updates.
 
+These are mutation patterns, not part of default triage. Use them only when the user explicitly authorized the relevant reply, resolution, or follow-up creation. An encompassing request to fix review comments authorizes the normal reply-and-resolve closeout for the threads fixed by that work. Do not request approval again for each authorized item.
+
 ## GitHub Inventory
 
 Prefer structured GitHub connector tools when available. CLI fallback patterns:
@@ -24,7 +26,7 @@ If counts come from truncated shell output, browser snippets, or one source only
 
 ## Resolving Review Threads
 
-Resolve an inline review thread only when:
+When resolution is authorized, resolve an inline review thread only when:
 - the thread is still open
 - current code addresses the underlying concern
 - the fix is visible in current PR state, not merely planned
@@ -59,7 +61,7 @@ Never count a thread as resolved unless it was already resolved before the run o
 
 ## Linear Follow-ups
 
-For non-Binder work, create or link a Linear issue for `Defer` items only when:
+When follow-up creation is authorized, create or link a Linear issue for non-Binder `Defer` items only when:
 - the item is a real engineering concern
 - it is likely to matter after merge
 - it is not already tracked
@@ -80,7 +82,7 @@ Issue body should include:
 
 ## Binder Deferred Bugs
 
-When the user gives the go-ahead after triaging Binder review comments, record real `Defer` items in the Binder repo at:
+When the user authorizes Binder follow-up tracking, record real `Defer` items in the Binder repo at:
 
 ```text
 docs/Deferred bugs.md
